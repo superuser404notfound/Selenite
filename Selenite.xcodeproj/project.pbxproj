@@ -8,14 +8,21 @@
 
 /* Begin PBXBuildFile section */
 		1EF96EFD252F0C8C6146CD9D /* SeleniteApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C17D93938F3EF35FC7048224 /* SeleniteApp.swift */; };
+		2D58FEC6AFD4831CD4B29071 /* MoonlightCore in Frameworks */ = {isa = PBXBuildFile; productRef = 9FE785F1EF1DE3002B7959FE /* MoonlightCore */; };
+		5BA01B8EF7A4CAF6F4FBC7AA /* StreamStageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43E33BDCDC3E51312A200C0C /* StreamStageView.swift */; };
+		69D9F74651CAD2AE7B5C3B0D /* HarnessView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 832F66ED4CF85C1E82200D8D /* HarnessView.swift */; };
+		B157748FACCC00CDBDF74094 /* HarnessModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC9C68881F381608C565060B /* HarnessModel.swift */; };
 		ED786636E3672852C14D4D5B /* HostKit in Frameworks */ = {isa = PBXBuildFile; productRef = CCD3F26D86A723963A2FB2BA /* HostKit */; };
 		F8AAB1581DDCDBB00D69C04C /* StreamKit in Frameworks */ = {isa = PBXBuildFile; productRef = 7469462ED7EB913A8C1A7626 /* StreamKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		152E3C6DC9B0F1A43ECDF02F /* Selenite-tvOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "Selenite-tvOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		43E33BDCDC3E51312A200C0C /* StreamStageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamStageView.swift; sourceTree = "<group>"; };
+		832F66ED4CF85C1E82200D8D /* HarnessView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessView.swift; sourceTree = "<group>"; };
 		B2E3997C9A5DCCC491590535 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		C17D93938F3EF35FC7048224 /* SeleniteApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeleniteApp.swift; sourceTree = "<group>"; };
+		CC9C68881F381608C565060B /* HarnessModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessModel.swift; sourceTree = "<group>"; };
 		E06B05EB5A9C79E42910DCC6 /* SeleniteKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = SeleniteKit; path = SeleniteKit; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
@@ -26,6 +33,7 @@
 			files = (
 				ED786636E3672852C14D4D5B /* HostKit in Frameworks */,
 				F8AAB1581DDCDBB00D69C04C /* StreamKit in Frameworks */,
+				2D58FEC6AFD4831CD4B29071 /* MoonlightCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -37,6 +45,7 @@
 			children = (
 				B2E3997C9A5DCCC491590535 /* Info.plist */,
 				C17D93938F3EF35FC7048224 /* SeleniteApp.swift */,
+				E1B829D8A889B2F55084D718 /* Harness */,
 			);
 			path = Selenite;
 			sourceTree = "<group>";
@@ -56,6 +65,16 @@
 				1DA298D2FD882246155E50AD /* Selenite */,
 				49964AC1B413FFD8049417B9 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		E1B829D8A889B2F55084D718 /* Harness */ = {
+			isa = PBXGroup;
+			children = (
+				CC9C68881F381608C565060B /* HarnessModel.swift */,
+				832F66ED4CF85C1E82200D8D /* HarnessView.swift */,
+				43E33BDCDC3E51312A200C0C /* StreamStageView.swift */,
+			);
+			path = Harness;
 			sourceTree = "<group>";
 		};
 		E342AB1525D5C123A61187A4 /* Packages */ = {
@@ -84,6 +103,7 @@
 			packageProductDependencies = (
 				CCD3F26D86A723963A2FB2BA /* HostKit */,
 				7469462ED7EB913A8C1A7626 /* StreamKit */,
+				9FE785F1EF1DE3002B7959FE /* MoonlightCore */,
 			);
 			productName = "Selenite-tvOS";
 			productReference = 152E3C6DC9B0F1A43ECDF02F /* Selenite-tvOS.app */;
@@ -131,7 +151,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B157748FACCC00CDBDF74094 /* HarnessModel.swift in Sources */,
+				69D9F74651CAD2AE7B5C3B0D /* HarnessView.swift in Sources */,
 				1EF96EFD252F0C8C6146CD9D /* SeleniteApp.swift in Sources */,
+				5BA01B8EF7A4CAF6F4FBC7AA /* StreamStageView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -333,6 +356,10 @@
 		7469462ED7EB913A8C1A7626 /* StreamKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = StreamKit;
+		};
+		9FE785F1EF1DE3002B7959FE /* MoonlightCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MoonlightCore;
 		};
 		CCD3F26D86A723963A2FB2BA /* HostKit */ = {
 			isa = XCSwiftPackageProductDependency;

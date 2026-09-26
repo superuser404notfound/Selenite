@@ -30,6 +30,7 @@ let package = Package(
     products: [
         .library(name: "HostKit", targets: ["HostKit"]),
         .library(name: "StreamKit", targets: ["StreamKit"]),
+        .library(name: "MoonlightCore", targets: ["MoonlightCore"]),
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-certificates.git", from: "1.0.0"),

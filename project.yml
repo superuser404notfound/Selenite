@@ -24,6 +24,8 @@ targets:
         product: HostKit
       - package: SeleniteKit
         product: StreamKit
+      - package: SeleniteKit
+        product: MoonlightCore
     info:
       path: Selenite/Info.plist
       properties:

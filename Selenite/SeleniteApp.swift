@@ -2,10 +2,12 @@ import SwiftUI
 
 @main
 struct SeleniteApp: App {
+    @State private var model = HarnessModel()
+
     var body: some Scene {
         WindowGroup {
-            Text("Selenite")
-                .font(.largeTitle)
+            HarnessView()
+                .environment(model)
         }
     }
 }
