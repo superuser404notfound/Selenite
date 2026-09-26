@@ -18,6 +18,7 @@ public final class AudioOutput: @unchecked Sendable {
 
     private struct NodeEntry {
         let node: AVAudioSourceNode
+        let channels: Int
     }
 
     private static let scratchFrameCapacity = 4096
@@ -95,19 +96,10 @@ public final class AudioOutput: @unchecked Sendable {
         try lock.withLock {
             #if os(tvOS)
             try activateSessionLocked()
-            if channels == 6 {
-                do {
-                    try AVAudioSession.sharedInstance().setPreferredOutputNumberOfChannels(6)
-                } catch {
-                    // Expected to fail on a route that only carries stereo; the mixer still
-                    // downmixes correctly, so this is diagnostic, not fatal.
-                    NSLog("AudioOutput: setPreferredOutputNumberOfChannels(6) failed: %@", String(describing: error))
-                }
-            }
             #endif
             engine.attach(node)
             engine.connect(node, to: engine.mainMixerNode, format: format)
-            nodes[attachment] = NodeEntry(node: node)
+            nodes[attachment] = NodeEntry(node: node, channels: channels)
             let outputChannels = connectOutput()
             NSLog("[Selenite] AudioOutput: attached a %d-channel stream, output runs %d channels",
                   Int32(channels), Int32(outputChannels))
@@ -131,6 +123,7 @@ public final class AudioOutput: @unchecked Sendable {
             if nodes.count == 1 { engine.stop() }
             engine.detach(entry.node)
             nodes.removeValue(forKey: attachment)
+            if !nodes.isEmpty { connectOutput() }
         }
     }
 
@@ -138,7 +131,8 @@ public final class AudioOutput: @unchecked Sendable {
         lock.withLock { nodes[attachment]?.node.volume = volume }
     }
 
-    /// Mixer to hardware in the hardware's channel count and layout. The plain
+    /// Mixer to hardware in the channel count the content needs (capped by the route) with an
+    /// explicit layout. The plain
     /// `standardFormat(sampleRate:channels:)` initializer returns nil above 2 channels, so using
     /// it here silently kept every route at stereo; 5.1 needs an explicit channel layout to reach
     /// an eARC receiver. Returns the channel count the output was connected with.
@@ -146,9 +140,29 @@ public final class AudioOutput: @unchecked Sendable {
     private func connectOutput() -> AVAudioChannelCount {
         let hardware = engine.outputNode.outputFormat(forBus: 0)
         let sampleRate = hardware.sampleRate > 0 ? hardware.sampleRate : 48000
-        let format = Self.outputFormat(sampleRate: sampleRate, channelCount: hardware.channelCount)
+        let wanted = AudioRoutePolicy.outputChannels(streamChannels: nodes.values.map(\.channels),
+                                                     hardwareMaximum: hardwareMaximumChannelsLocked(fallback: Int(hardware.channelCount)))
+        #if os(tvOS)
+        // Ask the route for exactly what the content needs, so stereo reaches the receiver as
+        // 2-channel PCM (a receiver shows and treats it as stereo) and 5.1 as 6 channels.
+        do {
+            try AVAudioSession.sharedInstance().setPreferredOutputNumberOfChannels(wanted)
+        } catch {
+            NSLog("[Selenite] AudioOutput: setPreferredOutputNumberOfChannels(%d) failed: %@",
+                  Int32(wanted), String(describing: error))
+        }
+        #endif
+        let format = Self.outputFormat(sampleRate: sampleRate, channelCount: AVAudioChannelCount(wanted))
         engine.connect(engine.mainMixerNode, to: engine.outputNode, format: format)
         return format.channelCount
+    }
+
+    private func hardwareMaximumChannelsLocked(fallback: Int) -> Int {
+        #if os(tvOS)
+        AVAudioSession.sharedInstance().maximumOutputNumberOfChannels
+        #else
+        fallback
+        #endif
     }
 
     private static func outputFormat(sampleRate: Double, channelCount: AVAudioChannelCount) -> AVAudioFormat {
