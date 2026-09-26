@@ -16,9 +16,22 @@ public struct NvEndpoints: Sendable {
     private var urlHost: String { address.contains(":") ? "[\(address)]" : address }
     private var http: String { "http://\(urlHost):\(httpPort)" }
     private var https: String { "https://\(urlHost):\(httpsPort)" }
-    private var pairPrefix: String { "uniqueid=\(uniqueID)&devicename=\(deviceName)&updateState=1" }
+    private var pairPrefix: String {
+        let encodedDeviceName = deviceName.addingPercentEncoding(withAllowedCharacters: Self.deviceNameQueryCharacters) ?? deviceName
+        return "uniqueid=\(uniqueID)&devicename=\(encodedDeviceName)&updateState=1"
+    }
 
-    private func url(_ string: String) -> URL { URL(string: string)! }
+    /// `.urlQueryAllowed` still permits `&`, `=`, `+` and `#`, which are query syntax, not safe
+    /// inside a value: an unescaped `&` in a device name would split the query into bogus pairs.
+    private static let deviceNameQueryCharacters =
+        CharacterSet.urlQueryAllowed.subtracting(CharacterSet(charactersIn: "&=+#"))
+
+    /// Never crashes: a user-typed address (e.g. "my pc") or odd device name must fail the
+    /// request, not the app. Falls back to an unroutable placeholder if even lenient encoding
+    /// can't produce a URL.
+    private func url(_ string: String) -> URL {
+        URL(string: string, encodingInvalidCharacters: true) ?? URL(string: "http://invalid.invalid/")!
+    }
 
     public func serverInfo(secure: Bool) -> URL {
         url("\(secure ? https : http)/serverinfo?uniqueid=\(uniqueID)")

@@ -34,3 +34,18 @@ import Testing
         surroundAudioInfo: 0x30002, gamepadMask: 1, launchQueryTail: "")
     #expect(request.query.contains("&hdrMode=1&clientHdrCapVersion=0"))
 }
+
+@Test func unusualAddressDoesNotCrash() {
+    let e = NvEndpoints(address: "my pc", uniqueID: "0123456789abcdef")
+    let url = e.serverInfo(secure: false)
+    #expect(!url.absoluteString.isEmpty)
+}
+
+@Test func deviceNameIsPercentEncodedInQuery() {
+    let e = NvEndpoints(address: "10.0.0.2", uniqueID: "0123456789abcdef", deviceName: "Living Room & TV")
+    let url = e.pairChallenge().absoluteString
+    #expect(url.contains("%20"))
+    #expect(url.contains("%26"))
+    let value = url.components(separatedBy: "devicename=")[1].components(separatedBy: "&updateState")[0]
+    #expect(!value.contains("&"))
+}
