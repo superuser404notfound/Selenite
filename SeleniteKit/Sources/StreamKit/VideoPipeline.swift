@@ -114,7 +114,10 @@ public final class VideoPipeline: @unchecked Sendable {
                 }
                 format = newFormat
             }
-            guard let format, let decoder else { return DR_NEED_IDR }
+            guard let format, let decoder else {
+                diagnostic("frame \(unit.frameNumber): no decoder yet (format \(format != nil)), requesting IDR")
+                return DR_NEED_IDR
+            }
             let sample = try NALPackager.sampleBuffer(annexB: picture, format: format,
                                                       pts: CMTime(value: Int64(unit.rtpTimestamp), timescale: 90000))
             let started = CACurrentMediaTime()
@@ -125,7 +128,14 @@ public final class VideoPipeline: @unchecked Sendable {
             lock.unlock()
             return DR_OK
         } catch {
+            diagnostic("frame \(unit.frameNumber) type \(unit.frameType) length \(unit.fullLength): \(error), requesting IDR")
             return DR_NEED_IDR
         }
     }
+}
+
+/// Routes a diagnostic line through the moonlight log sink, so it lands wherever the app logs.
+private func diagnostic(_ text: String) {
+    guard let sink = MLGetLogSink() else { return }
+    text.withCString { sink(-1, $0) }
 }
