@@ -1,0 +1,12 @@
+# Internal design specs and implementation plans stay local
+docs/superpowers/
+
+# Xcode
+xcuserdata/
+DerivedData/
+*.xcuserstate
+.build/
+.swiftpm/
+
+# macOS
+.DS_Store
