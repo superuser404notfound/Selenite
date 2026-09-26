@@ -1,5 +1,6 @@
 import CoreMedia
 import Foundation
+import QuartzCore
 import HostKit
 import MoonlightCore
 
@@ -325,8 +326,10 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
     /// `data` is nil for a lost packet; passed through unfiltered so `OpusDecoder` can hand libopus
     /// its packet-loss-concealment call (nil data, zero length).
     public func audioSample(_ data: UnsafePointer<CChar>?, length: Int32) {
+        let start = CACurrentMediaTime()
         lock.lock(); let stream = audio; lock.unlock()
         stream?.submit(UnsafeRawBufferPointer(start: data, count: Int(length)))
+        DiagnosticCounters.shared.audioCall(start: start, end: CACurrentMediaTime())
     }
 
     public func audioCleanup() {

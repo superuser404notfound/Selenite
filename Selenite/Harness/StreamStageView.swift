@@ -112,6 +112,8 @@ final class StreamStageController: GCEventViewController {
     private var previous: [StreamStats] = []
 
     private func refreshStats() {
+        let d = DiagnosticCounters.shared.takeSnapshot()
+        DiagnosticLogFile.shared.append("[diag] audio \(d.audioCalls)/s max call \(d.audioMaxCallMicros)us max gap \(d.audioMaxGapMicros)us | video \(d.videoFrames)/s max process \(d.videoMaxProcessMicros)us max gap \(d.videoMaxGapMicros)us | controller state \(d.controllerStates)/s motion \(d.controllerMotions)/s touch \(d.controllerTouches)/s max send \(d.controllerMaxSendMicros)us")
         let current = model.sessions.map { $0.stats() }
         for (index, stats) in current.enumerated() where index < halves.count {
             let last = index < previous.count ? previous[index] : nil

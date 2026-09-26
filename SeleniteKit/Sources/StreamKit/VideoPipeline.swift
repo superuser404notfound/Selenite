@@ -77,7 +77,9 @@ public final class VideoPipeline: @unchecked Sendable {
             var handle: VIDEO_FRAME_HANDLE?
             var unit: PDECODE_UNIT?
             guard slot.api.waitForNextVideoFrame!(&handle, &unit), let unit else { break }
+            let started = CACurrentMediaTime()
             let status = process(unit.pointee)
+            DiagnosticCounters.shared.videoFrame(start: started, end: CACurrentMediaTime())
             slot.api.completeVideoFrame!(handle, status)
         }
         decoder?.invalidate()
