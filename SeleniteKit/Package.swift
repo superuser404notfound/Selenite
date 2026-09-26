@@ -30,16 +30,29 @@ let package = Package(
     products: [
         .library(name: "HostKit", targets: ["HostKit"]),
     ],
+    dependencies: [
+        .package(url: "https://github.com/apple/swift-certificates.git", from: "1.0.0"),
+        .package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0"),
+        .package(url: "https://github.com/apple/swift-asn1.git", from: "1.0.0"),
+    ],
     targets: [
         .target(
             name: "MbedCrypto",
             cSettings: mbedDefines + [.headerSearchPath("../../Vendor/mbedtls/library")]
         ),
-        .target(name: "HostKit"),
+        .target(name: "HostKit", dependencies: [
+            .product(name: "X509", package: "swift-certificates"),
+            .product(name: "Crypto", package: "swift-crypto"),
+            .product(name: "_CryptoExtras", package: "swift-crypto"),
+            .product(name: "SwiftASN1", package: "swift-asn1"),
+        ]),
         .target(name: "MoonlightCore"),
         .target(name: "MoonlightSlotA", dependencies: ["MoonlightCore", "MbedCrypto"], cSettings: slotSettings),
         .target(name: "MoonlightSlotB", dependencies: ["MoonlightCore", "MbedCrypto"], cSettings: slotSettings),
-        .testTarget(name: "HostKitTests", dependencies: ["HostKit"]),
+        .testTarget(name: "HostKitTests", dependencies: [
+            "HostKit",
+            .product(name: "X509", package: "swift-certificates"),
+        ]),
         .testTarget(name: "MoonlightCoreTests", dependencies: ["MbedCrypto", "MoonlightCore", "MoonlightSlotA", "MoonlightSlotB"]),
     ]
 )
