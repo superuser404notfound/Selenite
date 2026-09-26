@@ -1,3 +1,4 @@
+import Crypto
 import Foundation
 import Security
 
@@ -6,7 +7,12 @@ public enum IdentityStore {
     public enum Error: Swift.Error { case keychain(OSStatus), key(String) }
 
     private static let service = "de.superuser404.Selenite.identity"
-    private static let label = "Selenite GameStream Client"
+
+    /// Distinct per certificate so a regenerated identity never resolves to a stale key/cert pair
+    /// left behind under a shared label from an earlier certificate.
+    static func keychainLabel(for certificateDER: Data) -> String {
+        "Selenite GameStream Client " + Data(SHA256.hash(data: certificateDER)).hexString
+    }
 
     public static func loadOrCreate() throws -> ClientIdentity {
         let query: [CFString: Any] = [kSecClass: kSecClassGenericPassword, kSecAttrService: service,
@@ -32,6 +38,7 @@ public enum IdentityStore {
         guard let certificate = SecCertificateCreateWithData(nil, identity.certificateDER as CFData) else {
             throw Error.key("certificate")
         }
+        let label = keychainLabel(for: identity.certificateDER)
         for (itemClass, ref) in [(kSecClassKey, key as AnyObject), (kSecClassCertificate, certificate as AnyObject)] {
             let status = SecItemAdd([kSecClass: itemClass, kSecValueRef: ref, kSecAttrLabel: label] as CFDictionary, nil)
             guard status == errSecSuccess || status == errSecDuplicateItem else { throw Error.keychain(status) }
@@ -40,6 +47,12 @@ public enum IdentityStore {
         let status = SecItemCopyMatching([kSecClass: kSecClassIdentity, kSecAttrLabel: label,
                                           kSecReturnRef: true, kSecMatchLimit: kSecMatchLimitOne] as CFDictionary, &item)
         guard status == errSecSuccess, let found = item else { throw Error.keychain(status) }
-        return found as! SecIdentity
+        let secIdentity = found as! SecIdentity
+        var foundCertificate: SecCertificate?
+        guard SecIdentityCopyCertificate(secIdentity, &foundCertificate) == errSecSuccess, let foundCertificate,
+              SecCertificateCopyData(foundCertificate) as Data == identity.certificateDER else {
+            throw Error.key("identity mismatch")
+        }
+        return secIdentity
     }
 }
