@@ -51,7 +51,13 @@ let package = Package(
         .target(name: "MoonlightCore"),
         .target(name: "MoonlightSlotA", dependencies: ["MoonlightCore", "MbedCrypto"], cSettings: slotSettings),
         .target(name: "MoonlightSlotB", dependencies: ["MoonlightCore", "MbedCrypto"], cSettings: slotSettings),
-        .target(name: "StreamKit", dependencies: ["HostKit", "MoonlightCore", "MoonlightSlotA", "MoonlightSlotB"]),
+        .target(
+            name: "StreamKit",
+            dependencies: ["HostKit", "MoonlightCore", "MoonlightSlotA", "MoonlightSlotB"],
+            // UIWindow.avDisplayManager is an AVKit category: nothing links a symbol from it, so
+            // without this the framework is never loaded and the call dies in doesNotRecognizeSelector.
+            linkerSettings: [.linkedFramework("AVKit", .when(platforms: [.tvOS]))]
+        ),
         .testTarget(name: "HostKitTests", dependencies: [
             "HostKit",
             .product(name: "X509", package: "swift-certificates"),

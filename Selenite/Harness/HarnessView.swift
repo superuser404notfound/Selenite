@@ -18,15 +18,15 @@ struct HarnessView: View {
                         if let pin = model.pairingPIN { Text("PIN \(pin)").font(.system(size: 80, weight: .bold)) }
                     }
                     Section("Layout") {
-                        Picker("Layout", selection: $model.layout) {
-                            ForEach(SplitLayout.allCases) { Text($0.rawValue).tag($0) }
+                        // tvOS Form rows focus as a whole: a Picker opens nothing and buttons inside an
+                        // HStack are unreachable, so every control here is its own Button row.
+                        ForEach(SplitLayout.allCases) { layout in
+                            Button(layout.rawValue + (model.layout == layout ? "  (selected)" : "")) {
+                                model.layout = layout
+                            }
                         }
-                        HStack {
-                            Text("Bitrate \(model.bitrateMbps) Mbps")
-                            Spacer()
-                            Button("-") { model.bitrateMbps = max(10, model.bitrateMbps - 10) }
-                            Button("+") { model.bitrateMbps = min(500, model.bitrateMbps + 10) }
-                        }
+                        Button("Bitrate \(model.bitrateMbps) Mbps: +10") { model.bitrateMbps = min(500, model.bitrateMbps + 10) }
+                        Button("Bitrate \(model.bitrateMbps) Mbps: -10") { model.bitrateMbps = max(10, model.bitrateMbps - 10) }
                         Toggle("HDR (solo only)", isOn: $model.hdr)
                     }
                     SidePicker(title: "Side A", choice: $model.sideA)
