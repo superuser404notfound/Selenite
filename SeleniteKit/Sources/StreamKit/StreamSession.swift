@@ -56,6 +56,9 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
     private let lock = NSLock()
     private var pipeline: VideoPipeline?
     private var audio: AudioStream?
+    /// Set right before the /launch or /resume request is sent, so stop() knows the host may
+    /// already be running the app even if that request never returned.
+    private var launchIssued = false
     // Not private: StreamSession+Controllers.swift reads `isConnected` before touching the slot.
     let lifecycle = SessionLifecycle()
     private var cStrings: [UnsafeMutablePointer<CChar>] = []
@@ -84,6 +87,14 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
         try lifecycle.beginStart()
         let info = try ServerInfo(NvResponse.parse(try await client.get(endpoints.serverInfo(secure: true), timeout: 10)).requireOK())
         try lifecycle.checkpoint()
+        let plan = LaunchPlan.decide(currentGame: info.currentGame, appID: appID)
+        if plan == .quitThenLaunch {
+            let cancel = try NvResponse.parse(try await client.get(endpoints.cancel(), timeout: 30))
+            guard cancel.statusCode == 200 else {
+                throw StreamSessionError.launchFailed(cancel.statusMessage)
+            }
+            try lifecycle.checkpoint()
+        }
         let riKey = Data((0..<16).map { _ in UInt8.random(in: 0...255) })
         let riKeyID = Int32.random(in: 0...Int32.max)
         let request = LaunchRequest(
@@ -92,7 +103,8 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
             surroundAudioInfo: Int(settings.audio == .surround51 ? ML_SURROUND_AUDIO_INFO_51 : ML_SURROUND_AUDIO_INFO_STEREO),
             gamepadMask: 1,
             launchQueryTail: String(cString: slot.api.getLaunchUrlQueryParameters!()!))
-        let launch = try NvResponse.parse(try await client.get(endpoints.launch(request, resume: info.isBusy), timeout: 60))
+        lock.withLock { launchIssued = true }
+        let launch = try NvResponse.parse(try await client.get(endpoints.launch(request, resume: plan == .resume), timeout: 60))
         try lifecycle.checkpoint()
         guard launch.statusCode == 200, let sessionURL = launch["sessionUrl0"] else {
             throw StreamSessionError.launchFailed(launch.statusMessage)
@@ -179,6 +191,13 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
                 }.start()
             }
         }
+        if found == .starting, lock.withLock({ launchIssued }) {
+            // The launch/resume request may already have reached the host with no client left to
+            // talk to it; best-effort, fire-and-forget before the client is invalidated below.
+            let client = self.client
+            let endpoints = self.endpoints
+            Task { _ = try? await client.get(endpoints.cancel(), timeout: 30) }
+        }
         let stillOpen: AudioStream? = lock.withLock {
             let stream = audio
             audio = nil
@@ -189,6 +208,7 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
         SlotAllocator.shared.release(slot)
         freeCStrings()
         eventSink.finish()
+        client.invalidate()
     }
 
     private func freeCStrings() {

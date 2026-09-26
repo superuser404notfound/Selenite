@@ -52,6 +52,7 @@ final class HarnessModel {
         isPairing = true
         defer { isPairing = false }
         let client = NvHTTPClient(pinnedCertificate: nil, clientIdentity: try? IdentityStore.secIdentity(for: identity))
+        defer { client.invalidate() }
         let endpoints = NvEndpoints(address: address, uniqueID: identity.uniqueID)
         do {
             let info = try ServerInfo(NvResponse.parse(try await client.get(endpoints.serverInfo(secure: false), timeout: 5)).requireOK())
@@ -75,6 +76,7 @@ final class HarnessModel {
         do {
             let client = NvHTTPClient(pinnedCertificate: host.serverCertificateDER,
                                       clientIdentity: try IdentityStore.secIdentity(for: identity))
+            defer { client.invalidate() }
             let endpoints = NvEndpoints(address: host.address, httpsPort: host.httpsPort, uniqueID: identity.uniqueID)
             apps[host.id] = AppEntry.list(try NvResponse.parse(try await client.get(endpoints.appList(), timeout: 10)).requireOK())
         } catch {

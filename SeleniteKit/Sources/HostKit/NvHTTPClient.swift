@@ -7,15 +7,23 @@ public final class NvHTTPClient: NSObject, NvHTTPTransport, URLSessionDelegate, 
     private let lock = NSLock()
     private var pinnedCertificate: Data?
     private let clientIdentity: SecIdentity?
-    private lazy var session = URLSession(configuration: .ephemeral, delegate: self, delegateQueue: nil)
+    private var sessionStorage: URLSession!
+    private var session: URLSession { sessionStorage }
 
     public init(pinnedCertificate: Data?, clientIdentity: SecIdentity?) {
         self.pinnedCertificate = pinnedCertificate
         self.clientIdentity = clientIdentity
+        super.init()
+        sessionStorage = URLSession(configuration: .ephemeral, delegate: self, delegateQueue: nil)
     }
 
     public func pinServerCertificate(_ der: Data) {
         lock.lock(); pinnedCertificate = der; lock.unlock()
+    }
+
+    /// Breaks the delegate's strong reference back to this client; call once the session is done.
+    public func invalidate() {
+        session.finishTasksAndInvalidate()
     }
 
     public func get(_ url: URL, timeout: TimeInterval) async throws -> Data {

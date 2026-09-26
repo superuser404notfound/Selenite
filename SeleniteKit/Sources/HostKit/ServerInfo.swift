@@ -9,6 +9,7 @@ public struct ServerInfo: Sendable, Equatable {
     public let httpsPort: Int
     public let codecModeSupport: Int32
     public let isPaired: Bool
+    public let currentGame: Int
 
     /// Sunshine reports a running session as a state ending in `_SERVER_BUSY`; launch then becomes resume.
     public var isBusy: Bool { state.hasSuffix("_SERVER_BUSY") }
@@ -25,6 +26,7 @@ public struct ServerInfo: Sendable, Equatable {
         self.httpsPort = response["HttpsPort"].flatMap(Int.init) ?? 47984
         self.codecModeSupport = response["ServerCodecModeSupport"].flatMap(Int32.init) ?? 0
         self.isPaired = response["PairStatus"] == "1"
+        self.currentGame = response["currentgame"].flatMap(Int.init) ?? 0
     }
 }
 
