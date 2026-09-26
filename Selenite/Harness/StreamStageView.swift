@@ -1,4 +1,5 @@
 import AVFoundation
+import GameController
 import StreamKit
 import SwiftUI
 import UIKit
@@ -23,8 +24,11 @@ final class StageRootView: UIView {
     override var canBecomeFocused: Bool { true }
 }
 
+/// A `GCEventViewController` with controller user interaction off while streaming: tvOS otherwise
+/// also delivers game controller buttons to UIKit as presses, and B (on many pads Menu/Start too)
+/// arrives as `.menu`, which would end the stream mid-game.
 @MainActor
-final class StreamStageController: UIViewController {
+final class StreamStageController: GCEventViewController {
     private let model: HarnessModel
     private let pacer = DisplayPacer()
     private var halves: [(view: StreamLayerView, label: UILabel)] = []
@@ -32,6 +36,8 @@ final class StreamStageController: UIViewController {
     private weak var displayWindow: UIWindow?
     private var tornDown = false
     private var exiting = false
+    private var remoteObservers: [NSObjectProtocol] = []
+    private var remotes: [ObjectIdentifier: GCController] = [:]
 
     init(model: HarnessModel) {
         self.model = model
@@ -48,6 +54,8 @@ final class StreamStageController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        controllerUserInteractionEnabled = false
+        startObservingRemotes()
         view.backgroundColor = .black
         for session in model.sessions {
             let layerView = StreamLayerView()
@@ -128,6 +136,49 @@ final class StreamStageController: UIViewController {
         previous = current
     }
 
+    // MARK: Exit
+
+    /// The Siri Remote's Menu no longer reaches UIKit either, so it is read through GameController:
+    /// a controller with a micro profile and no extended one is a Siri Remote (an extended gamepad
+    /// also reports a micro profile). Game controllers exit through the Start+Select hold instead.
+    private func startObservingRemotes() {
+        guard remoteObservers.isEmpty else { return }
+        let center = NotificationCenter.default
+        // Both notifications re-scan rather than read `note.object`, which is not Sendable.
+        for name in [Notification.Name.GCControllerDidConnect, .GCControllerDidDisconnect] {
+            remoteObservers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.refreshRemotes() }
+            })
+        }
+        refreshRemotes()
+    }
+
+    private func refreshRemotes() {
+        let connected = GCController.controllers()
+        let live = Set(connected.map(ObjectIdentifier.init))
+        for id in remotes.keys where !live.contains(id) {
+            remotes.removeValue(forKey: id)?.microGamepad?.buttonMenu.pressedChangedHandler = nil
+        }
+        for controller in connected where remotes[ObjectIdentifier(controller)] == nil {
+            guard controller.extendedGamepad == nil, let pad = controller.microGamepad else { continue }
+            // Exits on release, like the press handling this replaces. Handlers run on the main queue.
+            pad.buttonMenu.pressedChangedHandler = { [weak self] _, _, pressed in
+                guard !pressed else { return }
+                MainActor.assumeIsolated { self?.exitStream(reason: "Siri Remote Menu") }
+            }
+            remotes[ObjectIdentifier(controller)] = controller
+        }
+    }
+
+    private func stopObservingRemotes() {
+        remoteObservers.forEach(NotificationCenter.default.removeObserver)
+        remoteObservers.removeAll()
+        for controller in remotes.values { controller.microGamepad?.buttonMenu.pressedChangedHandler = nil }
+        remotes.removeAll()
+    }
+
+    // Fallback for a Menu that still arrives as a press, e.g. a TV remote over HDMI-CEC, which is no
+    // GameController device. Game controllers cannot reach this with controller user interaction off.
     // Menu is consumed here in full: passed on, the SwiftUI host would background the app with
     // both streams still running.
     override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
@@ -137,7 +188,7 @@ final class StreamStageController: UIViewController {
 
     override func pressesEnded(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
         if presses.contains(where: { $0.type == .menu }) {
-            exitStream()
+            exitStream(reason: "Menu press")
             return
         }
         super.pressesEnded(presses, with: event)
@@ -153,9 +204,11 @@ final class StreamStageController: UIViewController {
         super.pressesCancelled(presses, with: event)
     }
 
-    private func exitStream() {
+    /// The `exiting` latch keeps it to one exit per press, whichever path reports the press first.
+    private func exitStream(reason: String) {
         guard !exiting else { return }
         exiting = true
+        NSLog("[Selenite] stage exit: %@", reason)
         teardown()
         Task { await model.stop() }
     }
@@ -164,6 +217,8 @@ final class StreamStageController: UIViewController {
     private func teardown() {
         guard !tornDown else { return }
         tornDown = true
+        stopObservingRemotes()
+        controllerUserInteractionEnabled = true
         statsTimer?.invalidate()
         statsTimer = nil
         pacer.stop()
