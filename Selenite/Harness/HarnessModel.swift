@@ -87,17 +87,31 @@ final class HarnessModel {
 
     func start() async {
         let choices = layout == .solo ? [sideA] : [sideA, sideB]
+        // Resolve and validate every side before acquiring any slot, so a missing choice on a
+        // later side never leaves an earlier side's already-constructed session (and its slot)
+        // stranded.
+        var resolved: [(host: PairedHost, appID: Int)] = []
+        for choice in choices {
+            guard let host = hosts.first(where: { $0.id == choice.hostID }), let appID = choice.appID else {
+                status = "Pick a host and an app for every side"
+                return
+            }
+            resolved.append((host, appID))
+        }
         do {
             let secIdentity = try IdentityStore.secIdentity(for: identity)
             var started: [StreamSession] = []
-            for choice in choices {
-                guard let host = hosts.first(where: { $0.id == choice.hostID }), let appID = choice.appID else {
-                    status = "Pick a host and an app for every side"
-                    return
+            do {
+                for (host, appID) in resolved {
+                    started.append(try StreamSession(host: host, appID: appID, settings: settings(for: layout),
+                                                      identity: identity, clientIdentity: secIdentity))
                 }
-                let session = try StreamSession(host: host, appID: appID, settings: settings(for: layout),
-                                                identity: identity, clientIdentity: secIdentity)
-                started.append(session)
+            } catch {
+                // A later side failed to construct (e.g. no free slot): release every slot this
+                // call already acquired before `sessions`/`isStreaming` ever see them.
+                for session in started { await session.stop() }
+                status = "Start failed: \(error)"
+                return
             }
             sessions = started
             isStreaming = true
