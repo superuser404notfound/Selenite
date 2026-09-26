@@ -12,6 +12,9 @@ public final class VideoPipeline: @unchecked Sendable {
     private let mailbox: FrameMailbox<CMSampleBuffer>
     private let lock = NSLock()
     private var running = false
+    // Signalled when the pull thread has left run(), decoder teardown included; nil while no
+    // thread is running.
+    private var finished: DispatchSemaphore?
     private var format: CMVideoFormatDescription?
     private var decoder: VideoDecoder?
     private var lastFrameNumber: Int32 = 0
@@ -42,21 +45,34 @@ public final class VideoPipeline: @unchecked Sendable {
     }
 
     public func start() {
-        lock.lock(); running = true; lock.unlock()
-        let thread = Thread { [self] in run() }
+        lock.lock()
+        guard finished == nil else { lock.unlock(); return }
+        running = true
+        let done = DispatchSemaphore(value: 0)
+        finished = done
+        lock.unlock()
+        let thread = Thread { [self] in run(signalling: done) }
         thread.name = "Selenite video slot \(slot)"
         thread.qualityOfService = .userInteractive
         thread.start()
     }
 
+    /// Returns only after the pull thread has finished, so the slot can be released right after.
     public func stop() {
-        lock.lock(); running = false; lock.unlock()
+        lock.lock()
+        running = false
+        let done = finished
+        finished = nil
+        lock.unlock()
+        guard let done else { return }
         slot.api.wakeWaitForVideoFrame!()
+        done.wait()
     }
 
     private var isRunning: Bool { lock.lock(); defer { lock.unlock() }; return running }
 
-    private func run() {
+    private func run(signalling done: DispatchSemaphore) {
+        defer { done.signal() }
         while isRunning {
             var handle: VIDEO_FRAME_HANDLE?
             var unit: PDECODE_UNIT?
@@ -91,6 +107,7 @@ public final class VideoPipeline: @unchecked Sendable {
                 let newFormat = try NALPackager.formatDescription(codec: codec, parameterSets: parameterSets)
                 if decoder.map({ !$0.canAccept(newFormat) }) ?? true {
                     decoder?.invalidate()
+                    decoder = nil
                     decoder = try VideoDecoder(format: newFormat, color: color) { [mailbox] pixelBuffer in
                         if let sample = try? DisplaySample.make(pixelBuffer) { mailbox.put(sample) }
                     }
