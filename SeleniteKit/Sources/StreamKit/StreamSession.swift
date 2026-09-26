@@ -66,7 +66,7 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
     /// Latches once the stop-time /cancel has gone out, from whichever of start()/stop() notices
     /// first, so exactly one is ever sent.
     private var cancelSent = false
-    // Not private: StreamSession+Controllers.swift reads `isConnected` before touching the slot.
+    // Not private: StreamSession+Controllers.swift sends through `whileConnected`.
     let lifecycle = SessionLifecycle()
     private var cStrings: [UnsafeMutablePointer<CChar>] = []
     private weak var _feedbackHandler: (any ControllerFeedbackHandler)?
@@ -301,7 +301,12 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
     public func stageFailed(stage: Int32, error: Int32) {
         eventSink.yield(.stageFailed(String(cString: slot.api.getStageName!(stage)!), error))
     }
-    public func connectionStarted() { eventSink.yield(.started) }
+    /// Called from inside LiStartConnection, before it returns: mark the session connected first, so
+    /// a controller arrival re-sent on `.started` is not dropped as too early.
+    public func connectionStarted() {
+        lifecycle.markStarted()
+        eventSink.yield(.started)
+    }
     public func connectionTerminated(error: Int32) { eventSink.yield(.terminated(error)) }
     public func connectionStatus(_ status: Int32) { eventSink.yield(.poorConnection(status == CONN_STATUS_POOR)) }
     public func setHdrMode(_ enabled: Bool) { eventSink.yield(.hostHDR(enabled)) }
