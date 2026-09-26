@@ -65,8 +65,11 @@ public final class AudioRing: @unchecked Sendable {
             primed = true
         }
         if available > maximum {
-            r = w - target
-            available = target
+            // Same reasoning as priming: skipping ahead to exactly `target` underruns on the very
+            // next read once the render quantum is larger than the target.
+            let resume = max(target, frames)
+            r = w - resume
+            available = resume
             catchUps.add(1, ordering: .relaxed)
         }
         let count = min(frames, available)
