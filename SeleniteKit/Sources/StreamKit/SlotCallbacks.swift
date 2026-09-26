@@ -12,12 +12,32 @@ enum SlotCallbacks {
             callbacks.connectionTerminated = { SlotRouter.shared.sink(for: .a)?.connectionTerminated(error: $0) }
             callbacks.connectionStatusUpdate = { SlotRouter.shared.sink(for: .a)?.connectionStatus($0) }
             callbacks.setHdrMode = { SlotRouter.shared.sink(for: .a)?.setHdrMode($0) }
+            callbacks.rumble = { SlotRouter.shared.sink(for: .a)?.rumble(controller: $0, low: $1, high: $2) }
+            callbacks.rumbleTriggers = { SlotRouter.shared.sink(for: .a)?.rumbleTriggers(controller: $0, left: $1, right: $2) }
+            callbacks.setMotionEventState = { SlotRouter.shared.sink(for: .a)?.setMotionEventState(controller: $0, motionType: $1, reportRateHz: $2) }
+            callbacks.setControllerLED = { SlotRouter.shared.sink(for: .a)?.setControllerLED(controller: $0, r: $1, g: $2, b: $3) }
+            callbacks.setAdaptiveTriggers = { controller, flags, typeLeft, typeRight, left, right in
+                let size = Int(DS_EFFECT_PAYLOAD_SIZE)
+                let l = left.map { Array(UnsafeBufferPointer(start: $0, count: size)) } ?? []
+                let r = right.map { Array(UnsafeBufferPointer(start: $0, count: size)) } ?? []
+                SlotRouter.shared.sink(for: .a)?.setAdaptiveTriggers(controller: controller, eventFlags: flags, typeLeft: typeLeft, typeRight: typeRight, left: l, right: r)
+            }
         case .b:
             callbacks.stageFailed = { SlotRouter.shared.sink(for: .b)?.stageFailed(stage: $0, error: $1) }
             callbacks.connectionStarted = { SlotRouter.shared.sink(for: .b)?.connectionStarted() }
             callbacks.connectionTerminated = { SlotRouter.shared.sink(for: .b)?.connectionTerminated(error: $0) }
             callbacks.connectionStatusUpdate = { SlotRouter.shared.sink(for: .b)?.connectionStatus($0) }
             callbacks.setHdrMode = { SlotRouter.shared.sink(for: .b)?.setHdrMode($0) }
+            callbacks.rumble = { SlotRouter.shared.sink(for: .b)?.rumble(controller: $0, low: $1, high: $2) }
+            callbacks.rumbleTriggers = { SlotRouter.shared.sink(for: .b)?.rumbleTriggers(controller: $0, left: $1, right: $2) }
+            callbacks.setMotionEventState = { SlotRouter.shared.sink(for: .b)?.setMotionEventState(controller: $0, motionType: $1, reportRateHz: $2) }
+            callbacks.setControllerLED = { SlotRouter.shared.sink(for: .b)?.setControllerLED(controller: $0, r: $1, g: $2, b: $3) }
+            callbacks.setAdaptiveTriggers = { controller, flags, typeLeft, typeRight, left, right in
+                let size = Int(DS_EFFECT_PAYLOAD_SIZE)
+                let l = left.map { Array(UnsafeBufferPointer(start: $0, count: size)) } ?? []
+                let r = right.map { Array(UnsafeBufferPointer(start: $0, count: size)) } ?? []
+                SlotRouter.shared.sink(for: .b)?.setAdaptiveTriggers(controller: controller, eventFlags: flags, typeLeft: typeLeft, typeRight: typeRight, left: l, right: r)
+            }
         }
         callbacks.logMessage = slot.api.logMessage
         return callbacks

@@ -58,6 +58,14 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
     private var audio: AudioStream?
     private let lifecycle = SessionLifecycle()
     private var cStrings: [UnsafeMutablePointer<CChar>] = []
+    private weak var _feedbackHandler: (any ControllerFeedbackHandler)?
+
+    /// Host-side receiver for controller feedback (rumble, LED, motion, adaptive triggers) the
+    /// server sends back for this session. Weak: the caller owns the handler's lifetime.
+    public var feedbackHandler: (any ControllerFeedbackHandler)? {
+        get { lock.withLock { _feedbackHandler } }
+        set { lock.withLock { _feedbackHandler = newValue } }
+    }
 
     public init(host: PairedHost, appID: Int, settings: StreamSettings,
                 identity: ClientIdentity, clientIdentity: SecIdentity) throws {
@@ -259,5 +267,30 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
     public func audioCleanup() {
         lock.lock(); let stream = audio; audio = nil; lock.unlock()
         stream?.close()
+    }
+
+    public func rumble(controller: UInt16, low: UInt16, high: UInt16) {
+        lock.lock(); let handler = _feedbackHandler; lock.unlock()
+        handler?.rumble(controller: controller, low: low, high: high)
+    }
+
+    public func rumbleTriggers(controller: UInt16, left: UInt16, right: UInt16) {
+        lock.lock(); let handler = _feedbackHandler; lock.unlock()
+        handler?.rumbleTriggers(controller: controller, left: left, right: right)
+    }
+
+    public func setMotionEventState(controller: UInt16, motionType: UInt8, reportRateHz: UInt16) {
+        lock.lock(); let handler = _feedbackHandler; lock.unlock()
+        handler?.setMotionEventState(controller: controller, motionType: motionType, reportRateHz: reportRateHz)
+    }
+
+    public func setControllerLED(controller: UInt16, r: UInt8, g: UInt8, b: UInt8) {
+        lock.lock(); let handler = _feedbackHandler; lock.unlock()
+        handler?.setControllerLED(controller: controller, r: r, g: g, b: b)
+    }
+
+    public func setAdaptiveTriggers(controller: UInt16, eventFlags: UInt8, typeLeft: UInt8, typeRight: UInt8, left: [UInt8], right: [UInt8]) {
+        lock.lock(); let handler = _feedbackHandler; lock.unlock()
+        handler?.setAdaptiveTriggers(controller: controller, eventFlags: eventFlags, typeLeft: typeLeft, typeRight: typeRight, left: left, right: right)
     }
 }

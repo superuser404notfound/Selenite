@@ -28,6 +28,12 @@ typedef struct {
                                     unsigned char leftTrigger, unsigned char rightTrigger,
                                     short leftStickX, short leftStickY, short rightStickX, short rightStickY);
     bool (*getEstimatedRttInfo)(uint32_t *estimatedRtt, uint32_t *estimatedRttVariance);
+    int (*sendControllerArrivalEvent)(uint8_t controllerNumber, uint16_t activeGamepadMask, uint8_t type,
+                                      uint32_t supportedButtonFlags, uint16_t capabilities);
+    int (*sendControllerTouchEvent)(uint8_t controllerNumber, uint8_t eventType, uint32_t pointerId,
+                                    float x, float y, float pressure);
+    int (*sendControllerMotionEvent)(uint8_t controllerNumber, uint8_t motionType, float x, float y, float z);
+    int (*sendControllerBatteryEvent)(uint8_t controllerNumber, uint8_t batteryState, uint8_t batteryPercentage);
     // Variadic logger for CONNECTION_LISTENER_CALLBACKS.logMessage; formats and forwards to the log sink.
     ConnListenerLogMessage logMessage;
 } MLSlotAPI;

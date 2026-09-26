@@ -15,6 +15,22 @@ public protocol SlotEventSink: AnyObject, Sendable {
     /// conceal it, and that nil must reach `OpusDecoder.decode` unfiltered.
     func audioSample(_ data: UnsafePointer<CChar>?, length: Int32)
     func audioCleanup()
+    func rumble(controller: UInt16, low: UInt16, high: UInt16)
+    func rumbleTriggers(controller: UInt16, left: UInt16, right: UInt16)
+    func setMotionEventState(controller: UInt16, motionType: UInt8, reportRateHz: UInt16)
+    func setControllerLED(controller: UInt16, r: UInt8, g: UInt8, b: UInt8)
+    func setAdaptiveTriggers(controller: UInt16, eventFlags: UInt8, typeLeft: UInt8, typeRight: UInt8, left: [UInt8], right: [UInt8])
+}
+
+/// Host-side sink for controller feedback the server sends back to the client (rumble, LED,
+/// motion sensor requests, adaptive triggers). `StreamSession` forwards its `SlotEventSink`
+/// feedback callbacks here so callers do not need to conform to the full playback sink.
+public protocol ControllerFeedbackHandler: AnyObject, Sendable {
+    func rumble(controller: UInt16, low: UInt16, high: UInt16)
+    func rumbleTriggers(controller: UInt16, left: UInt16, right: UInt16)
+    func setMotionEventState(controller: UInt16, motionType: UInt8, reportRateHz: UInt16)
+    func setControllerLED(controller: UInt16, r: UInt8, g: UInt8, b: UInt8)
+    func setAdaptiveTriggers(controller: UInt16, eventFlags: UInt8, typeLeft: UInt8, typeRight: UInt8, left: [UInt8], right: [UInt8])
 }
 
 /// moonlight-common-c callbacks carry no context pointer; each slot's C trampolines look up their
