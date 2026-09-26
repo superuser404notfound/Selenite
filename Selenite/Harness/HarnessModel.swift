@@ -1,5 +1,6 @@
 import Foundation
 import HostKit
+import InputKit
 import MoonlightCore
 import Observation
 import StreamKit
@@ -13,6 +14,11 @@ struct SideChoice: Equatable {
     var hostID: String?
     var appID: Int?
 }
+
+/// Signatures already match `ControllerFeedbackHandler` exactly (each of `ControllerFeedback`'s
+/// five methods is declared `nonisolated` on the `@MainActor` class), so the conformance costs
+/// nothing: no isolation mismatch, InputKit untouched.
+extension ControllerFeedback: ControllerFeedbackHandler {}
 
 @Observable @MainActor
 final class HarnessModel {
@@ -29,11 +35,16 @@ final class HarnessModel {
     var sideB = SideChoice()
     var bitrateMbps = 150
     var hdr = false
+    var forceStereo = false
     var sessions: [StreamSession] = []
     /// The latest session event per half, index-aligned with `sessions`.
     var eventTexts: [String] = []
+    /// The audio channel layout actually requested per half, index-aligned with `sessions`.
+    var audioChannels: [AudioChannels] = []
     var isStreaming = false
     private var eventTasks: [Task<Void, Never>] = []
+    private var controllerManager: ControllerManager?
+    private var controllerFeedback: ControllerFeedback?
 
     init() {
         do {
@@ -84,15 +95,21 @@ final class HarnessModel {
         }
     }
 
-    /// 4K panel: a side-by-side half is 1920x2160, a top-bottom half 3840x1080.
-    func settings(for layout: SplitLayout) -> StreamSettings {
+    /// 4K panel: a side-by-side half is 1920x2160, a top-bottom half 3840x1080. `maximumOutputChannels`
+    /// is read by the caller before this is invoked, off the main thread: reading it here would read
+    /// it on whatever thread computes settings, and every existing caller does that on the main actor.
+    func settings(for layout: SplitLayout, maximumOutputChannels: Int) -> StreamSettings {
         let (width, height) = switch layout {
         case .solo: (3840, 2160)
         case .sideBySide: (1920, 2160)
         case .topBottom: (3840, 1080)
         }
+        // Split is always a stereo mix; only solo can offer 5.1 (M2 revisits per-side audio).
+        let audio: AudioChannels = layout == .solo
+            ? AudioRoutePolicy.channels(maximumOutputChannels: maximumOutputChannels, forceStereo: forceStereo)
+            : .stereo
         return StreamSettings(width: width, height: height, fps: 60, bitrateKbps: bitrateMbps * 1000,
-                              hdr: layout == .solo && hdr)
+                              hdr: layout == .solo && hdr, audio: audio)
     }
 
     func start() async {
@@ -110,11 +127,17 @@ final class HarnessModel {
         }
         do {
             let secIdentity = try IdentityStore.secIdentity(for: identity)
+            // Activates the audio session and can block briefly: hop off the main actor for it
+            // rather than paying that cost inline here or, worse, in a SwiftUI body.
+            let maximumOutputChannels = await Task.detached { AudioOutput.shared.maximumOutputChannels }.value
             var started: [StreamSession] = []
+            var channels: [AudioChannels] = []
             do {
                 for (host, appID) in resolved {
-                    started.append(try StreamSession(host: host, appID: appID, settings: settings(for: layout),
+                    let settings = settings(for: layout, maximumOutputChannels: maximumOutputChannels)
+                    started.append(try StreamSession(host: host, appID: appID, settings: settings,
                                                       identity: identity, clientIdentity: secIdentity))
+                    channels.append(settings.audio)
                 }
             } catch {
                 // A later side failed to construct (e.g. no free slot): release every slot this
@@ -124,6 +147,7 @@ final class HarnessModel {
                 return
             }
             sessions = started
+            audioChannels = channels
             eventTexts = Array(repeating: "", count: started.count)
             eventTasks = started.enumerated().map { index, session in
                 Task { [weak self] in
@@ -132,6 +156,18 @@ final class HarnessModel {
                     }
                 }
             }
+            // M1-A routes every controller to side A regardless of layout; M2 brings per-side assignment.
+            let manager = ControllerManager(sink: started[0], onOverlay: { [weak self] in Task { await self?.stop() } })
+            let feedback = ControllerFeedback(manager: manager)
+            feedback.sink = started[0]
+            started[0].feedbackHandler = feedback
+            controllerManager = manager
+            controllerFeedback = feedback
+            manager.start()
+            // Must run before session.start() can hand the host anything to send feedback for:
+            // `stopped` starts false, but an explicit resume() keeps that true regardless of
+            // whether this is the first stream or a later one reusing a stopped instance.
+            feedback.resume()
             isStreaming = true
             try await withThrowingTaskGroup(of: Void.self) { group in
                 for session in started { group.addTask { try await session.start() } }
@@ -146,11 +182,18 @@ final class HarnessModel {
     }
 
     func stop() async {
+        // Order matters: manager stop, then feedback stopAll, then sessions stop, so nothing keeps
+        // delivering feedback callbacks into a handler that has already been torn down.
+        controllerManager?.stop()
+        controllerFeedback?.stopAll()
+        controllerManager = nil
+        controllerFeedback = nil
         eventTasks.forEach { $0.cancel() }
         eventTasks = []
         for session in sessions { await session.stop() }
         sessions = []
         eventTexts = []
+        audioChannels = []
         isStreaming = false
     }
 
@@ -163,6 +206,9 @@ final class HarnessModel {
         case .poorConnection(let poor): poor ? "poor connection" : "connection ok"
         case .hostHDR(let enabled): "host HDR \(enabled ? "on" : "off")"
         }
+        // Arrival events sent before the session reports connected are dropped by the host, so the
+        // controller manager re-sends them here. Side A only: that is the only side it drives.
+        if case .started = event, index == 0 { controllerManager?.reannounce() }
         eventTexts[index] = text
         status = "Side \(index == 0 ? "A" : "B"): \(text)"
     }

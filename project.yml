@@ -25,6 +25,8 @@ targets:
       - package: SeleniteKit
         product: StreamKit
       - package: SeleniteKit
+        product: InputKit
+      - package: SeleniteKit
         product: MoonlightCore
     info:
       path: Selenite/Info.plist

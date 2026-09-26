@@ -111,11 +111,18 @@ final class StreamStageController: UIViewController {
             let stallsPerMinute = Int32((stats.pacer.stalls - (last?.pacer.stalls ?? 0)) * 60)
             let bufferedPerSecond = Int32(stats.pacer.bufferedTicks - (last?.pacer.bufferedTicks ?? 0))
             let event = index < model.eventTexts.count ? model.eventTexts[index] : ""
-            halves[index].label.text = String(
+            var text = String(
                 format: "shown %d fps  stalls %d/min  overflow %d  catch-up %d  buffered %d/s  jitter %.1f ms  decode %.2f ms  net drops %d  rtt %@",
                 fps, stallsPerMinute, Int32(stats.pacer.overflowDrops), Int32(stats.pacer.catchUpDrops), bufferedPerSecond,
                 stats.pacer.jitterMilliseconds, stats.averageDecodeMilliseconds, Int32(stats.networkDroppedFrames),
                 stats.rttMilliseconds.map { "\($0) ms" } ?? "n/a") + "\n" + event
+            if let audio = stats.audio {
+                let channels = index < model.audioChannels.count ? model.audioChannels[index] : .stereo
+                let channelsText = channels == .surround51 ? "5.1" : "stereo"
+                text += "\n" + String(format: "audio %@  fill %.0f ms  underruns %d  catch-up %d",
+                                      channelsText, audio.fillMilliseconds, Int32(audio.underruns), Int32(audio.catchUps))
+            }
+            halves[index].label.text = text
             halves[index].label.sizeToFit()
         }
         previous = current
