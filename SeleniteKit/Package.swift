@@ -29,6 +29,7 @@ let package = Package(
     platforms: [.tvOS(.v26), .macOS(.v26)],
     products: [
         .library(name: "HostKit", targets: ["HostKit"]),
+        .library(name: "StreamKit", targets: ["StreamKit"]),
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-certificates.git", from: "1.0.0"),
@@ -49,10 +50,12 @@ let package = Package(
         .target(name: "MoonlightCore"),
         .target(name: "MoonlightSlotA", dependencies: ["MoonlightCore", "MbedCrypto"], cSettings: slotSettings),
         .target(name: "MoonlightSlotB", dependencies: ["MoonlightCore", "MbedCrypto"], cSettings: slotSettings),
+        .target(name: "StreamKit", dependencies: ["HostKit", "MoonlightCore", "MoonlightSlotA", "MoonlightSlotB"]),
         .testTarget(name: "HostKitTests", dependencies: [
             "HostKit",
             .product(name: "X509", package: "swift-certificates"),
         ], resources: [.copy("Fixtures")]),
         .testTarget(name: "MoonlightCoreTests", dependencies: ["MbedCrypto", "MoonlightCore", "MoonlightSlotA", "MoonlightSlotB"]),
+        .testTarget(name: "StreamKitTests", dependencies: ["StreamKit"]),
     ]
 )

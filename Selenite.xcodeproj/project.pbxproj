@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		1EF96EFD252F0C8C6146CD9D /* SeleniteApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C17D93938F3EF35FC7048224 /* SeleniteApp.swift */; };
 		ED786636E3672852C14D4D5B /* HostKit in Frameworks */ = {isa = PBXBuildFile; productRef = CCD3F26D86A723963A2FB2BA /* HostKit */; };
+		F8AAB1581DDCDBB00D69C04C /* StreamKit in Frameworks */ = {isa = PBXBuildFile; productRef = 7469462ED7EB913A8C1A7626 /* StreamKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -24,6 +25,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				ED786636E3672852C14D4D5B /* HostKit in Frameworks */,
+				F8AAB1581DDCDBB00D69C04C /* StreamKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -81,6 +83,7 @@
 			name = "Selenite-tvOS";
 			packageProductDependencies = (
 				CCD3F26D86A723963A2FB2BA /* HostKit */,
+				7469462ED7EB913A8C1A7626 /* StreamKit */,
 			);
 			productName = "Selenite-tvOS";
 			productReference = 152E3C6DC9B0F1A43ECDF02F /* Selenite-tvOS.app */;
@@ -327,6 +330,10 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		7469462ED7EB913A8C1A7626 /* StreamKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = StreamKit;
+		};
 		CCD3F26D86A723963A2FB2BA /* HostKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = HostKit;
