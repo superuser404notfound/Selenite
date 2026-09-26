@@ -35,7 +35,15 @@ public struct Pairing: Sendable {
         do {
             return try await handshake(pin: pin, version: serverMajorVersion)
         } catch {
-            _ = try? await transport.get(endpoints.unpair(), timeout: 10)
+            // Runs as an unstructured task so a cancelled `run` (the user left the PIN
+            // screen while stage 1 was blocked) still gets the best-effort unpair out:
+            // an unstructured task does not inherit the enclosing task's cancellation.
+            let transport = transport
+            let unpairURL = endpoints.unpair()
+            let unpairTask = Task {
+                _ = try? await transport.get(unpairURL, timeout: 10)
+            }
+            await unpairTask.value
             throw error
         }
     }
