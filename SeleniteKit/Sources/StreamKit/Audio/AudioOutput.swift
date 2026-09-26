@@ -147,9 +147,11 @@ public final class AudioOutput: @unchecked Sendable {
     }
 
     private static func outputFormat(sampleRate: Double, channelCount: AVAudioChannelCount) -> AVAudioFormat {
-        let layoutTag: AudioChannelLayoutTag = channelCount == 6
-            ? kAudioChannelLayoutTag_MPEG_5_1_A
-            : (kAudioChannelLayoutTag_DiscreteInOrder | UInt32(channelCount))
+        let layoutTag: AudioChannelLayoutTag = switch channelCount {
+        case 2: kAudioChannelLayoutTag_Stereo
+        case 6: kAudioChannelLayoutTag_MPEG_5_1_A
+        default: kAudioChannelLayoutTag_DiscreteInOrder | UInt32(channelCount)
+        }
         guard channelCount > 0, let layout = AVAudioChannelLayout(layoutTag: layoutTag) else {
             return AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 2)!
         }

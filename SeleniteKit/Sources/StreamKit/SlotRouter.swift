@@ -1,4 +1,5 @@
 import Foundation
+import MoonlightCore
 
 public protocol SlotEventSink: AnyObject, Sendable {
     func decoderSetup(videoFormat: Int32, width: Int32, height: Int32, fps: Int32) -> Int32
@@ -9,6 +10,9 @@ public protocol SlotEventSink: AnyObject, Sendable {
     func connectionTerminated(error: Int32)
     func connectionStatus(_ status: Int32)
     func setHdrMode(_ enabled: Bool)
+    func audioInit(_ config: OPUS_MULTISTREAM_CONFIGURATION) -> Int32
+    func audioSample(_ data: UnsafePointer<CChar>, length: Int32)
+    func audioCleanup()
 }
 
 /// moonlight-common-c callbacks carry no context pointer; each slot's C trampolines look up their

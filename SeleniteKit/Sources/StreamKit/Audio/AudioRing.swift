@@ -66,11 +66,15 @@ public final class AudioRing: @unchecked Sendable {
         }
         if available > maximum {
             // Same reasoning as priming: skipping ahead to exactly `target` underruns on the very
-            // next read once the render quantum is larger than the target.
-            let resume = max(target, frames)
-            r = w - resume
-            available = resume
-            catchUps.add(1, ordering: .relaxed)
+            // next read once the render quantum is larger than the target. Capping at `available`
+            // keeps the read index from ever moving backwards: when this read alone drains at
+            // least as much as is buffered, there is nothing to catch up on.
+            let resume = min(available, max(target, frames))
+            if resume < available {
+                r = w - resume
+                available = resume
+                catchUps.add(1, ordering: .relaxed)
+            }
         }
         let count = min(frames, available)
         for i in 0..<count {

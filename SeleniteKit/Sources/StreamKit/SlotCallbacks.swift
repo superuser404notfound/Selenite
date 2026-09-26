@@ -44,12 +44,31 @@ enum SlotCallbacks {
         return callbacks
     }
 
-    /// M0 discards audio; M1 replaces this with the Opus decoder and the AVAudioEngine mixer.
     static func audio(for slot: Slot) -> AUDIO_RENDERER_CALLBACKS {
         var callbacks = AUDIO_RENDERER_CALLBACKS()
         slot.api.initializeAudioCallbacks!(&callbacks)
-        callbacks.`init` = { _, _, _, _ in 0 }
-        callbacks.decodeAndPlaySample = { _, _ in }
+        switch slot {
+        case .a:
+            callbacks.`init` = { _, opusConfig, _, _ in
+                guard let opusConfig else { return -1 }
+                return SlotRouter.shared.sink(for: .a)?.audioInit(opusConfig.pointee) ?? -1
+            }
+            callbacks.decodeAndPlaySample = { data, length in
+                guard let data else { return }
+                SlotRouter.shared.sink(for: .a)?.audioSample(data, length: length)
+            }
+            callbacks.cleanup = { SlotRouter.shared.sink(for: .a)?.audioCleanup() }
+        case .b:
+            callbacks.`init` = { _, opusConfig, _, _ in
+                guard let opusConfig else { return -1 }
+                return SlotRouter.shared.sink(for: .b)?.audioInit(opusConfig.pointee) ?? -1
+            }
+            callbacks.decodeAndPlaySample = { data, length in
+                guard let data else { return }
+                SlotRouter.shared.sink(for: .b)?.audioSample(data, length: length)
+            }
+            callbacks.cleanup = { SlotRouter.shared.sink(for: .b)?.audioCleanup() }
+        }
         return callbacks
     }
 }

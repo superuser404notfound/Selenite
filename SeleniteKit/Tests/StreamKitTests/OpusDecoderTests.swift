@@ -50,6 +50,12 @@ private func roundTrip(channels: Int32) throws -> (decoder: OpusDecoder, frames:
     #expect(result.peak > 0.3)
 }
 
+@Test func mappingShorterThanChannelCountThrows() {
+    #expect(throws: OpusError.self) {
+        _ = try OpusDecoder(sampleRate: 48000, channels: 6, streams: 4, coupledStreams: 2, mapping: [0, 1])
+    }
+}
+
 @Test func garbagePacketDecodesToNothing() throws {
     let decoder = try OpusDecoder(sampleRate: 48000, channels: 2, streams: 1, coupledStreams: 1, mapping: [0, 1])
     var out = [Float](repeating: 0, count: 5760 * 2)

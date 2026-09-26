@@ -9,6 +9,7 @@ public final class OpusDecoder: @unchecked Sendable {
     private let decoder: OpaquePointer
 
     public init(sampleRate: Int32, channels: Int32, streams: Int32, coupledStreams: Int32, mapping: [UInt8]) throws {
+        guard mapping.count >= Int(channels) else { throw OpusError.create(OPUS_BAD_ARG) }
         var error: Int32 = 0
         guard let created = opus_multistream_decoder_create(sampleRate, channels, streams, coupledStreams, mapping, &error),
               error == OPUS_OK else { throw OpusError.create(error) }

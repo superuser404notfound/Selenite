@@ -28,3 +28,8 @@ import MoonlightSlotB
     #expect(ML_AUDIO_CONFIGURATION_STEREO == 0x302CA)
     #expect(ML_SURROUND_AUDIO_INFO_STEREO == 0x30002)
 }
+
+@Test func surroundConstantsMatchMoonlight() {
+    #expect(ML_AUDIO_CONFIGURATION_51 == (0x3F << 16 | 6 << 8 | 0xCA))
+    #expect(ML_SURROUND_AUDIO_INFO_51 == (0x3F << 16 | 6))
+}

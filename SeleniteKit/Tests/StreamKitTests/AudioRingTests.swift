@@ -54,6 +54,19 @@ private func read(_ ring: AudioRing, frames: Int) -> [Float] {
     #expect(out.allSatisfy { $0 == 1 })
 }
 
+@Test func catchUpNeverMovesTheReadIndexBackwards() {
+    let ring = AudioRing(channels: 1)                 // target 30 ms (1440 frames), max 80 ms (3840 frames)
+    write(ring, frames: 1440, value: 1)
+    _ = read(ring, frames: 240)                       // primes; 1200 frames of `1` remain buffered
+    write(ring, frames: 2700, value: 2)               // 3900 buffered, above the 80 ms cap
+    let out = read(ring, frames: 4000)                // resume = min(3900, max(1440, 4000)) == available: no skip
+    #expect(out.prefix(1200).allSatisfy { $0 == 1 })
+    #expect(out[1200..<3900].allSatisfy { $0 == 2 })
+    #expect(out.suffix(100).allSatisfy { $0 == 0 })
+    #expect(ring.stats.underruns == 1)
+    #expect(ring.stats.catchUps == 0)
+}
+
 @Test func primingUsesMaxOfTargetAndFrames() {
     let ring = AudioRing(channels: 2)
     // 1600 frames clears the 30 ms (1440-frame) target but not a 2048-frame render quantum.

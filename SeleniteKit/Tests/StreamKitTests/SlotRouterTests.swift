@@ -1,4 +1,5 @@
 import Testing
+import MoonlightCore
 @testable import StreamKit
 
 private final class StubSink: SlotEventSink {
@@ -10,6 +11,9 @@ private final class StubSink: SlotEventSink {
     func connectionTerminated(error: Int32) {}
     func connectionStatus(_ status: Int32) {}
     func setHdrMode(_ enabled: Bool) {}
+    func audioInit(_ config: OPUS_MULTISTREAM_CONFIGURATION) -> Int32 { 0 }
+    func audioSample(_ data: UnsafePointer<CChar>, length: Int32) {}
+    func audioCleanup() {}
 }
 
 @Test func detachWithAnotherSinkLeavesTheAttachedOneInPlace() {
