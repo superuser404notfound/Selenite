@@ -10,3 +10,6 @@ DerivedData/
 
 # macOS
 .DS_Store
+
+# Generated schemes are rewritten by Xcode on every use; project.yml restores them
+Selenite.xcodeproj/xcshareddata/xcschemes/

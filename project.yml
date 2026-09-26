@@ -1,0 +1,44 @@
+name: Selenite
+options:
+  bundleIdPrefix: de.superuser404
+  deploymentTarget:
+    tvOS: "26.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    DEVELOPMENT_TEAM: 4NY63S72W9
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    SWIFT_VERSION: "6.0"
+    CODE_SIGN_STYLE: Automatic
+packages:
+  SeleniteKit:
+    path: SeleniteKit
+targets:
+  Selenite-tvOS:
+    type: application
+    platform: tvOS
+    sources: [Selenite]
+    dependencies:
+      - package: SeleniteKit
+        product: HostKit
+    info:
+      path: Selenite/Info.plist
+      properties:
+        CFBundleDisplayName: Selenite
+        NSLocalNetworkUsageDescription: Selenite connects to Sunshine hosts on your local network.
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        UILaunchScreen: {}
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: de.superuser404.Selenite
+        PRODUCT_NAME: Selenite
+        TARGETED_DEVICE_FAMILY: "3"
+schemes:
+  Selenite-tvOS:
+    build:
+      targets:
+        Selenite-tvOS: all
+    run:
+      config: Debug
