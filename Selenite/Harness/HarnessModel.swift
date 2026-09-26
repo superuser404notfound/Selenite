@@ -160,7 +160,9 @@ final class HarnessModel {
                 }
             }
             // M1-A routes every controller to side A regardless of layout; M2 brings per-side assignment.
-            let manager = ControllerManager(sink: started[0], onOverlay: { [weak self] in Task { await self?.stop() } })
+            // Only the Siri Remote ends a stream (Vincent); the controller combo is reserved for the
+            // M1-B overlay and does nothing in the harness.
+            let manager = ControllerManager(sink: started[0], onOverlay: {})
             let feedback = ControllerFeedback(manager: manager)
             feedback.sink = started[0]
             started[0].feedbackHandler = feedback
