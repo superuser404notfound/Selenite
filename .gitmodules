@@ -4,3 +4,6 @@
 [submodule "SeleniteKit/Vendor/mbedtls"]
 	path = SeleniteKit/Vendor/mbedtls
 	url = https://github.com/Mbed-TLS/mbedtls.git
+[submodule "SeleniteKit/Vendor/opus"]
+	path = SeleniteKit/Vendor/opus
+	url = https://github.com/xiph/opus.git

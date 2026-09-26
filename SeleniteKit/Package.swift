@@ -52,8 +52,21 @@ let package = Package(
         .target(name: "MoonlightSlotA", dependencies: ["MoonlightCore", "MbedCrypto"], cSettings: slotSettings),
         .target(name: "MoonlightSlotB", dependencies: ["MoonlightCore", "MbedCrypto"], cSettings: slotSettings),
         .target(
+            name: "OpusCodec",
+            cSettings: [
+                .define("OPUS_BUILD"), .define("USE_ALLOCA"),
+                .define("HAVE_LRINTF", to: "1"), .define("HAVE_LRINT", to: "1"),
+                .headerSearchPath("../../Vendor/opus/include"),
+                .headerSearchPath("../../Vendor/opus/celt"),
+                .headerSearchPath("../../Vendor/opus/silk"),
+                .headerSearchPath("../../Vendor/opus/silk/float"),
+                .headerSearchPath("../../Vendor/opus/src"),
+                .unsafeFlags(["-w"]),
+            ]
+        ),
+        .target(
             name: "StreamKit",
-            dependencies: ["HostKit", "MoonlightCore", "MoonlightSlotA", "MoonlightSlotB"],
+            dependencies: ["HostKit", "MoonlightCore", "MoonlightSlotA", "MoonlightSlotB", "OpusCodec"],
             // UIWindow.avDisplayManager is an AVKit category: nothing links a symbol from it, so
             // without this the framework is never loaded and the call dies in doesNotRecognizeSelector.
             linkerSettings: [.linkedFramework("AVKit", .when(platforms: [.tvOS]))]
