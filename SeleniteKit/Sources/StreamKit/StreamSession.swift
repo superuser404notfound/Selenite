@@ -35,6 +35,9 @@ public enum StreamSessionError: Error {
     case noFreeSlot
     case launchFailed(String)
     case connectionFailed(Int32)
+    /// stop() ran before or while start() was connecting.
+    case cancelled
+    case alreadyStarted
 }
 
 public final class StreamSession: SlotEventSink, @unchecked Sendable {
@@ -49,7 +52,7 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
     private let client: NvHTTPClient
     private let lock = NSLock()
     private var pipeline: VideoPipeline?
-    private var stopped = false
+    private let lifecycle = SessionLifecycle()
     private var cStrings: [UnsafeMutablePointer<CChar>] = []
 
     public init(host: PairedHost, appID: Int, settings: StreamSettings,
@@ -65,7 +68,9 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
     }
 
     public func start() async throws {
+        try lifecycle.beginStart()
         let info = try ServerInfo(NvResponse.parse(try await client.get(endpoints.serverInfo(secure: true), timeout: 10)).requireOK())
+        try lifecycle.checkpoint()
         let riKey = Data((0..<16).map { _ in UInt8.random(in: 0...255) })
         let riKeyID = Int32.random(in: 0...Int32.max)
         let request = LaunchRequest(
@@ -74,6 +79,7 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
             surroundAudioInfo: Int(ML_SURROUND_AUDIO_INFO_STEREO), gamepadMask: 1,
             launchQueryTail: String(cString: slot.api.getLaunchUrlQueryParameters!()!))
         let launch = try NvResponse.parse(try await client.get(endpoints.launch(request, resume: info.isBusy), timeout: 60))
+        try lifecycle.checkpoint()
         guard launch.statusCode == 200, let sessionURL = launch["sessionUrl0"] else {
             throw StreamSessionError.launchFailed(launch.statusMessage)
         }
@@ -111,19 +117,30 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
         args.serverInfo = serverInfo
         args.config = config
 
+        do {
+            try lifecycle.beginConnect()
+        } catch {
+            // A stop that ran before this point may already have freed the earlier strings.
+            freeCStrings()
+            throw error
+        }
         SlotRouter.shared.attach(self, to: slot)
         args.connection = SlotCallbacks.connection(for: slot)
         args.video = SlotCallbacks.video(for: slot)
         args.audio = SlotCallbacks.audio(for: slot)
         let slot = self.slot
+        let lifecycle = self.lifecycle
         // LiStartConnection blocks through the whole RTSP handshake.
-        let result: Int32 = await withCheckedContinuation { continuation in
+        let (result, owned): (Int32, Bool) = await withCheckedContinuation { continuation in
             Thread {
                 let status = slot.api.startConnection!(&args.serverInfo, &args.config, &args.connection,
                                                        &args.video, &args.audio, nil, 0, nil, 0)
-                continuation.resume(returning: status)
+                let owned = lifecycle.endConnect(succeeded: status == 0)
+                continuation.resume(returning: (status, owned))
             }.start()
         }
+        // A stop arrived while connecting; it waited for this return and tears the slot down.
+        guard owned else { throw StreamSessionError.cancelled }
         guard result == 0 else {
             SlotRouter.shared.detach(slot, ifAttached: self)
             throw StreamSessionError.connectionFailed(result)
@@ -131,26 +148,34 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
     }
 
     /// Only the first call does anything: after it the slot may already belong to another session.
+    /// A stop during LiStartConnection interrupts it and waits for it to return before stopping,
+    /// the two are not thread-safe against each other.
     public func stop() async {
-        let alreadyStopped = lock.withLock {
-            defer { stopped = true }
-            return stopped
-        }
-        guard !alreadyStopped else { return }
+        guard let found = lifecycle.requestStop() else { return }
         let slot = self.slot
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            Thread {
-                slot.api.stopConnection!()
-                continuation.resume()
-            }.start()
+        let lifecycle = self.lifecycle
+        if found == .connecting || found == .connected || found == .failed {
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                Thread {
+                    if found == .connecting {
+                        lifecycle.waitForConnectReturn { slot.api.interruptConnection!() }
+                    }
+                    slot.api.stopConnection!()
+                    continuation.resume()
+                }.start()
+            }
         }
         SlotRouter.shared.detach(slot, ifAttached: self)
         SlotAllocator.shared.release(slot)
+        freeCStrings()
+        eventSink.finish()
+    }
+
+    private func freeCStrings() {
         lock.withLock {
             cStrings.forEach { free($0) }
             cStrings.removeAll()
         }
-        eventSink.finish()
     }
 
     public func stats() -> StreamStats {
