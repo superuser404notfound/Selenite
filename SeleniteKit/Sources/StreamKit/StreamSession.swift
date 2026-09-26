@@ -49,6 +49,7 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
     private let client: NvHTTPClient
     private let lock = NSLock()
     private var pipeline: VideoPipeline?
+    private var stopped = false
     private var cStrings: [UnsafeMutablePointer<CChar>] = []
 
     public init(host: PairedHost, appID: Int, settings: StreamSettings,
@@ -124,12 +125,18 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
             }.start()
         }
         guard result == 0 else {
-            SlotRouter.shared.detach(slot)
+            SlotRouter.shared.detach(slot, ifAttached: self)
             throw StreamSessionError.connectionFailed(result)
         }
     }
 
+    /// Only the first call does anything: after it the slot may already belong to another session.
     public func stop() async {
+        let alreadyStopped = lock.withLock {
+            defer { stopped = true }
+            return stopped
+        }
+        guard !alreadyStopped else { return }
         let slot = self.slot
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             Thread {
@@ -137,7 +144,7 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
                 continuation.resume()
             }.start()
         }
-        SlotRouter.shared.detach(slot)
+        SlotRouter.shared.detach(slot, ifAttached: self)
         SlotAllocator.shared.release(slot)
         lock.withLock {
             cStrings.forEach { free($0) }

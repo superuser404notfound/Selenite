@@ -22,8 +22,11 @@ final class SlotRouter: @unchecked Sendable {
         lock.lock(); sinks[slot] = sink; lock.unlock()
     }
 
-    func detach(_ slot: Slot) {
-        lock.lock(); sinks[slot] = nil; lock.unlock()
+    /// Removes the entry only while `sink` is the one attached, so a stale session cannot unhook
+    /// the session that reused its slot.
+    func detach(_ slot: Slot, ifAttached sink: any SlotEventSink) {
+        lock.lock(); defer { lock.unlock() }
+        if sinks[slot] === sink { sinks[slot] = nil }
     }
 
     func sink(for slot: Slot) -> (any SlotEventSink)? {
