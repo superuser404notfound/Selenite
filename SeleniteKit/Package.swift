@@ -52,7 +52,7 @@ let package = Package(
         .testTarget(name: "HostKitTests", dependencies: [
             "HostKit",
             .product(name: "X509", package: "swift-certificates"),
-        ]),
+        ], resources: [.copy("Fixtures")]),
         .testTarget(name: "MoonlightCoreTests", dependencies: ["MbedCrypto", "MoonlightCore", "MoonlightSlotA", "MoonlightSlotB"]),
     ]
 )

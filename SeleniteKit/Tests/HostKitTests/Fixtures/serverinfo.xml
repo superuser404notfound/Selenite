@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root status_code="200">
+<hostname>GAMING-PC</hostname>
+<appversion>7.1.431.-1</appversion>
+<GfeVersion>3.23.0.74</GfeVersion>
+<uniqueid>4D7BA7C5-1E1A-4E0B-9F2A-0C4C8E6B2B11</uniqueid>
+<HttpsPort>47984</HttpsPort>
+<ExternalPort>47989</ExternalPort>
+<mac>00:11:22:33:44:55</mac>
+<LocalIP>192.168.1.20</LocalIP>
+<ServerCodecModeSupport>259</ServerCodecModeSupport>
+<PairStatus>1</PairStatus>
+<currentgame>0</currentgame>
+<state>SUNSHINE_SERVER_FREE</state>
+</root>
