@@ -14,6 +14,7 @@ struct HarnessView: View {
                     Section("Add host") {
                         TextField("IP address", text: $model.newAddress)
                         Button("Pair") { Task { await model.pair() } }
+                            .disabled(model.isPairing)
                         if let pin = model.pairingPIN { Text("PIN \(pin)").font(.system(size: 80, weight: .bold)) }
                     }
                     Section("Layout") {

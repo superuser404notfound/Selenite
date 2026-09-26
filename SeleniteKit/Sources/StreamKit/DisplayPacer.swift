@@ -33,6 +33,7 @@ public final class DisplayPacer {
     }
 
     public func start() {
+        link?.invalidate()
         let link = CADisplayLink(target: target, selector: #selector(Target.tick(_:)))
         link.add(to: .main, forMode: .common)
         self.link = link

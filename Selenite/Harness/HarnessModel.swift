@@ -22,6 +22,7 @@ final class HarnessModel {
     var apps: [String: [AppEntry]] = [:]
     var status = ""
     var pairingPIN: String?
+    var isPairing = false
     var newAddress = ""
     var layout: SplitLayout = .solo
     var sideA = SideChoice()
@@ -29,10 +30,18 @@ final class HarnessModel {
     var bitrateMbps = 150
     var hdr = false
     var sessions: [StreamSession] = []
+    /// The latest session event per half, index-aligned with `sessions`.
+    var eventTexts: [String] = []
     var isStreaming = false
+    private var eventTasks: [Task<Void, Never>] = []
 
     init() {
-        identity = (try? IdentityStore.loadOrCreate()) ?? (try! ClientIdentity.generate())
+        do {
+            identity = try IdentityStore.loadOrCreate()
+        } catch {
+            identity = try! ClientIdentity.generate()
+            status = "Keychain unavailable, pairings will not persist: \(error)"
+        }
         hosts = hostStore.all()
         MLSetLogSink { slot, line in
             guard let line else { return }
@@ -42,7 +51,9 @@ final class HarnessModel {
 
     func pair() async {
         let address = newAddress.trimmingCharacters(in: .whitespaces)
-        guard !address.isEmpty else { return }
+        guard !address.isEmpty, !isPairing else { return }
+        isPairing = true
+        defer { isPairing = false }
         let client = NvHTTPClient(pinnedCertificate: nil, clientIdentity: try? IdentityStore.secIdentity(for: identity))
         let endpoints = NvEndpoints(address: address, uniqueID: identity.uniqueID)
         do {
@@ -114,11 +125,21 @@ final class HarnessModel {
                 return
             }
             sessions = started
+            eventTexts = Array(repeating: "", count: started.count)
+            eventTasks = started.enumerated().map { index, session in
+                Task { [weak self] in
+                    for await event in session.events {
+                        self?.record(event, forHalf: index)
+                    }
+                }
+            }
             isStreaming = true
             try await withThrowingTaskGroup(of: Void.self) { group in
                 for session in started { group.addTask { try await session.start() } }
                 try await group.waitForAll()
             }
+        } catch StreamSessionError.cancelled {
+            await stop()
         } catch {
             status = "Start failed: \(error)"
             await stop()
@@ -126,8 +147,24 @@ final class HarnessModel {
     }
 
     func stop() async {
+        eventTasks.forEach { $0.cancel() }
+        eventTasks = []
         for session in sessions { await session.stop() }
         sessions = []
+        eventTexts = []
         isStreaming = false
+    }
+
+    private func record(_ event: StreamEvent, forHalf index: Int) {
+        guard index < eventTexts.count else { return }
+        let text = switch event {
+        case .started: "connected"
+        case .stageFailed(let name, let code): "stage \(name) failed (\(code))"
+        case .terminated(let code): "terminated (\(code))"
+        case .poorConnection(let poor): poor ? "poor connection" : "connection ok"
+        case .hostHDR(let enabled): "host HDR \(enabled ? "on" : "off")"
+        }
+        eventTexts[index] = text
+        status = "Side \(index == 0 ? "A" : "B"): \(text)"
     }
 }
