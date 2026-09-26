@@ -11,16 +11,25 @@ public final class ControllerFeedback {
     private let manager: ControllerManager
     private var motors: [UInt8: CachedMotors] = [:]
     private var motionRates: [UInt8: [UInt8: UInt16]] = [:]
-    private var motionControllers: [UInt8: ObjectIdentifier] = [:]
+    // Stores the actual controller a motion handler is bound to (not just its identity), so
+    // `stopAll()` can tear the handler down on the object it was set on even if `manager.controller
+    // (number:)` has since started reporting a different, newer controller for that number.
+    private var motionControllers: [UInt8: GCController] = [:]
     private var lastMotionSend: [UInt8: Double] = [:]
     public weak var sink: (any ControllerEventSink)?
+
+    // Set by `stopAll()`, cleared by `resume()`. Gates every drain's apply step (not the drain
+    // itself, which always runs so a store's dirty bit never gets stuck) so a feedback call that
+    // was already in flight, or one that arrives from a stray/late packet after the stream ended,
+    // cannot rebuild an engine or start a player after teardown.
+    private var stopped = false
 
     // Each queue coalesces the nonisolated writes moonlight-common-c's callback thread makes into a
     // single main-actor apply per key, always applying whatever is newest (see `LatestValueStore`).
     private nonisolated let rumbleQueue = LatestValueStore<UInt8, RumbleValue>()
     private nonisolated let triggerRumbleQueue = LatestValueStore<UInt8, TriggerRumbleValue>()
     private nonisolated let ledQueue = LatestValueStore<UInt8, LEDValue>()
-    private nonisolated let adaptiveTriggerQueue = LatestValueStore<UInt8, AdaptiveTriggerCommand>()
+    private nonisolated let adaptiveTriggerQueue = LatestValueStore<AdaptiveTriggerKey, AdaptiveTriggerCommand>()
     private nonisolated let motionQueue = LatestValueStore<MotionKey, UInt16>()
 
     public init(manager: ControllerManager) { self.manager = manager }
@@ -30,6 +39,7 @@ public final class ControllerFeedback {
         guard rumbleQueue.write(RumbleValue(low: low, high: high), for: number) else { return }
         Task { @MainActor in
             guard let value = self.rumbleQueue.drain(for: number) else { return }
+            guard !self.stopped else { return }
             self.motorsFor(number)?.set(low: value.low, high: value.high)
         }
     }
@@ -38,6 +48,7 @@ public final class ControllerFeedback {
         guard triggerRumbleQueue.write(TriggerRumbleValue(left: left, right: right), for: number) else { return }
         Task { @MainActor in
             guard let value = self.triggerRumbleQueue.drain(for: number) else { return }
+            guard !self.stopped else { return }
             self.motorsFor(number)?.setTriggers(left: value.left, right: value.right)
         }
     }
@@ -46,17 +57,31 @@ public final class ControllerFeedback {
         guard ledQueue.write(LEDValue(r: r, g: g, b: b), for: number) else { return }
         Task { @MainActor in
             guard let value = self.ledQueue.drain(for: number) else { return }
+            guard !self.stopped else { return }
             self.manager.controller(number: number)?.light?.color =
                 GCColor(red: Float(value.r) / 255, green: Float(value.g) / 255, blue: Float(value.b) / 255)
         }
     }
+    // Each side coalesces independently, keyed by (number, side). A single shared "whole command"
+    // slot (the previous design) let a left-only command and a right-only command that both landed
+    // in the same drain window replace each other, so one side's request was silently lost even
+    // though neither write was itself stale.
     nonisolated public func setAdaptiveTriggers(controller: UInt16, eventFlags: UInt8, typeLeft: UInt8, typeRight: UInt8, left: [UInt8], right: [UInt8]) {
         let number = UInt8(truncatingIfNeeded: controller)
-        let command = AdaptiveTriggerCommand(eventFlags: eventFlags, typeLeft: typeLeft, typeRight: typeRight, left: left, right: right)
-        guard adaptiveTriggerQueue.write(command, for: number) else { return }
+        if eventFlags & UInt8(DS_EFFECT_LEFT_TRIGGER) != 0 {
+            scheduleAdaptiveTrigger(number: number, side: .left, type: typeLeft, payload: left)
+        }
+        if eventFlags & UInt8(DS_EFFECT_RIGHT_TRIGGER) != 0 {
+            scheduleAdaptiveTrigger(number: number, side: .right, type: typeRight, payload: right)
+        }
+    }
+    nonisolated private func scheduleAdaptiveTrigger(number: UInt8, side: AdaptiveTriggerSide, type: UInt8, payload: [UInt8]) {
+        let key = AdaptiveTriggerKey(number: number, side: side)
+        guard adaptiveTriggerQueue.write(AdaptiveTriggerCommand(type: type, payload: payload), for: key) else { return }
         Task { @MainActor in
-            guard let command = self.adaptiveTriggerQueue.drain(for: number) else { return }
-            self.applyAdaptiveTriggers(number: number, command: command)
+            guard let command = self.adaptiveTriggerQueue.drain(for: key) else { return }
+            guard !self.stopped else { return }
+            self.applyAdaptiveTrigger(number: number, side: side, command: command)
         }
     }
     nonisolated public func setMotionEventState(controller: UInt16, motionType: UInt8, reportRateHz: UInt16) {
@@ -65,25 +90,51 @@ public final class ControllerFeedback {
         guard motionQueue.write(reportRateHz, for: key) else { return }
         Task { @MainActor in
             guard let rate = self.motionQueue.drain(for: key) else { return }
+            guard !self.stopped else { return }
             self.updateMotion(number: number, type: motionType, rate: rate)
         }
     }
 
-    /// Stops every player and engine, drops every cached `RumbleMotors`, and tears down every bound
-    /// motion handler. Called by the harness at stream end so nothing keeps buzzing or reporting
-    /// motion after the session that asked for it is gone.
+    /// Stops every player and engine, drops every cached `RumbleMotors`, tears down every bound
+    /// motion handler, and turns off any DualSense adaptive trigger effect, so nothing keeps
+    /// buzzing, reporting motion, or resisting a trigger pull after the session that asked for it is
+    /// gone. The lightbar is left alone: the host's last colour choice is harmless to leave showing.
+    /// Also clears every coalescing queue and sets `stopped`, so a drain already scheduled before
+    /// this call, or a stray feedback call that arrives after it, cannot undo the teardown; call
+    /// `resume()` when a new stream starts to accept feedback again.
     public func stopAll() {
+        stopped = true
+        rumbleQueue.clear()
+        triggerRumbleQueue.clear()
+        ledQueue.clear()
+        adaptiveTriggerQueue.clear()
+        motionQueue.clear()
         for cached in motors.values { cached.motors.stopAll() }
         motors.removeAll()
-        for number in motionRates.keys {
-            if let motion = manager.controller(number: number)?.motion {
-                motion.valueChangedHandler = nil
-                if motion.sensorsRequireManualActivation { motion.sensorsActive = false }
-            }
+        for controller in motionControllers.values {
+            guard let motion = controller.motion else { continue }
+            motion.valueChangedHandler = nil
+            if motion.sensorsRequireManualActivation { motion.sensorsActive = false }
         }
         motionRates.removeAll()
         motionControllers.removeAll()
         lastMotionSend.removeAll()
+        // Bounded by ControllerRoster's own 0..<16 slot range (ControllerRoster.swift), not by which
+        // numbers this instance happens to have touched, so a trigger effect set before this
+        // instance existed (or outside the coalescing queue entirely) still gets turned off.
+        for number: UInt8 in 0..<16 {
+            guard let pad = manager.controller(number: number)?.extendedGamepad as? GCDualSenseGamepad else { continue }
+            pad.leftTrigger.setModeOff()
+            pad.rightTrigger.setModeOff()
+        }
+    }
+
+    /// Re-arms feedback after `stopAll()`. An explicit call, made by the harness when a new stream
+    /// starts, rather than an implicit reset on the first feedback call after a stop: whether this
+    /// instance is currently accepting feedback is then a deliberate, observable transition instead
+    /// of something inferred from traffic timing.
+    public func resume() {
+        stopped = false
     }
 
     private static func apply(_ effect: AdaptiveTriggerEffect, to trigger: GCDualSenseAdaptiveTrigger) {
@@ -95,10 +146,10 @@ public final class ControllerFeedback {
         }
     }
 
-    private func applyAdaptiveTriggers(number: UInt8, command: AdaptiveTriggerCommand) {
+    private func applyAdaptiveTrigger(number: UInt8, side: AdaptiveTriggerSide, command: AdaptiveTriggerCommand) {
         guard let pad = manager.controller(number: number)?.extendedGamepad as? GCDualSenseGamepad else { return }
-        if command.eventFlags & UInt8(DS_EFFECT_LEFT_TRIGGER) != 0 { Self.apply(.decode(type: command.typeLeft, payload: command.left), to: pad.leftTrigger) }
-        if command.eventFlags & UInt8(DS_EFFECT_RIGHT_TRIGGER) != 0 { Self.apply(.decode(type: command.typeRight, payload: command.right), to: pad.rightTrigger) }
+        let trigger = side == .left ? pad.leftTrigger : pad.rightTrigger
+        Self.apply(.decode(type: command.type, payload: command.payload), to: trigger)
     }
 
     /// `ControllerRoster` hands a disconnected controller's number to the next one that connects, so
@@ -150,11 +201,11 @@ public final class ControllerFeedback {
         // number is reused), so a host that reacts to arrivals already re-issues setMotionEventState
         // for the new occupant of the slot, which is the simpler of the two correct options.
         let identity = ObjectIdentifier(controller)
-        motionControllers[number] = identity
+        motionControllers[number] = controller
         let interval = 1 / Double(rates.values.max() ?? 100)
         motion.valueChangedHandler = { [weak self] m in
             MainActor.assumeIsolated {
-                guard let self, self.motionControllers[number] == identity, let sink = self.sink else { return }
+                guard let self, self.motionControllers[number].map(ObjectIdentifier.init) == identity, let sink = self.sink else { return }
                 let now = CACurrentMediaTime()
                 // 10% slack: a strict >= interval throttle halves the effective rate whenever two
                 // deliveries land a hair under one interval apart, which real sensor jitter does
@@ -189,13 +240,9 @@ private struct CachedMotors {
 private struct RumbleValue: Sendable { var low: UInt16; var high: UInt16 }
 private struct TriggerRumbleValue: Sendable { var left: UInt16; var right: UInt16 }
 private struct LEDValue: Sendable { var r: UInt8; var g: UInt8; var b: UInt8 }
-private struct AdaptiveTriggerCommand: Sendable {
-    var eventFlags: UInt8
-    var typeLeft: UInt8
-    var typeRight: UInt8
-    var left: [UInt8]
-    var right: [UInt8]
-}
+private enum AdaptiveTriggerSide: Hashable, Sendable { case left, right }
+private struct AdaptiveTriggerKey: Hashable, Sendable { let number: UInt8; let side: AdaptiveTriggerSide }
+private struct AdaptiveTriggerCommand: Sendable { var type: UInt8; var payload: [UInt8] }
 private struct MotionKey: Hashable, Sendable { let number: UInt8; let type: UInt8 }
 
 /// Coalesces bursts of nonisolated writes (moonlight-common-c's callback thread) into a single
@@ -224,6 +271,12 @@ private final class LatestValueStore<Key: Hashable & Sendable, Value: Sendable>:
             dict[key] = Slot(value: slot.value, dirty: false)
             return slot.value
         }
+    }
+
+    /// Discards every pending value. `stopAll()` calls this on every queue so a drain `Task`
+    /// scheduled before it, but not yet run, finds nothing to apply.
+    func clear() {
+        state.withLock { $0.removeAll() }
     }
 }
 
