@@ -53,12 +53,19 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
     private let settings: StreamSettings
     private let endpoints: NvEndpoints
     private let client: NvHTTPClient
+    private let clientIdentity: SecIdentity
     private let lock = NSLock()
     private var pipeline: VideoPipeline?
     private var audio: AudioStream?
-    /// Set right before the /launch or /resume request is sent, so stop() knows the host may
+    /// Set right before the /launch or /resume request is sent, so a stop knows the host may
     /// already be running the app even if that request never returned.
     private var launchIssued = false
+    /// The plan decided in start(), stored so stop() can tell a resumed game (never cancelled)
+    /// from one this session launched or force-quit into (cancelled if abandoned before connect).
+    private var issuedPlan: LaunchPlan?
+    /// Latches once the stop-time /cancel has gone out, from whichever of start()/stop() notices
+    /// first, so exactly one is ever sent.
+    private var cancelSent = false
     // Not private: StreamSession+Controllers.swift reads `isConnected` before touching the slot.
     let lifecycle = SessionLifecycle()
     private var cStrings: [UnsafeMutablePointer<CChar>] = []
@@ -80,6 +87,7 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
         self.settings = settings
         self.endpoints = NvEndpoints(address: host.address, httpsPort: host.httpsPort, uniqueID: identity.uniqueID)
         self.client = NvHTTPClient(pinnedCertificate: host.serverCertificateDER, clientIdentity: clientIdentity)
+        self.clientIdentity = clientIdentity
         (events, eventSink) = AsyncStream.makeStream()
     }
 
@@ -103,8 +111,14 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
             surroundAudioInfo: Int(settings.audio == .surround51 ? ML_SURROUND_AUDIO_INFO_51 : ML_SURROUND_AUDIO_INFO_STEREO),
             gamepadMask: 1,
             launchQueryTail: String(cString: slot.api.getLaunchUrlQueryParameters!()!))
-        lock.withLock { launchIssued = true }
+        lock.withLock { launchIssued = true; issuedPlan = plan }
         let launch = try NvResponse.parse(try await client.get(endpoints.launch(request, resume: plan == .resume), timeout: 60))
+        // A stop that arrived too early to see launchIssued (or raced beginConnect) never sent its
+        // own cancel; this call is what closes that gap. sendStopTimeCancelIfNeeded() is idempotent
+        // with stop()'s own call, so it is safe to check unconditionally here.
+        if lifecycle.state == .stopped {
+            sendStopTimeCancelIfNeeded()
+        }
         try lifecycle.checkpoint()
         guard launch.statusCode == 200, let sessionURL = launch["sessionUrl0"] else {
             throw StreamSessionError.launchFailed(launch.statusMessage)
@@ -191,12 +205,8 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
                 }.start()
             }
         }
-        if found == .starting, lock.withLock({ launchIssued }) {
-            // The launch/resume request may already have reached the host with no client left to
-            // talk to it; best-effort, fire-and-forget before the client is invalidated below.
-            let client = self.client
-            let endpoints = self.endpoints
-            Task { _ = try? await client.get(endpoints.cancel(), timeout: 30) }
+        if found == .starting {
+            sendStopTimeCancelIfNeeded()
         }
         let stillOpen: AudioStream? = lock.withLock {
             let stream = audio
@@ -209,6 +219,35 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
         freeCStrings()
         eventSink.finish()
         client.invalidate()
+    }
+
+    /// Best-effort, fire-and-forget /cancel for a session that stopped before (or racing) connect:
+    /// the host would otherwise keep running an app this session launched or force-quit into. Runs
+    /// on its own short-lived client so it never races `self.client.invalidate()`, which stop()
+    /// calls unconditionally right after this. Safe to call from both stop() and start(): the
+    /// cancelSent latch makes it a no-op the second time, from whichever side notices first.
+    private func sendStopTimeCancelIfNeeded() {
+        let shouldSend: Bool = lock.withLock {
+            guard let plan = issuedPlan,
+                  StreamSession.shouldCancelOnStop(plan: plan, launchIssued: launchIssued, cancelSent: cancelSent)
+            else { return false }
+            cancelSent = true
+            return true
+        }
+        guard shouldSend else { return }
+        let cancelClient = NvHTTPClient(pinnedCertificate: host.serverCertificateDER, clientIdentity: clientIdentity)
+        let endpoints = self.endpoints
+        Task {
+            _ = try? await cancelClient.get(endpoints.cancel(), timeout: 30)
+            cancelClient.invalidate()
+        }
+    }
+
+    /// Pure so it is testable without a network stack. A stop-time cancel is warranted only once,
+    /// only after the launch/resume request actually went out, and never for `.resume`: that game
+    /// was already running on the host before this session touched it.
+    static func shouldCancelOnStop(plan: LaunchPlan, launchIssued: Bool, cancelSent: Bool) -> Bool {
+        launchIssued && !cancelSent && plan != .resume
     }
 
     private func freeCStrings() {
