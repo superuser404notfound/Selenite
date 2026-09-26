@@ -51,9 +51,18 @@ private func roundTrip(channels: Int32) throws -> (decoder: OpusDecoder, frames:
 }
 
 @Test func mappingShorterThanChannelCountThrows() {
-    #expect(throws: OpusError.self) {
-        _ = try OpusDecoder(sampleRate: 48000, channels: 6, streams: 4, coupledStreams: 2, mapping: [0, 1])
+    #expect(throws: OpusError.create(OPUS_BAD_ARG)) {
+        try OpusDecoder(sampleRate: 48000, channels: 6, streams: 4, coupledStreams: 2, mapping: [0, 1])
     }
+}
+
+@Test func concealsALostPacketAfterRealPackets() throws {
+    let result = try roundTrip(channels: 2)
+    var out = [Float](repeating: 0, count: 5760 * 2)
+    let frames = out.withUnsafeMutableBufferPointer { buffer in
+        result.decoder.decode(UnsafeRawBufferPointer(start: nil, count: 0), into: buffer.baseAddress!, maxFrames: 5760)
+    }
+    #expect(frames > 0)
 }
 
 @Test func garbagePacketDecodesToNothing() throws {

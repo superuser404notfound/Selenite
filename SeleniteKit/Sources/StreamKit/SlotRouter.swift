@@ -11,7 +11,9 @@ public protocol SlotEventSink: AnyObject, Sendable {
     func connectionStatus(_ status: Int32)
     func setHdrMode(_ enabled: Bool)
     func audioInit(_ config: OPUS_MULTISTREAM_CONFIGURATION) -> Int32
-    func audioSample(_ data: UnsafePointer<CChar>, length: Int32)
+    /// `data` is nil for a lost packet: moonlight-common-c calls this with (nil, 0) so libopus can
+    /// conceal it, and that nil must reach `OpusDecoder.decode` unfiltered.
+    func audioSample(_ data: UnsafePointer<CChar>?, length: Int32)
     func audioCleanup()
 }
 

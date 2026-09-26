@@ -14,8 +14,11 @@ final class AudioStream: @unchecked Sendable {
         decoder = try OpusDecoder(sampleRate: config.sampleRate, channels: config.channelCount,
                                   streams: config.streams, coupledStreams: config.coupledStreams, mapping: mapping)
         ring = AudioRing(channels: Int(config.channelCount), sampleRate: Int(config.sampleRate))
-        pcm = .allocate(capacity: maxFrames * Int(config.channelCount))
+        // Attach before allocating `pcm`: nothing after a successful attach can throw, so a failed
+        // attach never leaves `pcm` allocated with no `deinit` to free it (a throwing init that
+        // doesn't finish never runs deinit).
         attachment = try AudioOutput.shared.attach(ring)
+        pcm = .allocate(capacity: maxFrames * Int(config.channelCount))
     }
 
     func submit(_ packet: UnsafeRawBufferPointer) {

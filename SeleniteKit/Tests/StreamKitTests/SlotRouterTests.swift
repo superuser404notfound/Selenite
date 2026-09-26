@@ -12,7 +12,7 @@ private final class StubSink: SlotEventSink {
     func connectionStatus(_ status: Int32) {}
     func setHdrMode(_ enabled: Bool) {}
     func audioInit(_ config: OPUS_MULTISTREAM_CONFIGURATION) -> Int32 { 0 }
-    func audioSample(_ data: UnsafePointer<CChar>, length: Int32) {}
+    func audioSample(_ data: UnsafePointer<CChar>?, length: Int32) {}
     func audioCleanup() {}
 }
 

@@ -244,11 +244,14 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
             lock.lock(); audio = stream; lock.unlock()
             return 0
         } catch {
+            NSLog("StreamSession: audio init failed on slot %@: %@", String(describing: slot), String(describing: error))
             return -1
         }
     }
 
-    public func audioSample(_ data: UnsafePointer<CChar>, length: Int32) {
+    /// `data` is nil for a lost packet; passed through unfiltered so `OpusDecoder` can hand libopus
+    /// its packet-loss-concealment call (nil data, zero length).
+    public func audioSample(_ data: UnsafePointer<CChar>?, length: Int32) {
         lock.lock(); let stream = audio; lock.unlock()
         stream?.submit(UnsafeRawBufferPointer(start: data, count: Int(length)))
     }

@@ -54,7 +54,6 @@ enum SlotCallbacks {
                 return SlotRouter.shared.sink(for: .a)?.audioInit(opusConfig.pointee) ?? -1
             }
             callbacks.decodeAndPlaySample = { data, length in
-                guard let data else { return }
                 SlotRouter.shared.sink(for: .a)?.audioSample(data, length: length)
             }
             callbacks.cleanup = { SlotRouter.shared.sink(for: .a)?.audioCleanup() }
@@ -64,7 +63,6 @@ enum SlotCallbacks {
                 return SlotRouter.shared.sink(for: .b)?.audioInit(opusConfig.pointee) ?? -1
             }
             callbacks.decodeAndPlaySample = { data, length in
-                guard let data else { return }
                 SlotRouter.shared.sink(for: .b)?.audioSample(data, length: length)
             }
             callbacks.cleanup = { SlotRouter.shared.sink(for: .b)?.audioCleanup() }

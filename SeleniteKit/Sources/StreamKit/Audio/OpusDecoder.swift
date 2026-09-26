@@ -1,6 +1,6 @@
 import OpusCodec
 
-public enum OpusError: Error { case create(Int32) }
+public enum OpusError: Error, Equatable { case create(Int32) }
 
 /// libopus multistream decoder for one session, configured from moonlight-common-c's
 /// OPUS_MULTISTREAM_CONFIGURATION. Called only from moonlight's audio thread.
