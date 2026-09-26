@@ -20,6 +20,8 @@ public final class OpusDecoder: @unchecked Sendable {
     deinit { opus_multistream_decoder_destroy(decoder) }
 
     /// Decoded frames (samples per channel) written interleaved into `pcm`; 0 when the packet is bad.
+    /// An empty packet (nil base, zero length) runs packet loss concealment, which fills exactly
+    /// `maxFrames`: pass the duration of one lost packet there, not the buffer capacity.
     public func decode(_ packet: UnsafeRawBufferPointer, into pcm: UnsafeMutablePointer<Float>, maxFrames: Int) -> Int {
         let result = opus_multistream_decode_float(decoder, packet.bindMemory(to: UInt8.self).baseAddress,
                                                    Int32(packet.count), pcm, Int32(maxFrames), 0)

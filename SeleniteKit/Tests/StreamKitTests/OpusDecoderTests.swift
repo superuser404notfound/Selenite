@@ -56,13 +56,22 @@ private func roundTrip(channels: Int32) throws -> (decoder: OpusDecoder, frames:
     }
 }
 
+/// libopus conceals exactly the frame size it is given, so AudioStream passes one Sunshine packet (5 ms).
 @Test func concealsALostPacketAfterRealPackets() throws {
     let result = try roundTrip(channels: 2)
     var out = [Float](repeating: 0, count: 5760 * 2)
     let frames = out.withUnsafeMutableBufferPointer { buffer in
-        result.decoder.decode(UnsafeRawBufferPointer(start: nil, count: 0), into: buffer.baseAddress!, maxFrames: 5760)
+        result.decoder.decode(UnsafeRawBufferPointer(start: nil, count: 0), into: buffer.baseAddress!, maxFrames: 240)
     }
-    #expect(frames > 0)
+    let expected = 240
+    #expect(frames == expected)
+}
+
+@Test func aLostPacketIsConcealedAsOnePacketNotAWholeBuffer() {
+    let lost: Int = AudioStream.frameBudget(packetBytes: 0, samplesPerFrame: 240, maxFrames: 5760)
+    let real: Int = AudioStream.frameBudget(packetBytes: 120, samplesPerFrame: 240, maxFrames: 5760)
+    #expect(lost == 240)
+    #expect(real == 5760)
 }
 
 @Test func garbagePacketDecodesToNothing() throws {
