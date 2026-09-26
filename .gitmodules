@@ -1,0 +1,6 @@
+[submodule "SeleniteKit/Vendor/moonlight-common-c"]
+	path = SeleniteKit/Vendor/moonlight-common-c
+	url = https://github.com/moonlight-stream/moonlight-common-c.git
+[submodule "SeleniteKit/Vendor/mbedtls"]
+	path = SeleniteKit/Vendor/mbedtls
+	url = https://github.com/Mbed-TLS/mbedtls.git
