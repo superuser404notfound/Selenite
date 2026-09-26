@@ -12,6 +12,10 @@ final class SessionLifecycle: @unchecked Sendable {
 
     var state: State { lock.withLock { current } }
 
+    /// True only once LiStartConnection succeeded and no stop has run yet. Controller feedback
+    /// callers use this to avoid sending into a slot the session no longer owns.
+    var isConnected: Bool { state == .connected }
+
     func beginStart() throws {
         try lock.withLock {
             switch current {

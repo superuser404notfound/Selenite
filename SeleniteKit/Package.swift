@@ -68,7 +68,7 @@ let package = Package(
         ),
         .target(
             name: "StreamKit",
-            dependencies: ["HostKit", "MoonlightCore", "MoonlightSlotA", "MoonlightSlotB", "OpusCodec"],
+            dependencies: ["HostKit", "MoonlightCore", "MoonlightSlotA", "MoonlightSlotB", "OpusCodec", "InputKit"],
             // UIWindow.avDisplayManager is an AVKit category: nothing links a symbol from it, so
             // without this the framework is never loaded and the call dies in doesNotRecognizeSelector.
             linkerSettings: [.linkedFramework("AVKit", .when(platforms: [.tvOS]))]

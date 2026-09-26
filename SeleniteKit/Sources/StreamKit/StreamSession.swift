@@ -56,7 +56,8 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
     private let lock = NSLock()
     private var pipeline: VideoPipeline?
     private var audio: AudioStream?
-    private let lifecycle = SessionLifecycle()
+    // Not private: StreamSession+Controllers.swift reads `isConnected` before touching the slot.
+    let lifecycle = SessionLifecycle()
     private var cStrings: [UnsafeMutablePointer<CChar>] = []
     private weak var _feedbackHandler: (any ControllerFeedbackHandler)?
 
