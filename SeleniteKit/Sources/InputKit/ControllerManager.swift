@@ -132,6 +132,8 @@ public final class ControllerManager {
 
     private func disconnect(id: ObjectIdentifier) {
         guard let number = roster.disconnect(id: id) else { return }
+        // A departed controller object can outlive this call; its handler must not keep sending.
+        controllers[number]?.extendedGamepad?.valueChangedHandler = nil
         controllers[number] = nil
         combos[number] = nil
         touching[number] = nil

@@ -39,3 +39,11 @@ import Testing
     #expect(ControllerKind.xbox.capabilities & UInt16(LI_CCAP_TRIGGER_RUMBLE) != 0)
     #expect(ControllerKind.xbox.capabilities & UInt16(LI_CCAP_TOUCHPAD) == 0)
 }
+
+/// Battery state is never sent in M1-A, so no kind may advertise it.
+@Test func noKindAdvertisesBatteryState() {
+    let battery = UInt16(LI_CCAP_BATTERY_STATE)
+    let kinds: [ControllerKind] = [.xbox, .dualSense, .dualShock4, .generic]
+    let advertising: [ControllerKind] = kinds.filter { $0.capabilities & battery != 0 }
+    #expect(advertising.isEmpty)
+}

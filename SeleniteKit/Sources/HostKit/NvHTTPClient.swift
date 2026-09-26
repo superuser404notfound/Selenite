@@ -6,6 +6,8 @@ import Security
 public final class NvHTTPClient: NSObject, NvHTTPTransport, URLSessionDelegate, @unchecked Sendable {
     private let lock = NSLock()
     private var pinnedCertificate: Data?
+    /// Set by `invalidate()`: a task created on an invalidated URLSession raises an Objective-C exception.
+    private var invalidated = false
     private let clientIdentity: SecIdentity?
     private var sessionStorage: URLSession!
     private var session: URLSession { sessionStorage }
@@ -23,10 +25,13 @@ public final class NvHTTPClient: NSObject, NvHTTPTransport, URLSessionDelegate, 
 
     /// Breaks the delegate's strong reference back to this client; call once the session is done.
     public func invalidate() {
+        lock.withLock { invalidated = true }
         session.finishTasksAndInvalidate()
     }
 
+    /// Throws `CancellationError` once the client was invalidated, before any task is created.
     public func get(_ url: URL, timeout: TimeInterval) async throws -> Data {
+        if lock.withLock({ invalidated }) { throw CancellationError() }
         var request = URLRequest(url: url)
         request.timeoutInterval = timeout
         let (data, _) = try await session.data(for: request)

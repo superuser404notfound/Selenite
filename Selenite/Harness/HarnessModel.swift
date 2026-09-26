@@ -148,6 +148,9 @@ final class HarnessModel {
             }
             sessions = started
             audioChannels = channels
+            NSLog("[Selenite] stream start: layout %@, %d side(s), audio %@, hdr %@, %d Mbps",
+                  layout.rawValue, Int32(started.count), String(describing: channels),
+                  String(describing: hdr), Int32(bitrateMbps))
             eventTexts = Array(repeating: "", count: started.count)
             eventTasks = started.enumerated().map { index, session in
                 Task { [weak self] in
@@ -182,6 +185,7 @@ final class HarnessModel {
     }
 
     func stop() async {
+        if !sessions.isEmpty { NSLog("[Selenite] stream stop: %d side(s)", Int32(sessions.count)) }
         // Order matters: manager stop, then feedback stopAll, then sessions stop, so nothing keeps
         // delivering feedback callbacks into a handler that has already been torn down.
         controllerManager?.stop()

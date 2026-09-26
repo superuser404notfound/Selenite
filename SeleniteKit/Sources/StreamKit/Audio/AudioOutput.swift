@@ -108,11 +108,14 @@ public final class AudioOutput: @unchecked Sendable {
             engine.attach(node)
             engine.connect(node, to: engine.mainMixerNode, format: format)
             nodes[attachment] = NodeEntry(node: node)
-            connectOutput()
+            let outputChannels = connectOutput()
+            NSLog("[Selenite] AudioOutput: attached a %d-channel stream, output runs %d channels",
+                  Int32(channels), Int32(outputChannels))
             if !engine.isRunning {
                 do {
                     try engine.start()
                 } catch {
+                    NSLog("[Selenite] AudioOutput: engine start failed: %@", String(describing: error))
                     nodes.removeValue(forKey: attachment)
                     engine.detach(node)
                     throw error
@@ -138,12 +141,14 @@ public final class AudioOutput: @unchecked Sendable {
     /// Mixer to hardware in the hardware's channel count and layout. The plain
     /// `standardFormat(sampleRate:channels:)` initializer returns nil above 2 channels, so using
     /// it here silently kept every route at stereo; 5.1 needs an explicit channel layout to reach
-    /// an eARC receiver.
-    private func connectOutput() {
+    /// an eARC receiver. Returns the channel count the output was connected with.
+    @discardableResult
+    private func connectOutput() -> AVAudioChannelCount {
         let hardware = engine.outputNode.outputFormat(forBus: 0)
         let sampleRate = hardware.sampleRate > 0 ? hardware.sampleRate : 48000
-        engine.connect(engine.mainMixerNode, to: engine.outputNode,
-                       format: Self.outputFormat(sampleRate: sampleRate, channelCount: hardware.channelCount))
+        let format = Self.outputFormat(sampleRate: sampleRate, channelCount: hardware.channelCount)
+        engine.connect(engine.mainMixerNode, to: engine.outputNode, format: format)
+        return format.channelCount
     }
 
     private static func outputFormat(sampleRate: Double, channelCount: AVAudioChannelCount) -> AVAudioFormat {
@@ -161,8 +166,15 @@ public final class AudioOutput: @unchecked Sendable {
     private func rewire() {
         lock.withLock {
             guard !nodes.isEmpty else { return }
-            connectOutput()
-            try? engine.start()
+            let outputChannels = connectOutput()
+            do {
+                try engine.start()
+                NSLog("[Selenite] AudioOutput: rewired after a configuration change, output runs %d channels",
+                      Int32(outputChannels))
+            } catch {
+                NSLog("[Selenite] AudioOutput: engine restart after a configuration change failed: %@",
+                      String(describing: error))
+            }
         }
     }
 }

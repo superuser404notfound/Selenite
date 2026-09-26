@@ -12,7 +12,8 @@ public enum ControllerKind: Sendable, Equatable {
     }
 
     public var capabilities: UInt16 {
-        let base = UInt16(LI_CCAP_ANALOG_TRIGGERS | LI_CCAP_RUMBLE | LI_CCAP_BATTERY_STATE)
+        // No LI_CCAP_BATTERY_STATE: battery reporting is not implemented in M1-A.
+        let base = UInt16(LI_CCAP_ANALOG_TRIGGERS | LI_CCAP_RUMBLE)
         switch self {
         case .xbox: return base | UInt16(LI_CCAP_TRIGGER_RUMBLE)
         case .dualSense, .dualShock4: return base | UInt16(LI_CCAP_TOUCHPAD | LI_CCAP_ACCEL | LI_CCAP_GYRO | LI_CCAP_RGB_LED)
