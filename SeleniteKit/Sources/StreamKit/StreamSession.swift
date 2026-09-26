@@ -26,7 +26,7 @@ public enum StreamEvent: Sendable {
 public struct StreamStats: Sendable {
     public var decodedFrames: Int
     public var networkDroppedFrames: Int
-    public var mailbox: MailboxStats
+    public var pacer: PacerStats
     public var averageDecodeMilliseconds: Double
     public var rttMilliseconds: UInt32?
 }
@@ -42,7 +42,7 @@ public enum StreamSessionError: Error {
 
 public final class StreamSession: SlotEventSink, @unchecked Sendable {
     public let slot: Slot
-    public let mailbox = FrameMailbox<CMSampleBuffer>()
+    public let pacer = FramePacer<CMSampleBuffer>()
     public let events: AsyncStream<StreamEvent>
     private let eventSink: AsyncStream<StreamEvent>.Continuation
     private let host: PairedHost
@@ -185,7 +185,7 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
         let hasRTT = slot.api.getEstimatedRttInfo!(&rtt, &variance)
         return StreamStats(decodedFrames: pipeline?.decodedFrames ?? 0,
                            networkDroppedFrames: pipeline?.networkDroppedFrames ?? 0,
-                           mailbox: mailbox.stats,
+                           pacer: pacer.stats,
                            averageDecodeMilliseconds: pipeline?.averageDecodeMilliseconds ?? 0,
                            rttMilliseconds: hasRTT ? rtt : nil)
     }
@@ -211,7 +211,7 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
         let codec: VideoCodec = (videoFormat & VIDEO_FORMAT_MASK_H264) != 0 ? .h264 : .hevc
         let color: ColorSignal = (videoFormat & VIDEO_FORMAT_MASK_10BIT) != 0 ? .hdr10 : .sdr709
         lock.lock()
-        pipeline = VideoPipeline(slot: slot, codec: codec, color: color, mailbox: mailbox)
+        pipeline = VideoPipeline(slot: slot, codec: codec, color: color, pacer: pacer)
         lock.unlock()
         return 0
     }

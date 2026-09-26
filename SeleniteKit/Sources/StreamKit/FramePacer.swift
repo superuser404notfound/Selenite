@@ -19,6 +19,10 @@ public struct PacerStats: Sendable, Equatable {
 /// Hand-off between the decoder and the vsync tick. Keeps at most two frames in arrival order, so
 /// frames that arrive bunched inside one refresh are shown on consecutive ticks instead of dropped,
 /// and cuts a lag that stands for `catchUpTicks` ticks so latency cannot creep.
+///
+/// `Frame` carries no `Sendable` constraint: `CMSampleBufferRef` is `CM_SWIFT_NONSENDABLE` in this
+/// SDK, but frames still cross from the decode thread to the vsync tick and must be treated as
+/// immutable once put.
 public final class FramePacer<Frame>: @unchecked Sendable {
     public static var capacity: Int { 2 }
 

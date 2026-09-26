@@ -4,12 +4,12 @@ import MoonlightCore
 import QuartzCore
 
 /// Pulls decode units from one slot on a dedicated thread, decodes them and hands the newest
-/// frame to the mailbox the display pacer reads.
+/// frames to the pacer the display tick reads.
 public final class VideoPipeline: @unchecked Sendable {
     private let slot: Slot
     private let codec: VideoCodec
     private let color: ColorSignal
-    private let mailbox: FrameMailbox<CMSampleBuffer>
+    private let pacer: FramePacer<CMSampleBuffer>
     private let lock = NSLock()
     private var running = false
     // Signalled when the pull thread has left run(), decoder teardown included; nil while no
@@ -25,8 +25,8 @@ public final class VideoPipeline: @unchecked Sendable {
     private var decodedFramesCount = 0
     private var networkDroppedFramesCount = 0
 
-    public init(slot: Slot, codec: VideoCodec, color: ColorSignal, mailbox: FrameMailbox<CMSampleBuffer>) {
-        self.slot = slot; self.codec = codec; self.color = color; self.mailbox = mailbox
+    public init(slot: Slot, codec: VideoCodec, color: ColorSignal, pacer: FramePacer<CMSampleBuffer>) {
+        self.slot = slot; self.codec = codec; self.color = color; self.pacer = pacer
     }
 
     public var decodedFrames: Int {
@@ -108,8 +108,8 @@ public final class VideoPipeline: @unchecked Sendable {
                 if decoder.map({ !$0.canAccept(newFormat) }) ?? true {
                     decoder?.invalidate()
                     decoder = nil
-                    decoder = try VideoDecoder(format: newFormat, color: color) { [mailbox] pixelBuffer in
-                        if let sample = try? DisplaySample.make(pixelBuffer) { mailbox.put(sample) }
+                    decoder = try VideoDecoder(format: newFormat, color: color) { [pacer] pixelBuffer in
+                        if let sample = try? DisplaySample.make(pixelBuffer) { pacer.put(sample, arrival: CACurrentMediaTime()) }
                     }
                 }
                 format = newFormat

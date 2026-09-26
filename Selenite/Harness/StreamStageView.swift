@@ -62,7 +62,7 @@ final class StreamStageController: UIViewController {
             view.addSubview(layerView)
             view.addSubview(label)
             halves.append((layerView, label))
-            pacer.attach(mailbox: session.mailbox, layer: layerView.displayLayer)
+            pacer.attach(pacer: session.pacer, layer: layerView.displayLayer)
         }
     }
 
@@ -107,12 +107,14 @@ final class StreamStageController: UIViewController {
         let current = model.sessions.map { $0.stats() }
         for (index, stats) in current.enumerated() where index < halves.count {
             let last = index < previous.count ? previous[index] : nil
-            let fps = stats.mailbox.delivered - (last?.mailbox.delivered ?? 0)
-            let dropped = stats.mailbox.dropped - (last?.mailbox.dropped ?? 0)
+            let fps = Int32(stats.pacer.presented - (last?.pacer.presented ?? 0))
+            let stallsPerMinute = Int32((stats.pacer.stalls - (last?.pacer.stalls ?? 0)) * 60)
+            let bufferedPerSecond = Int32(stats.pacer.bufferedTicks - (last?.pacer.bufferedTicks ?? 0))
             let event = index < model.eventTexts.count ? model.eventTexts[index] : ""
             halves[index].label.text = String(
-                format: "shown %d fps  mailbox drops %d/s  decode %.2f ms  net drops %d  rtt %@",
-                fps, dropped, stats.averageDecodeMilliseconds, stats.networkDroppedFrames,
+                format: "shown %d fps  stalls %d/min  overflow %d  catch-up %d  buffered %d/s  jitter %.1f ms  decode %.2f ms  net drops %d  rtt %@",
+                fps, stallsPerMinute, Int32(stats.pacer.overflowDrops), Int32(stats.pacer.catchUpDrops), bufferedPerSecond,
+                stats.pacer.jitterMilliseconds, stats.averageDecodeMilliseconds, Int32(stats.networkDroppedFrames),
                 stats.rttMilliseconds.map { "\($0) ms" } ?? "n/a") + "\n" + event
             halves[index].label.sizeToFit()
         }
