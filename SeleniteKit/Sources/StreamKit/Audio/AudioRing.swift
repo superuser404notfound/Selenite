@@ -55,7 +55,10 @@ public final class AudioRing: @unchecked Sendable {
         let w = written.load(ordering: .acquiring)
         var available = w - r
         if !primed {
-            guard available >= target else {
+            // A render quantum can exceed the target (tvOS may ignore the preferred IO buffer
+            // duration), so priming on `target` alone would underrun on every read once the
+            // quantum is larger than it.
+            guard available >= max(target, frames) else {
                 out.initialize(repeating: 0, count: frames * channels)
                 return
             }
@@ -84,6 +87,6 @@ public final class AudioRing: @unchecked Sendable {
         return AudioRingStats(underruns: underruns.load(ordering: .relaxed),
                               catchUps: catchUps.load(ordering: .relaxed),
                               overflows: overflows.load(ordering: .relaxed),
-                              fillMilliseconds: Double(fill) * 1000 / Double(sampleRate))
+                              fillMilliseconds: max(0, Double(fill) * 1000 / Double(sampleRate)))
     }
 }

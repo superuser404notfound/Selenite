@@ -44,3 +44,16 @@ private func read(_ ring: AudioRing, frames: Int) -> [Float] {
     #expect(ring.stats.overflows == 1)
     #expect(abs(ring.stats.fillMilliseconds - 50) < 1)
 }
+
+@Test func primingUsesMaxOfTargetAndFrames() {
+    let ring = AudioRing(channels: 2)
+    // 1600 frames clears the 30 ms (1440-frame) target but not a 2048-frame render quantum.
+    write(ring, frames: 1600, value: 0.5)
+    let first = read(ring, frames: 2048)
+    #expect(first.allSatisfy { $0 == 0 })
+    #expect(ring.stats.underruns == 0)
+    write(ring, frames: 600, value: 0.5)              // 2200 frames now buffered, above the quantum
+    let second = read(ring, frames: 2048)
+    #expect(second.allSatisfy { $0 == 0.5 })
+    #expect(ring.stats.underruns == 0)
+}
