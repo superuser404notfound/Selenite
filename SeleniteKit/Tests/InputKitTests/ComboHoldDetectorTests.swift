@@ -30,3 +30,10 @@ import Testing
     fired = d.update(pressed: true, now: 1.9)
     #expect(fired)
 }
+
+/// `holdSeconds` has to be public: `ControllerManager` reads it to arm a timer for a combo held
+/// motionless, since `valueChangedHandler` never fires again on its own to re-check the threshold.
+@Test func holdSecondsIsReadableForArmingATimer() {
+    #expect(ComboHoldDetector().holdSeconds == 1.0)
+    #expect(ComboHoldDetector(holdSeconds: 2.5).holdSeconds == 2.5)
+}

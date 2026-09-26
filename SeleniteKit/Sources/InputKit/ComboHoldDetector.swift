@@ -4,7 +4,7 @@ public struct ComboHoldDetector: Sendable {
     // (e.g. 1.9 - 0.9 == 0.9999999999999999 in IEEE 754 double, not exactly 1.0).
     private static let epsilon = 1e-9
 
-    private let holdSeconds: Double
+    public let holdSeconds: Double
     private var pressedSince: Double?
     private var fired = false
 
