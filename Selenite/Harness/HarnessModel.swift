@@ -43,10 +43,7 @@ final class HarnessModel {
             status = "Keychain unavailable, pairings will not persist: \(error)"
         }
         hosts = hostStore.all()
-        MLSetLogSink { slot, line in
-            guard let line else { return }
-            print("[slot \(slot)] \(String(cString: line))", terminator: "")
-        }
+        MLSetLogSink(seleniteLogSink)
     }
 
     func pair() async {
@@ -167,4 +164,11 @@ final class HarnessModel {
         eventTexts[index] = text
         status = "Side \(index == 0 ? "A" : "B"): \(text)"
     }
+}
+
+/// moonlight-common-c logs from its own connection threads. A closure written inside the
+/// @MainActor init would inherit main-actor isolation and trap on its first off-main call.
+private nonisolated func seleniteLogSink(_ slot: Int32, _ line: UnsafePointer<CChar>?) {
+    guard let line else { return }
+    print("[slot \(slot)] \(String(cString: line))", terminator: "")
 }
