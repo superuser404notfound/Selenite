@@ -105,7 +105,7 @@ public final class VideoPipeline: @unchecked Sendable {
         do {
             if !parameterSets.isEmpty {
                 let newFormat = try NALPackager.formatDescription(codec: codec, parameterSets: parameterSets)
-                if decoder.map({ !$0.canAccept(newFormat) }) ?? true {
+                if decoder.map({ !$0.canAccept(newFormat, color: color) }) ?? true {
                     decoder?.invalidate()
                     decoder = nil
                     decoder = try VideoDecoder(format: newFormat, color: color) { [pacer] pixelBuffer in

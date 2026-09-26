@@ -42,7 +42,26 @@ func annexBKeyframeDecodesToAPixelBuffer(codec: VideoCodec) throws {
             parameterSets: unit.parameterSets.map { $0.withUnsafeBytes(NALPackager.stripStartCode) })
     }
     let decoder = try VideoDecoder(format: try format(small), color: .sdr709) { _ in }
-    #expect(decoder.canAccept(try format(small)))
-    #expect(!decoder.canAccept(try format(large)))
+    #expect(decoder.canAccept(try format(small), color: .sdr709))
+    #expect(!decoder.canAccept(try format(large), color: .sdr709))
+    decoder.invalidate()
+}
+
+@Test func splitAnnexBTrimsTrailingZerosAndSkipsEmptyUnits() {
+    let stream = Data([0, 0, 1, 0xAA, 0, 0, 0, 0, 1, 0, 0, 1, 0xBB, 0, 0])
+    #expect(NALPackager.splitAnnexB(stream) == [Data([0xAA]), Data([0xBB])])
+}
+
+@Test func splitAnnexBRejectsDataWithoutStartCode() {
+    #expect(NALPackager.splitAnnexB(Data([0xAA, 0xBB])) == [])
+}
+
+@Test func decoderRejectsAColorChange() throws {
+    let unit = try TestEncoder.keyframe(codec: .hevc)
+    let format = try NALPackager.formatDescription(codec: .hevc,
+        parameterSets: unit.parameterSets.map { $0.withUnsafeBytes(NALPackager.stripStartCode) })
+    let decoder = try VideoDecoder(format: format, color: .sdr709) { _ in }
+    #expect(decoder.canAccept(format, color: .sdr709))
+    #expect(!decoder.canAccept(format, color: .hdr10))
     decoder.invalidate()
 }
