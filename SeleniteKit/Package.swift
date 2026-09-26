@@ -31,6 +31,7 @@ let package = Package(
         .library(name: "HostKit", targets: ["HostKit"]),
         .library(name: "StreamKit", targets: ["StreamKit"]),
         .library(name: "MoonlightCore", targets: ["MoonlightCore"]),
+        .library(name: "InputKit", targets: ["InputKit"]),
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-certificates.git", from: "1.0.0"),
@@ -49,6 +50,7 @@ let package = Package(
             .product(name: "SwiftASN1", package: "swift-asn1"),
         ]),
         .target(name: "MoonlightCore"),
+        .target(name: "InputKit", dependencies: ["MoonlightCore"]),
         .target(name: "MoonlightSlotA", dependencies: ["MoonlightCore", "MbedCrypto"], cSettings: slotSettings),
         .target(name: "MoonlightSlotB", dependencies: ["MoonlightCore", "MbedCrypto"], cSettings: slotSettings),
         .target(
@@ -77,5 +79,6 @@ let package = Package(
         ], resources: [.copy("Fixtures")]),
         .testTarget(name: "MoonlightCoreTests", dependencies: ["MbedCrypto", "MoonlightCore", "MoonlightSlotA", "MoonlightSlotB"]),
         .testTarget(name: "StreamKitTests", dependencies: ["StreamKit"]),
+        .testTarget(name: "InputKitTests", dependencies: ["InputKit", "MoonlightCore"]),
     ]
 )
