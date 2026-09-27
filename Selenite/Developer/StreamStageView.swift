@@ -140,7 +140,8 @@ final class StreamStageController: GCEventViewController {
 
     /// The Siri Remote's Menu no longer reaches UIKit either, so it is read through GameController:
     /// a controller with a micro profile and no extended one is a Siri Remote (an extended gamepad
-    /// also reports a micro profile). Game controllers exit through the Start+Select hold instead.
+    /// also reports a micro profile). It is the only way out: game controllers have no exit, and
+    /// Start+Select does nothing.
     private func startObservingRemotes() {
         guard remoteObservers.isEmpty else { return }
         let center = NotificationCenter.default
