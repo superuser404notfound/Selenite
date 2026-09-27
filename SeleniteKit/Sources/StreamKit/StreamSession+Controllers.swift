@@ -1,4 +1,3 @@
-import QuartzCore
 import Foundation
 import InputKit
 import MoonlightCore
@@ -19,8 +18,6 @@ extension StreamSession: ControllerEventSink {
     }
 
     public func controllerState(number: UInt8, mask: UInt16, state: GamepadState) {
-        let start = CACurrentMediaTime()
-        defer { DiagnosticCounters.shared.controllerSend(.state, start: start, end: CACurrentMediaTime()) }
         _ = lifecycle.whileConnected {
             slot.api.sendMultiControllerEvent!(Int16(number), Int16(bitPattern: mask), state.buttons,
                                                state.leftTrigger, state.rightTrigger,
@@ -29,14 +26,10 @@ extension StreamSession: ControllerEventSink {
     }
 
     public func controllerTouch(number: UInt8, event: UInt8, pointer: UInt32, x: Float, y: Float, pressure: Float) {
-        let start = CACurrentMediaTime()
-        defer { DiagnosticCounters.shared.controllerSend(.touch, start: start, end: CACurrentMediaTime()) }
         _ = lifecycle.whileConnected { slot.api.sendControllerTouchEvent!(number, event, pointer, x, y, pressure) }
     }
 
     public func controllerMotion(number: UInt8, type: UInt8, x: Float, y: Float, z: Float) {
-        let start = CACurrentMediaTime()
-        defer { DiagnosticCounters.shared.controllerSend(.motion, start: start, end: CACurrentMediaTime()) }
         _ = lifecycle.whileConnected { slot.api.sendControllerMotionEvent!(number, type, x, y, z) }
     }
 
