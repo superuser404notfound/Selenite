@@ -1,5 +1,4 @@
 import MoonlightCore
-import QuartzCore
 
 /// Assigns each connected controller the lowest free number 0...15 and tracks the active mask,
 /// independent of GameController so it is testable on every platform.
@@ -28,38 +27,46 @@ public struct ControllerRoster: Sendable {
 #if os(tvOS)
 import GameController
 
+/// Observes GameController, numbers the pads and forwards their input through a
+/// `ControllerForwarder`. Start+Select is an ordinary button pair here: only the Siri Remote
+/// controls the stream (M1-B spec, section 2), and it never reaches this class.
 @MainActor
 public final class ControllerManager {
-    private weak var sink: (any ControllerEventSink)?
-    private let onOverlay: @MainActor () -> Void
+    private let forwarder: ControllerForwarder
     private var roster = ControllerRoster()
+    private var ledger = DisconnectLedger()
     private var controllers: [UInt8: GCController] = [:]
-    private var combos: [UInt8: ComboHoldDetector] = [:]
-    private var comboTimers: [UInt8: Task<Void, Never>] = [:]
     private var touching: [UInt8: Bool] = [:]
     private var observers: [NSObjectProtocol] = []
 
-    public init(sink: any ControllerEventSink, onOverlay: @escaping @MainActor () -> Void) {
-        self.sink = sink
-        self.onOverlay = onOverlay
+    public init(sink: any ControllerEventSink) {
+        forwarder = ControllerForwarder(sink: sink)
+    }
+
+    /// False while the stream overlay owns the input. Pausing sends one neutral state per
+    /// controller, resuming sends each controller's current state.
+    public var isForwarding: Bool {
+        get { forwarder.isForwarding }
+        set { forwarder.setForwarding(newValue) }
     }
 
     /// Idempotent: a second call while already observing is a no-op.
     public func start() {
         guard observers.isEmpty else { return }
         let center = NotificationCenter.default
-        // Connect re-scans rather than reads `note.object`: a Notification is not Sendable, so
-        // reaching into it from the main-actor hop is a data race the compiler rightly refuses.
-        // The controller list is the same answer and costs nothing at this frequency (matches the
-        // pattern already established in Sodalite's SiriRemoteSurfaceTracker for the same reason).
-        observers.append(center.addObserver(forName: .GCControllerDidConnect, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.refreshControllers() }
+        // Both observers read the controller's identity synchronously, before the main-actor hop:
+        // a Notification and the GCController it wraps are not Sendable, ObjectIdentifier is.
+        // A connect clears a ledger entry for that controller, then rescans.
+        observers.append(center.addObserver(forName: .GCControllerDidConnect, object: nil, queue: .main) { [weak self] note in
+            let id = (note.object as? GCController).map(ObjectIdentifier.init)
+            MainActor.assumeIsolated {
+                if let id { self?.ledger.markReconnected(id) }
+                self?.refreshControllers()
+            }
         })
-        // Disconnect cannot rely on the same rescan: whether GCController.controllers() still lists
-        // the controller by the time this notification is delivered is undocumented, so a rescan-based
-        // release can miss it. The identity is read synchronously here, before the hop (ObjectIdentifier
-        // is Sendable even though the Notification and the GCController it wraps are not), and release
-        // is driven directly from it regardless of what the live list says.
+        // Disconnect cannot rely on a rescan: whether GCController.controllers() still lists the
+        // controller when this notification arrives is undocumented, so release is driven directly
+        // from the notification's identity.
         observers.append(center.addObserver(forName: .GCControllerDidDisconnect, object: nil, queue: .main) { [weak self] note in
             let id = (note.object as? GCController).map(ObjectIdentifier.init)
             MainActor.assumeIsolated {
@@ -70,41 +77,45 @@ public final class ControllerManager {
         refreshControllers()
     }
 
-    /// Diffs `GCController.controllers()` against what is currently tracked and connects anything new.
-    /// Also releases anything that vanished without a disconnect notification, as a defensive backstop;
-    /// the disconnect notification itself never depends on this rescan (see `start()`).
+    /// Diffs `GCController.controllers()` against what is tracked: releases anything that vanished
+    /// without a notification, connects anything new that the ledger does not mark as a ghost.
     private func refreshControllers() {
         let connected = GCController.controllers()
         let liveIDs = Set(connected.map(ObjectIdentifier.init))
         for controller in Array(controllers.values) where !liveIDs.contains(ObjectIdentifier(controller)) {
             disconnect(id: ObjectIdentifier(controller))
         }
-        let trackedIDs = Set(controllers.values.map(ObjectIdentifier.init))
-        for controller in connected where !trackedIDs.contains(ObjectIdentifier(controller)) {
+        let tracked = Set(controllers.values.map(ObjectIdentifier.init))
+        let admitted = Set(ledger.admissible(live: connected.map(ObjectIdentifier.init), tracked: tracked))
+        for controller in connected where admitted.contains(ObjectIdentifier(controller)) {
             connect(controller)
         }
     }
 
+    /// Releases every controller on the host (M1-A ledger minor: stop() used to send nothing), then
+    /// forgets them.
     public func stop() {
         observers.forEach(NotificationCenter.default.removeObserver)
         observers.removeAll()
         for controller in controllers.values { controller.extendedGamepad?.valueChangedHandler = nil }
-        for timer in comboTimers.values { timer.cancel() }
-        comboTimers.removeAll()
+        forwarder.releaseAll()
         controllers.removeAll()
-        combos.removeAll()
         touching.removeAll()
         roster = ControllerRoster()
+        ledger = DisconnectLedger()
     }
 
     public func controller(number: UInt8) -> GCController? { controllers[number] }
 
-    /// Re-sends `controllerArrived` for every tracked controller with the current mask. Arrival
+    /// Re-sends `controllerArrived` and the current state for every tracked controller. Arrival
     /// events sent before the session reports connected are dropped by the host, so the caller
-    /// (Task 13) calls this once the session is actually connected.
+    /// calls this once the session is connected.
     public func reannounce() {
-        for (number, controller) in controllers {
-            sink?.controllerArrived(number: number, mask: roster.mask, kind: Self.kind(of: controller))
+        for (number, controller) in controllers.sorted(by: { $0.key < $1.key }) {
+            forwarder.arrived(number: number, mask: roster.mask, kind: Self.kind(of: controller))
+            if let pad = controller.extendedGamepad {
+                forwarder.state(number: number, mask: roster.mask, state: GamepadMapper.state(from: Self.snapshot(of: pad)))
+            }
         }
     }
 
@@ -122,8 +133,7 @@ public final class ControllerManager {
         let number = roster.connect(id: ObjectIdentifier(controller))
         controllers[number] = controller
         controller.playerIndex = GCControllerPlayerIndex(rawValue: Int(number)) ?? .indexUnset
-        let kind = Self.kind(of: controller)
-        sink?.controllerArrived(number: number, mask: roster.mask, kind: kind)
+        forwarder.arrived(number: number, mask: roster.mask, kind: Self.kind(of: controller))
         gamepad.valueChangedHandler = { [weak self] pad, _ in
             MainActor.assumeIsolated { self?.send(pad, number: number) }
         }
@@ -132,69 +142,19 @@ public final class ControllerManager {
 
     private func disconnect(id: ObjectIdentifier) {
         guard let number = roster.disconnect(id: id) else { return }
+        ledger.markReleased(id)
         // A departed controller object can outlive this call; its handler must not keep sending.
         controllers[number]?.extendedGamepad?.valueChangedHandler = nil
         controllers[number] = nil
-        combos[number] = nil
         touching[number] = nil
-        cancelComboTimer(number: number)
-        for event in ControllerRoster.releaseEvents(number: number, remainingMask: roster.mask) {
-            sink?.controllerState(number: number, mask: event.mask, state: event.state)
-        }
+        forwarder.released(number: number, remainingMask: roster.mask)
     }
 
     private func send(_ pad: GCExtendedGamepad, number: UInt8) {
-        let snapshot = Self.snapshot(of: pad)
-        let pressed = snapshot.menu && snapshot.options
-        var combo = combos[number] ?? ComboHoldDetector()
-        let overlay = combo.update(pressed: pressed, now: CACurrentMediaTime())
-        combos[number] = combo
-        if pressed {
-            scheduleComboTimer(number: number, holdSeconds: combo.holdSeconds)
-        } else {
-            cancelComboTimer(number: number)
-        }
-        if overlay {
-            onOverlay()
-            // The combo held Start+Select down in the stream's view of the pad; without this the
-            // game keeps seeing them held after the overlay takes the input.
-            sink?.controllerState(number: number, mask: roster.mask, state: GamepadState())
-            return
-        }
-        sink?.controllerState(number: number, mask: roster.mask, state: GamepadMapper.state(from: snapshot))
+        forwarder.state(number: number, mask: roster.mask, state: GamepadMapper.state(from: Self.snapshot(of: pad)))
         if let touchpad = Self.touchpad(of: pad) {
             sendTouch(touchpad, number: number)
         }
-    }
-
-    /// `valueChangedHandler` only fires on an input change, so holding the combo perfectly still
-    /// never re-checks the hold threshold. This one-shot timer, (re)armed whenever the combo becomes
-    /// pressed and cancelled on release/disconnect/stop, re-evaluates it directly off the pad's
-    /// current button state instead of waiting for another event.
-    private func scheduleComboTimer(number: UInt8, holdSeconds: Double) {
-        guard comboTimers[number] == nil else { return }
-        comboTimers[number] = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .seconds(holdSeconds))
-            guard !Task.isCancelled else { return }
-            self?.checkComboTimeout(number: number)
-        }
-    }
-
-    private func cancelComboTimer(number: UInt8) {
-        comboTimers[number]?.cancel()
-        comboTimers[number] = nil
-    }
-
-    private func checkComboTimeout(number: UInt8) {
-        comboTimers[number] = nil
-        guard let pad = controllers[number]?.extendedGamepad else { return }
-        let pressed = pad.buttonMenu.isPressed && (pad.buttonOptions?.isPressed ?? false)
-        var combo = combos[number] ?? ComboHoldDetector()
-        let overlay = combo.update(pressed: pressed, now: CACurrentMediaTime())
-        combos[number] = combo
-        guard overlay else { return }
-        onOverlay()
-        sink?.controllerState(number: number, mask: roster.mask, state: GamepadState())
     }
 
     static func snapshot(of pad: GCExtendedGamepad) -> GamepadSnapshot {
@@ -224,7 +184,7 @@ public final class ControllerManager {
     }
 
     /// GameController reports no touch state, only a position that rests at (0, 0): treat any other
-    /// position as a finger on the pad. Device-verified in Task 14.
+    /// position as a finger on the pad (M1-A device round).
     private func sendTouch(_ pad: GCControllerDirectionPad, number: UInt8) {
         let x = pad.xAxis.value, y = pad.yAxis.value
         let down = x != 0 || y != 0
@@ -232,7 +192,7 @@ public final class ControllerManager {
         guard down || was else { return }
         let event = down ? (was ? UInt8(LI_TOUCH_EVENT_MOVE) : UInt8(LI_TOUCH_EVENT_DOWN)) : UInt8(LI_TOUCH_EVENT_UP)
         touching[number] = down
-        sink?.controllerTouch(number: number, event: event, pointer: 0, x: (x + 1) / 2, y: (1 - y) / 2, pressure: down ? 1 : 0)
+        forwarder.touch(number: number, event: event, pointer: 0, x: (x + 1) / 2, y: (1 - y) / 2, pressure: down ? 1 : 0)
     }
 }
 #endif
