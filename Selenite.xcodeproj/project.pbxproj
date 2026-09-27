@@ -9,23 +9,37 @@
 /* Begin PBXBuildFile section */
 		0BF9A5FEDDE308F69811C949 /* AppCore in Frameworks */ = {isa = PBXBuildFile; productRef = 09C91847BF3CE63FF4B9A88E /* AppCore */; };
 		1EF96EFD252F0C8C6146CD9D /* SeleniteApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C17D93938F3EF35FC7048224 /* SeleniteApp.swift */; };
+		233F6F38F4D6327243A997A1 /* HarnessView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A6A866C8C288C7F96C4E477 /* HarnessView.swift */; };
+		25C43362B5FA13ECE711080A /* PromptPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 587861A0A29BF0BAD44514E0 /* PromptPanel.swift */; };
 		2D58FEC6AFD4831CD4B29071 /* InputKit in Frameworks */ = {isa = PBXBuildFile; productRef = 22C051D647308BA6DDCFF816 /* InputKit */; };
+		42F2F727BE695487B17FC82D /* ColorTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29084BD577B639C217599362 /* ColorTheme.swift */; };
 		52AC0336E4A7777DB30D201F /* MoonlightCore in Frameworks */ = {isa = PBXBuildFile; productRef = 9FE785F1EF1DE3002B7959FE /* MoonlightCore */; };
-		5BA01B8EF7A4CAF6F4FBC7AA /* StreamStageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43E33BDCDC3E51312A200C0C /* StreamStageView.swift */; };
-		69D9F74651CAD2AE7B5C3B0D /* HarnessView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 832F66ED4CF85C1E82200D8D /* HarnessView.swift */; };
-		B157748FACCC00CDBDF74094 /* HarnessModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC9C68881F381608C565060B /* HarnessModel.swift */; };
+		66808BE2A8E9D404085E10AA /* StreamStageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E70B26630A9DC9D63AA3FF5 /* StreamStageView.swift */; };
+		9A5E740E012CFCADE2B10078 /* HarnessModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 617BEEA33243BBB500BFE892 /* HarnessModel.swift */; };
+		C44E78C4EDFB53E5C70B370F /* MenuPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95FB195CF38E94D64367E7C8 /* MenuPresentation.swift */; };
+		E4CBC4B4BCE309F4E1F5AE83 /* AsyncCachedImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45E145C40671B3024384F31F /* AsyncCachedImage.swift */; };
+		EBD2EC4B6DED50553E7C4F9E /* ArtworkTile.swift in Sources */ = {isa = PBXBuildFile; fileRef = B660E02E5ABAFD106CB03193 /* ArtworkTile.swift */; };
 		ED786636E3672852C14D4D5B /* HostKit in Frameworks */ = {isa = PBXBuildFile; productRef = CCD3F26D86A723963A2FB2BA /* HostKit */; };
+		F78DD469BAF41BA4CE2359AB /* ValuePickerRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00F01E3CDDCB412C415DCCB0 /* ValuePickerRow.swift */; };
 		F8AAB1581DDCDBB00D69C04C /* StreamKit in Frameworks */ = {isa = PBXBuildFile; productRef = 7469462ED7EB913A8C1A7626 /* StreamKit */; };
+		FE2E1B2C36AC1AEF0DC84B61 /* FocusKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00EAE024DF3884F582048B1 /* FocusKit.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		00F01E3CDDCB412C415DCCB0 /* ValuePickerRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ValuePickerRow.swift; sourceTree = "<group>"; };
 		152E3C6DC9B0F1A43ECDF02F /* Selenite-tvOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "Selenite-tvOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
-		43E33BDCDC3E51312A200C0C /* StreamStageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamStageView.swift; sourceTree = "<group>"; };
-		832F66ED4CF85C1E82200D8D /* HarnessView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessView.swift; sourceTree = "<group>"; };
+		29084BD577B639C217599362 /* ColorTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorTheme.swift; sourceTree = "<group>"; };
+		2A6A866C8C288C7F96C4E477 /* HarnessView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessView.swift; sourceTree = "<group>"; };
+		45E145C40671B3024384F31F /* AsyncCachedImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AsyncCachedImage.swift; sourceTree = "<group>"; };
+		587861A0A29BF0BAD44514E0 /* PromptPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromptPanel.swift; sourceTree = "<group>"; };
+		617BEEA33243BBB500BFE892 /* HarnessModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessModel.swift; sourceTree = "<group>"; };
+		6E70B26630A9DC9D63AA3FF5 /* StreamStageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamStageView.swift; sourceTree = "<group>"; };
+		95FB195CF38E94D64367E7C8 /* MenuPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuPresentation.swift; sourceTree = "<group>"; };
 		B2E3997C9A5DCCC491590535 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		B660E02E5ABAFD106CB03193 /* ArtworkTile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkTile.swift; sourceTree = "<group>"; };
 		C17D93938F3EF35FC7048224 /* SeleniteApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeleniteApp.swift; sourceTree = "<group>"; };
-		CC9C68881F381608C565060B /* HarnessModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessModel.swift; sourceTree = "<group>"; };
 		E06B05EB5A9C79E42910DCC6 /* SeleniteKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = SeleniteKit; path = SeleniteKit; sourceTree = SOURCE_ROOT; };
+		F00EAE024DF3884F582048B1 /* FocusKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusKit.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -49,7 +63,8 @@
 			children = (
 				B2E3997C9A5DCCC491590535 /* Info.plist */,
 				C17D93938F3EF35FC7048224 /* SeleniteApp.swift */,
-				E1B829D8A889B2F55084D718 /* Harness */,
+				B96A0335EA2C3F46F2F4083A /* Developer */,
+				FF192B3F71CF0B5F9815F3F0 /* UI */,
 			);
 			path = Selenite;
 			sourceTree = "<group>";
@@ -62,6 +77,16 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		B96A0335EA2C3F46F2F4083A /* Developer */ = {
+			isa = PBXGroup;
+			children = (
+				617BEEA33243BBB500BFE892 /* HarnessModel.swift */,
+				2A6A866C8C288C7F96C4E477 /* HarnessView.swift */,
+				6E70B26630A9DC9D63AA3FF5 /* StreamStageView.swift */,
+			);
+			path = Developer;
+			sourceTree = "<group>";
+		};
 		DD117898FE65DFBA59087221 = {
 			isa = PBXGroup;
 			children = (
@@ -71,22 +96,26 @@
 			);
 			sourceTree = "<group>";
 		};
-		E1B829D8A889B2F55084D718 /* Harness */ = {
-			isa = PBXGroup;
-			children = (
-				CC9C68881F381608C565060B /* HarnessModel.swift */,
-				832F66ED4CF85C1E82200D8D /* HarnessView.swift */,
-				43E33BDCDC3E51312A200C0C /* StreamStageView.swift */,
-			);
-			path = Harness;
-			sourceTree = "<group>";
-		};
 		E342AB1525D5C123A61187A4 /* Packages */ = {
 			isa = PBXGroup;
 			children = (
 				E06B05EB5A9C79E42910DCC6 /* SeleniteKit */,
 			);
 			name = Packages;
+			sourceTree = "<group>";
+		};
+		FF192B3F71CF0B5F9815F3F0 /* UI */ = {
+			isa = PBXGroup;
+			children = (
+				B660E02E5ABAFD106CB03193 /* ArtworkTile.swift */,
+				45E145C40671B3024384F31F /* AsyncCachedImage.swift */,
+				29084BD577B639C217599362 /* ColorTheme.swift */,
+				F00EAE024DF3884F582048B1 /* FocusKit.swift */,
+				95FB195CF38E94D64367E7C8 /* MenuPresentation.swift */,
+				587861A0A29BF0BAD44514E0 /* PromptPanel.swift */,
+				00F01E3CDDCB412C415DCCB0 /* ValuePickerRow.swift */,
+			);
+			path = UI;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -157,10 +186,17 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				B157748FACCC00CDBDF74094 /* HarnessModel.swift in Sources */,
-				69D9F74651CAD2AE7B5C3B0D /* HarnessView.swift in Sources */,
+				EBD2EC4B6DED50553E7C4F9E /* ArtworkTile.swift in Sources */,
+				E4CBC4B4BCE309F4E1F5AE83 /* AsyncCachedImage.swift in Sources */,
+				42F2F727BE695487B17FC82D /* ColorTheme.swift in Sources */,
+				FE2E1B2C36AC1AEF0DC84B61 /* FocusKit.swift in Sources */,
+				9A5E740E012CFCADE2B10078 /* HarnessModel.swift in Sources */,
+				233F6F38F4D6327243A997A1 /* HarnessView.swift in Sources */,
+				C44E78C4EDFB53E5C70B370F /* MenuPresentation.swift in Sources */,
+				25C43362B5FA13ECE711080A /* PromptPanel.swift in Sources */,
 				1EF96EFD252F0C8C6146CD9D /* SeleniteApp.swift in Sources */,
-				5BA01B8EF7A4CAF6F4FBC7AA /* StreamStageView.swift in Sources */,
+				66808BE2A8E9D404085E10AA /* StreamStageView.swift in Sources */,
+				F78DD469BAF41BA4CE2359AB /* ValuePickerRow.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
