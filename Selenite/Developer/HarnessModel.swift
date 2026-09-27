@@ -14,11 +14,6 @@ struct SideChoice: Equatable {
     var appID: Int?
 }
 
-/// Signatures already match `ControllerFeedbackHandler` exactly (each of `ControllerFeedback`'s
-/// five methods is declared `nonisolated` on the `@MainActor` class), so the conformance costs
-/// nothing: no isolation mismatch, InputKit untouched.
-extension ControllerFeedback: ControllerFeedbackHandler {}
-
 @Observable @MainActor
 final class HarnessModel {
     let identity: ClientIdentity
