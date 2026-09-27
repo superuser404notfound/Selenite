@@ -6,6 +6,14 @@ public struct AudioRingStats: Sendable, Equatable {
     public var catchUps = 0
     public var overflows = 0
     public var fillMilliseconds: Double = 0
+
+    /// Public so AppCore's tests can build stats; `AudioRing.stats` keeps using every argument.
+    public init(underruns: Int = 0, catchUps: Int = 0, overflows: Int = 0, fillMilliseconds: Double = 0) {
+        self.underruns = underruns
+        self.catchUps = catchUps
+        self.overflows = overflows
+        self.fillMilliseconds = fillMilliseconds
+    }
 }
 
 /// Lock-free single-producer single-consumer ring of interleaved Float32 frames between

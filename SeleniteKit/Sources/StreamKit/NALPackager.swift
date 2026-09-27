@@ -1,7 +1,7 @@
 import CoreMedia
 import Foundation
 
-public enum VideoCodec: Sendable { case h264, hevc }
+public enum VideoCodec: Sendable, Equatable { case h264, hevc }
 
 public enum StreamKitError: Error {
     case formatDescription(OSStatus)

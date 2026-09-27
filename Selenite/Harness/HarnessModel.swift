@@ -206,6 +206,7 @@ final class HarnessModel {
     private func record(_ event: StreamEvent, forHalf index: Int) {
         guard index < eventTexts.count else { return }
         let text = switch event {
+        case .launching: "launching"
         case .started: "connected"
         case .stageFailed(let name, let code): "stage \(name) failed (\(code))"
         case .terminated(let code): "terminated (\(code))"
