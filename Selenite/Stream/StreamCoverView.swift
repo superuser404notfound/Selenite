@@ -15,7 +15,7 @@ struct StreamCoverView: View {
                 StreamLoadingView(controller: controller)
                     .transition(.opacity)
             }
-            if controller.phase == .running {
+            if controller.phase == .running, controller.ending == nil {
                 StreamIndicators(controller: controller, showsStats: model.settings.preferences.stats == .compact)
             }
             if controller.isOverlayOpen {
@@ -25,11 +25,14 @@ struct StreamCoverView: View {
         }
         .background(Color.Theme.page.ignoresSafeArea())
         .animation(.easeOut(duration: 0.4), value: controller.phase)
+        .animation(.easeOut(duration: 0.4), value: controller.ending)
         .animation(.easeInOut(duration: 0.2), value: controller.isOverlayOpen)
     }
 
+    /// Also while ending: the loading view says what the stop is waiting for.
     private var isLoading: Bool {
-        switch controller.phase {
+        if controller.ending != nil { return true }
+        return switch controller.phase {
         case .connecting, .startingGame, .waitingForPicture: true
         case .running, .ended: false
         }

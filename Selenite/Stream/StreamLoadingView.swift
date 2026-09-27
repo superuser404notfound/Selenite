@@ -1,7 +1,8 @@
 import AppCore
 import SwiftUI
 
-/// Until the first frame: the app's box art blurred behind its name and the current step.
+/// Until the first frame, and while a stream ends: the app's box art blurred behind its name and
+/// the current step.
 struct StreamLoadingView: View {
     @Environment(AppModel.self) private var model
     let controller: StreamController
@@ -34,7 +35,12 @@ struct StreamLoadingView: View {
     }
 
     private var statusLine: LocalizedStringKey {
-        switch controller.phase {
+        switch controller.ending {
+        case .quittingGame: return "Quitting game…"
+        case .disconnecting: return "Disconnecting…"
+        case nil: break
+        }
+        return switch controller.phase {
         case .connecting: "Connecting…"
         case .startingGame: "Starting game…"
         case .waitingForPicture, .running, .ended: "Waiting for picture…"

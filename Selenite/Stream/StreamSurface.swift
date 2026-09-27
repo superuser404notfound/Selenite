@@ -80,6 +80,9 @@ final class StreamSurfaceController: GCEventViewController {
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        // A controller is not touch input to the idle timer: without this the screensaver or
+        // sleep starts in the middle of a game.
+        UIApplication.shared.isIdleTimerDisabled = true
         if let window = view.window {
             displayWindow = window
             let fps = controller.settings.fps
@@ -187,6 +190,7 @@ final class StreamSurfaceController: GCEventViewController {
     private func teardown() {
         guard !tornDown else { return }
         tornDown = true
+        UIApplication.shared.isIdleTimerDisabled = false
         stopObservingRemotes()
         controllerUserInteractionEnabled = true
         pacer.stop()

@@ -33,6 +33,13 @@ public enum StreamPhase: Equatable, Sendable {
     case ended
 }
 
+/// Set from the moment the stream starts ending until the session and any quit have returned, so
+/// the cover can say what it is waiting for instead of holding a frozen frame.
+public enum StreamEnding: Equatable, Sendable {
+    case disconnecting
+    case quittingGame
+}
+
 /// One solo stream from the moment an app is chosen until the cover closes (M1-B spec, 4.4 and
 /// 4.5): loading phases, the overlay, disconnect, quit, and every way it can end. Every ending runs
 /// through `finish`, which stops input, stops the session and reports exactly once.
@@ -41,6 +48,8 @@ public final class StreamController: Identifiable {
     /// The Siri Remote's Menu can reach the controller through GameController and through UIKit
     /// for one press; a second report inside this window is the same press.
     public static let menuDebounceSeconds = 0.3
+    /// A stream that connected but shows no frame within this long ends as `.noVideoTraffic`.
+    public static let defaultFirstFrameTimeout: Duration = .seconds(20)
 
     public let id = UUID()
     public let host: PairedHost
@@ -52,21 +61,23 @@ public final class StreamController: Identifiable {
     public private(set) var isPoorConnection = false
     public private(set) var liveStats: StreamStatsSummary?
     public private(set) var failure: StreamFailure?
+    public private(set) var ending: StreamEnding?
 
     public let session: any StreamSessionHandle
     private let input: any StreamInput
     private let commands: any HostCommands
     private let onEnded: @MainActor (StreamFailure?) -> Void
+    private let firstFrameTimeout: Duration
     @ObservationIgnored private var loops: [Task<Void, Never>] = []
     @ObservationIgnored private var lastMenuPress = -Double.infinity
     @ObservationIgnored private var previousStats: StreamStats?
     @ObservationIgnored private var stageFailure: StreamFailure?
     @ObservationIgnored private var started = false
-    @ObservationIgnored private var ending = false
     @ObservationIgnored private(set) var endTask: Task<Void, Never>?
 
     public init(host: PairedHost, app: AppEntry, settings: StreamSettings, session: any StreamSessionHandle,
                 input: any StreamInput, commands: any HostCommands,
+                firstFrameTimeout: Duration = StreamController.defaultFirstFrameTimeout,
                 onEnded: @escaping @MainActor (StreamFailure?) -> Void) {
         self.host = host
         self.app = app
@@ -75,6 +86,7 @@ public final class StreamController: Identifiable {
         self.input = input
         self.commands = commands
         self.onEnded = onEnded
+        self.firstFrameTimeout = firstFrameTimeout
     }
 
     public func start() {
@@ -120,7 +132,7 @@ public final class StreamController: Identifiable {
     }
 
     public func requestQuit() {
-        guard isOverlayOpen, !ending else { return }
+        guard isOverlayOpen, ending == nil else { return }
         isConfirmingQuit = true
     }
 
@@ -135,7 +147,7 @@ public final class StreamController: Identifiable {
     }
 
     func handle(_ event: StreamEvent) {
-        guard !ending else { return }
+        guard ending == nil else { return }
         switch event {
         case .launching:
             if phase == .connecting { phase = .startingGame }
@@ -158,7 +170,7 @@ public final class StreamController: Identifiable {
 
     /// The first presented frame ends the loading view.
     func checkFirstFrame() {
-        guard phase == .waitingForPicture, !ending, session.stats().pacer.presented > 0 else { return }
+        guard phase == .waitingForPicture, ending == nil, session.stats().pacer.presented > 0 else { return }
         phase = .running
         sampleStats()
         loops.append(Task { [weak self] in
@@ -193,25 +205,30 @@ public final class StreamController: Identifiable {
     }
 
     private func watchForFirstFrame() {
+        let deadline = ContinuousClock.now + firstFrameTimeout
         loops.append(Task { [weak self] in
             while !Task.isCancelled {
                 guard let self, self.phase == .waitingForPicture else { return }
                 self.checkFirstFrame()
+                if self.phase == .waitingForPicture, ContinuousClock.now >= deadline {
+                    self.finish(failure: .noVideoTraffic)
+                    return
+                }
                 try? await Task.sleep(for: .milliseconds(50))
             }
         })
     }
 
     private func setOverlay(open: Bool) {
-        guard phase == .running, !ending, open != isOverlayOpen else { return }
+        guard phase == .running, ending == nil, open != isOverlayOpen else { return }
         isOverlayOpen = open
         if !open { isConfirmingQuit = false }
         input.setForwarding(!open)
     }
 
     private func finish(failure: StreamFailure?, quitGame: Bool = false) {
-        guard !ending else { return }
-        ending = true
+        guard ending == nil else { return }
+        ending = quitGame ? .quittingGame : .disconnecting
         isOverlayOpen = false
         isConfirmingQuit = false
         input.end()

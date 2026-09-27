@@ -118,6 +118,9 @@
     "Disconnect" : {
 
     },
+    "Disconnecting…" : {
+
+    },
     "Dropped frames" : {
 
     },
@@ -203,6 +206,9 @@
 
     },
     "Quit the running game?" : {
+
+    },
+    "Quitting game…" : {
 
     },
     "Remove" : {

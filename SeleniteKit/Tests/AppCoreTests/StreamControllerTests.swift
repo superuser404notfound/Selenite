@@ -112,7 +112,8 @@ private final class FakeCommands: HostCommands, @unchecked Sendable {
     let controller: StreamController
 }
 
-@MainActor private func makeRig(session: FakeSession = FakeSession(), quitError: (any Error)? = nil) -> Rig {
+@MainActor private func makeRig(session: FakeSession = FakeSession(), quitError: (any Error)? = nil,
+                                firstFrameTimeout: Duration = .seconds(20)) -> Rig {
     let input = FakeInput()
     let commands = FakeCommands(session: session, error: quitError)
     let ended = EndLog()
@@ -120,7 +121,7 @@ private final class FakeCommands: HostCommands, @unchecked Sendable {
         host: PairedHost(id: "H", name: "PC", address: "10.0.0.2", httpsPort: 47984, serverCertificateDER: Data([1])),
         app: AppEntry(id: 7, title: "Game", supportsHDR: false),
         settings: StreamSettings(width: 1920, height: 1080, fps: 60, bitrateKbps: 20_000, hdr: false),
-        session: session, input: input, commands: commands,
+        session: session, input: input, commands: commands, firstFrameTimeout: firstFrameTimeout,
         onEnded: { failure in ended.calls.append(failure) })
     return Rig(session: session, input: input, commands: commands, ended: ended, controller: controller)
 }
@@ -272,4 +273,41 @@ private final class FakeCommands: HostCommands, @unchecked Sendable {
     rig.session.send(.poorConnection(false))
     let recovered = await eventually { !rig.controller.isPoorConnection }
     #expect(recovered)
+}
+
+@MainActor @Test func disconnectShowsItsEndingUntilTheSessionStops() async {
+    let rig = await runningRig()
+    let before: StreamEnding? = rig.controller.ending
+    #expect(before == nil)
+    rig.controller.menuPressed(now: 10)
+    rig.controller.disconnect()
+    let during: StreamEnding? = rig.controller.ending
+    #expect(during == .disconnecting)
+    #expect(rig.controller.phase == .running)
+    await rig.controller.endTask?.value
+    #expect(rig.controller.phase == .ended)
+}
+
+@MainActor @Test func quitShowsItsEndingUntilTheHostAnswers() async {
+    let rig = await runningRig()
+    rig.controller.menuPressed(now: 10)
+    rig.controller.requestQuit()
+    rig.controller.confirmQuit()
+    let during: StreamEnding? = rig.controller.ending
+    #expect(during == .quittingGame)
+    #expect(!rig.controller.isOverlayOpen)
+    await rig.controller.endTask?.value
+    let calls: [StreamFailure?] = rig.ended.calls
+    #expect(calls == [nil])
+}
+
+@MainActor @Test func noFirstFrameInTimeEndsWithNoVideoTraffic() async {
+    let rig = makeRig(firstFrameTimeout: .milliseconds(100))
+    rig.controller.start()
+    rig.session.send(.started)
+    let ended = await eventually { rig.controller.phase == .ended }
+    let calls: [StreamFailure?] = rig.ended.calls
+    #expect(ended)
+    #expect(calls == [.noVideoTraffic])
+    #expect(rig.session.stopCount == 1)
 }
