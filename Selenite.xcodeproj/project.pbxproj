@@ -23,6 +23,7 @@
 		6DF9D32C15A12D0C2955FE33 /* FailureText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68830DDB57D3AA87AD8A38C6 /* FailureText.swift */; };
 		6E89F70DE09BD4F802273DA2 /* AppTile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BE0886C65B71808D997F30A /* AppTile.swift */; };
 		71A30642922B8F8B29A65265 /* AddHostFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31D65A510D94364F3B5D7626 /* AddHostFlowView.swift */; };
+		81B8795B97796488DA74FFC8 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 12D1C745A4359BA90A9D9162 /* Localizable.xcstrings */; };
 		993D6AFA841889D22673347E /* StreamOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56AEAF6F7A60D4EE01BA1587 /* StreamOverlayView.swift */; };
 		9A5E740E012CFCADE2B10078 /* HarnessModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 617BEEA33243BBB500BFE892 /* HarnessModel.swift */; };
 		9E014C89E72ACA197D89FC43 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 273A08E874EAF5433651BECB /* HomeView.swift */; };
@@ -44,6 +45,7 @@
 /* Begin PBXFileReference section */
 		00F01E3CDDCB412C415DCCB0 /* ValuePickerRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ValuePickerRow.swift; sourceTree = "<group>"; };
 		10D449D417CA0BAC6F70C675 /* StreamCoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamCoverView.swift; sourceTree = "<group>"; };
+		12D1C745A4359BA90A9D9162 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		152E3C6DC9B0F1A43ECDF02F /* Selenite-tvOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "Selenite-tvOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		1AFF32ECFE4F5B57C7D3376D /* Prompts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Prompts.swift; sourceTree = "<group>"; };
 		273A08E874EAF5433651BECB /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
@@ -106,6 +108,7 @@
 			isa = PBXGroup;
 			children = (
 				B2E3997C9A5DCCC491590535 /* Info.plist */,
+				12D1C745A4359BA90A9D9162 /* Localizable.xcstrings */,
 				C17D93938F3EF35FC7048224 /* SeleniteApp.swift */,
 				C3C1E8BF29C70C40301DA001 /* App */,
 				B96A0335EA2C3F46F2F4083A /* Developer */,
@@ -206,6 +209,7 @@
 			buildConfigurationList = 862573DC8B659A1BDF915C96 /* Build configuration list for PBXNativeTarget "Selenite-tvOS" */;
 			buildPhases = (
 				14FE14DCC2412C09AD09837E /* Sources */,
+				B9840716A2DF9616AC9E773C /* Resources */,
 				413528C21218222185578EFB /* Frameworks */,
 			);
 			buildRules = (
@@ -260,6 +264,17 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		B9840716A2DF9616AC9E773C /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				81B8795B97796488DA74FFC8 /* Localizable.xcstrings in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		14FE14DCC2412C09AD09837E /* Sources */ = {
