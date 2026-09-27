@@ -53,6 +53,10 @@ public struct NvEndpoints: Sendable {
     }
     public func unpair() -> URL { url("\(http)/unpair?uniqueid=\(uniqueID)") }
     public func appList() -> URL { url("\(https)/applist?uniqueid=\(uniqueID)") }
+    /// Box art (Sunshine returns a PNG), same parameters as Moonlight's app asset request.
+    public func appAsset(appID: Int) -> URL {
+        url("\(https)/appasset?uniqueid=\(uniqueID)&appid=\(appID)&AssetType=2&AssetIdx=0")
+    }
     public func launch(_ request: LaunchRequest, resume: Bool) -> URL {
         url("\(https)/\(resume ? "resume" : "launch")?uniqueid=\(uniqueID)&\(request.query)")
     }

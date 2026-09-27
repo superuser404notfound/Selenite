@@ -56,3 +56,17 @@ public final class NvHTTPClient: NSObject, NvHTTPTransport, URLSessionDelegate, 
         return (.performDefaultHandling, nil)
     }
 }
+
+/// Builds `NvHTTPClient`s that carry the client identity. A `@Sendable` factory closure captures
+/// this object instead of a `SecIdentity`, which is not Sendable.
+public final class NvHTTPClientFactory: @unchecked Sendable {
+    private let clientIdentity: SecIdentity?
+
+    public init(clientIdentity: SecIdentity?) {
+        self.clientIdentity = clientIdentity
+    }
+
+    public func make(pinnedCertificate: Data?) -> NvHTTPClient {
+        NvHTTPClient(pinnedCertificate: pinnedCertificate, clientIdentity: clientIdentity)
+    }
+}

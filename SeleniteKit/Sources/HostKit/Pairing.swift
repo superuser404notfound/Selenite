@@ -4,6 +4,12 @@ public protocol NvHTTPTransport: Sendable {
     func get(_ url: URL, timeout: TimeInterval) async throws -> Data
     /// Called once the host certificate is known, before the first HTTPS request.
     func pinServerCertificate(_ der: Data)
+    /// Called once the transport is done; `NvHTTPClient` closes its URLSession here.
+    func invalidate()
+}
+
+extension NvHTTPTransport {
+    public func invalidate() {}
 }
 
 public enum PairingError: Error, Equatable {
