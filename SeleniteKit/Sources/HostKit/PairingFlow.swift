@@ -68,14 +68,16 @@ public struct PairingFlow: Sendable {
             let reply = try await transport.get(endpoints.serverInfo(secure: false), timeout: 5)
             let info = try ServerInfo(NvResponse.parse(reply).requireOK())
             if !forcePairing, let known = store.all().first(where: { $0.id == info.uniqueID }),
-               await stillPaired(known, address: address) {
+               let verified = await stillPaired(known, address: address, httpsPort: info.httpsPort) {
                 var updated = known
                 updated.address = address
-                updated.name = info.hostname
-                updated.httpsPort = info.httpsPort
+                updated.name = verified.hostname
+                updated.httpsPort = verified.httpsPort
                 store.save(updated)
                 return .alreadyPaired(updated)
             }
+            // The probe swallows its errors, a cancellation among them: a closed panel stops here.
+            try Task.checkCancellation()
             let pin = makePIN()
             await onPIN(pin)
             let certificate = try await Pairing(transport: transport, endpoints: endpoints, identity: identity)
@@ -90,12 +92,15 @@ public struct PairingFlow: Sendable {
     }
 
     /// The saved certificate still opens an HTTPS serverinfo at this address, for the same host.
-    private func stillPaired(_ host: PairedHost, address: String) async -> Bool {
+    /// Probed at the port the plain reply advertises (the pin protects it whatever the port), and
+    /// the verified reply is returned: only it is trusted for the name and port that get saved.
+    private func stillPaired(_ host: PairedHost, address: String, httpsPort: Int) async -> ServerInfo? {
         let transport = makeTransport(host.serverCertificateDER)
         defer { transport.invalidate() }
-        let endpoints = NvEndpoints(address: address, httpsPort: host.httpsPort, uniqueID: identity.uniqueID)
+        let endpoints = NvEndpoints(address: address, httpsPort: httpsPort, uniqueID: identity.uniqueID)
         guard let reply = try? await transport.get(endpoints.serverInfo(secure: true), timeout: 5),
-              let info = try? ServerInfo(NvResponse.parse(reply).requireOK()) else { return false }
-        return info.uniqueID == host.id && info.isPaired
+              let info = try? ServerInfo(NvResponse.parse(reply).requireOK()),
+              info.uniqueID == host.id, info.isPaired else { return nil }
+        return info
     }
 }
