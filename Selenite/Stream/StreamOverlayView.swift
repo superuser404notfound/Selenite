@@ -1,0 +1,120 @@
+import AppCore
+import QuartzCore
+import SwiftUI
+
+/// The in-stream overlay (spec 4.4): glass panel at the bottom, live stats, Resume, Disconnect and
+/// Quit game with a confirmation. The stream keeps running behind it; controllers are paused.
+struct StreamOverlayView: View {
+    let controller: StreamController
+
+    private enum Action: Hashable {
+        case resume, disconnect, quit, confirmQuit, cancelQuit
+    }
+
+    @FocusState private var focused: Action?
+
+    var body: some View {
+        VStack {
+            Spacer()
+            panel
+        }
+        .padding(.bottom, 60)
+        .frame(maxWidth: .infinity)
+    }
+
+    private var panel: some View {
+        VStack(alignment: .leading, spacing: 28) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(controller.app.title)
+                    .font(.title2)
+                    .fontWeight(.bold)
+                Text(controller.host.name)
+                    .foregroundStyle(.secondary)
+            }
+            if let stats = controller.liveStats {
+                OverlayStats(stats: stats)
+            }
+            if controller.isConfirmingQuit {
+                Text("Quit \(controller.app.title) on \(controller.host.name)? Unsaved progress may be lost.")
+                VStack(spacing: 16) {
+                    Button("Quit game", role: .destructive) { controller.confirmQuit() }
+                        .focused($focused, equals: .confirmQuit)
+                    Button("Cancel") { controller.cancelQuit() }
+                        .focused($focused, equals: .cancelQuit)
+                }
+                .frame(maxWidth: .infinity)
+            } else {
+                VStack(spacing: 16) {
+                    Button("Resume") { controller.closeOverlay() }
+                        .focused($focused, equals: .resume)
+                    Button("Disconnect") { controller.disconnect() }
+                        .focused($focused, equals: .disconnect)
+                    Button("Quit game") { controller.requestQuit() }
+                        .focused($focused, equals: .quit)
+                }
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .padding(48)
+        .frame(width: 960)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 32))
+        .overlay(RoundedRectangle(cornerRadius: 32).strokeBorder(Color.Theme.panelEdge, lineWidth: 1))
+        .defaultFocus($focused, .resume)
+        .onAppear { focused = .resume }
+        .onChange(of: controller.isConfirmingQuit) { _, confirming in
+            focused = confirming ? .cancelQuit : .resume
+        }
+        // Menu while the overlay is open (the Siri Remote, or B while controllers drive it). The
+        // surface's GameController path ignores a press that began with the overlay open, so one
+        // press toggles once whichever edge this fires on; StreamController's debounce is a backstop.
+        .onExitCommand { controller.menuPressed(now: CACurrentMediaTime()) }
+    }
+}
+
+/// The overlay's stats, refreshed once per second by `StreamController`.
+private struct OverlayStats: View {
+    let stats: StreamStatsSummary
+
+    var body: some View {
+        Grid(alignment: .leading, horizontalSpacing: 40, verticalSpacing: 8) {
+            GridRow {
+                Text("Resolution")
+                Text(verbatim: "\(stats.width)x\(stats.height)")
+            }
+            GridRow {
+                Text("Frame rate")
+                Text("\(stats.fps) fps")
+            }
+            GridRow {
+                Text("Bitrate")
+                Text("\(stats.bitrateMbps) Mbps")
+            }
+            GridRow {
+                Text("Round trip")
+                if let rtt = stats.rttMilliseconds {
+                    Text("\(rtt) ms")
+                } else {
+                    Text("n/a")
+                }
+            }
+            GridRow {
+                Text("Decode time")
+                Text("\(StatsFormat.milliseconds(stats.decodeMilliseconds)) ms")
+            }
+            GridRow {
+                Text("Dropped frames")
+                Text("\(stats.networkDrops) network, \(stats.pacerDrops) pacer")
+            }
+            GridRow {
+                Text("Stalls")
+                Text(verbatim: "\(stats.stalls)")
+            }
+            GridRow {
+                Text("Audio underruns")
+                Text(verbatim: "\(stats.audioUnderruns)")
+            }
+        }
+        .font(.callout.monospacedDigit())
+        .foregroundStyle(.secondary)
+    }
+}

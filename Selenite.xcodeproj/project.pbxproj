@@ -14,6 +14,8 @@
 		254805DE344BBFCC597A314F /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A81EDC7452537FA8570F814B /* SettingsView.swift */; };
 		25C43362B5FA13ECE711080A /* PromptPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 587861A0A29BF0BAD44514E0 /* PromptPanel.swift */; };
 		2D58FEC6AFD4831CD4B29071 /* InputKit in Frameworks */ = {isa = PBXBuildFile; productRef = 22C051D647308BA6DDCFF816 /* InputKit */; };
+		3444C9834442D162D4AFDEE1 /* StreamCoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10D449D417CA0BAC6F70C675 /* StreamCoverView.swift */; };
+		37E4DAF36DD2A84FC1F1BFD5 /* StreamLoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA2DB4429BE59BAC3854583B /* StreamLoadingView.swift */; };
 		42F2F727BE695487B17FC82D /* ColorTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29084BD577B639C217599362 /* ColorTheme.swift */; };
 		4722FE1A787E162F5C3448F6 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB1D9C38AA34B31FFCA5FA32 /* RootView.swift */; };
 		52AC0336E4A7777DB30D201F /* MoonlightCore in Frameworks */ = {isa = PBXBuildFile; productRef = 9FE785F1EF1DE3002B7959FE /* MoonlightCore */; };
@@ -21,6 +23,7 @@
 		6DF9D32C15A12D0C2955FE33 /* FailureText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68830DDB57D3AA87AD8A38C6 /* FailureText.swift */; };
 		6E89F70DE09BD4F802273DA2 /* AppTile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BE0886C65B71808D997F30A /* AppTile.swift */; };
 		71A30642922B8F8B29A65265 /* AddHostFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31D65A510D94364F3B5D7626 /* AddHostFlowView.swift */; };
+		993D6AFA841889D22673347E /* StreamOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56AEAF6F7A60D4EE01BA1587 /* StreamOverlayView.swift */; };
 		9A5E740E012CFCADE2B10078 /* HarnessModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 617BEEA33243BBB500BFE892 /* HarnessModel.swift */; };
 		9E014C89E72ACA197D89FC43 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 273A08E874EAF5433651BECB /* HomeView.swift */; };
 		9F22A3E8D26DF283C88C1080 /* LiveDependencies.swift in Sources */ = {isa = PBXBuildFile; fileRef = B991729B15A5D4B5BC2C7A7A /* LiveDependencies.swift */; };
@@ -29,6 +32,7 @@
 		BB47697DDEA70547D1DCAC7D /* DeveloperView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45EAB5CCA5EF274867374D67 /* DeveloperView.swift */; };
 		C44E78C4EDFB53E5C70B370F /* MenuPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95FB195CF38E94D64367E7C8 /* MenuPresentation.swift */; };
 		D2F2FB6D3F9FB933330C3A2F /* ErrorPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A94CE08B4C9A3E680A947E22 /* ErrorPanel.swift */; };
+		D994CAFD234138F65277521A /* StreamSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF77301DC333661362D4FEB7 /* StreamSurface.swift */; };
 		E4CBC4B4BCE309F4E1F5AE83 /* AsyncCachedImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45E145C40671B3024384F31F /* AsyncCachedImage.swift */; };
 		EBD2EC4B6DED50553E7C4F9E /* ArtworkTile.swift in Sources */ = {isa = PBXBuildFile; fileRef = B660E02E5ABAFD106CB03193 /* ArtworkTile.swift */; };
 		ED786636E3672852C14D4D5B /* HostKit in Frameworks */ = {isa = PBXBuildFile; productRef = CCD3F26D86A723963A2FB2BA /* HostKit */; };
@@ -39,6 +43,7 @@
 
 /* Begin PBXFileReference section */
 		00F01E3CDDCB412C415DCCB0 /* ValuePickerRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ValuePickerRow.swift; sourceTree = "<group>"; };
+		10D449D417CA0BAC6F70C675 /* StreamCoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamCoverView.swift; sourceTree = "<group>"; };
 		152E3C6DC9B0F1A43ECDF02F /* Selenite-tvOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "Selenite-tvOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		1AFF32ECFE4F5B57C7D3376D /* Prompts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Prompts.swift; sourceTree = "<group>"; };
 		273A08E874EAF5433651BECB /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
@@ -48,6 +53,7 @@
 		45E145C40671B3024384F31F /* AsyncCachedImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AsyncCachedImage.swift; sourceTree = "<group>"; };
 		45EAB5CCA5EF274867374D67 /* DeveloperView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperView.swift; sourceTree = "<group>"; };
 		536760E4329F49D368B1B8BD /* HostCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostCard.swift; sourceTree = "<group>"; };
+		56AEAF6F7A60D4EE01BA1587 /* StreamOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamOverlayView.swift; sourceTree = "<group>"; };
 		587861A0A29BF0BAD44514E0 /* PromptPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromptPanel.swift; sourceTree = "<group>"; };
 		617BEEA33243BBB500BFE892 /* HarnessModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessModel.swift; sourceTree = "<group>"; };
 		68830DDB57D3AA87AD8A38C6 /* FailureText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FailureText.swift; sourceTree = "<group>"; };
@@ -56,10 +62,12 @@
 		95FB195CF38E94D64367E7C8 /* MenuPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuPresentation.swift; sourceTree = "<group>"; };
 		A81EDC7452537FA8570F814B /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		A94CE08B4C9A3E680A947E22 /* ErrorPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorPanel.swift; sourceTree = "<group>"; };
+		AF77301DC333661362D4FEB7 /* StreamSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamSurface.swift; sourceTree = "<group>"; };
 		B2E3997C9A5DCCC491590535 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		B660E02E5ABAFD106CB03193 /* ArtworkTile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkTile.swift; sourceTree = "<group>"; };
 		B991729B15A5D4B5BC2C7A7A /* LiveDependencies.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveDependencies.swift; sourceTree = "<group>"; };
 		C17D93938F3EF35FC7048224 /* SeleniteApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeleniteApp.swift; sourceTree = "<group>"; };
+		DA2DB4429BE59BAC3854583B /* StreamLoadingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamLoadingView.swift; sourceTree = "<group>"; };
 		E06B05EB5A9C79E42910DCC6 /* SeleniteKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = SeleniteKit; path = SeleniteKit; sourceTree = SOURCE_ROOT; };
 		ED727DA465B015CE790EDF05 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 		F00EAE024DF3884F582048B1 /* FocusKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusKit.swift; sourceTree = "<group>"; };
@@ -121,6 +129,10 @@
 			isa = PBXGroup;
 			children = (
 				A94CE08B4C9A3E680A947E22 /* ErrorPanel.swift */,
+				10D449D417CA0BAC6F70C675 /* StreamCoverView.swift */,
+				DA2DB4429BE59BAC3854583B /* StreamLoadingView.swift */,
+				56AEAF6F7A60D4EE01BA1587 /* StreamOverlayView.swift */,
+				AF77301DC333661362D4FEB7 /* StreamSurface.swift */,
 			);
 			path = Stream;
 			sourceTree = "<group>";
@@ -275,7 +287,11 @@
 				4722FE1A787E162F5C3448F6 /* RootView.swift in Sources */,
 				1EF96EFD252F0C8C6146CD9D /* SeleniteApp.swift in Sources */,
 				254805DE344BBFCC597A314F /* SettingsView.swift in Sources */,
+				3444C9834442D162D4AFDEE1 /* StreamCoverView.swift in Sources */,
+				37E4DAF36DD2A84FC1F1BFD5 /* StreamLoadingView.swift in Sources */,
+				993D6AFA841889D22673347E /* StreamOverlayView.swift in Sources */,
 				66808BE2A8E9D404085E10AA /* StreamStageView.swift in Sources */,
+				D994CAFD234138F65277521A /* StreamSurface.swift in Sources */,
 				F78DD469BAF41BA4CE2359AB /* ValuePickerRow.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

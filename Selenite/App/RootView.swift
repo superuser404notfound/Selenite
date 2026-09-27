@@ -9,6 +9,9 @@ struct RootView: View {
     var body: some View {
         @Bindable var model = model
         HomeView()
+            .fullScreenCover(item: $model.activeStream, onDismiss: { model.streamCoverDismissed() }) { controller in
+                StreamCoverView(controller: controller).environment(model)
+            }
             .menuPresentation(item: $model.pendingRemoval) { host in
                 RemoveHostPrompt(host: host).environment(model)
             }
