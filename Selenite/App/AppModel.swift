@@ -56,6 +56,7 @@ final class AppModel {
     private let identityProblem: String?
     @ObservationIgnored private var homeVisible = false
     @ObservationIgnored private var isStarting = false
+    @ObservationIgnored private var isBackgrounded = false
     @ObservationIgnored private var lastLaunch: (host: PairedHost, app: AppEntry)?
     @ObservationIgnored private var queuedLaunch: (host: PairedHost, app: AppEntry)?
     @ObservationIgnored private var failureAfterCover: StreamFailure?
@@ -186,6 +187,8 @@ final class AppModel {
             }
             // Activates the audio session and can block briefly: off the main actor.
             let channels = await Task.detached { AudioOutput.shared.maximumOutputChannels }.value
+            // Backgrounded while the audio query ran: the start is abandoned, nothing was built yet.
+            guard !isBackgrounded else { return }
             let streamSettings = StreamSettingsResolver.resolve(preferences, display: display,
                                                                 maximumOutputChannels: channels,
                                                                 hostCodecModeSupport: codecs)
@@ -202,6 +205,7 @@ final class AppModel {
                     // Strong: AppModel lives as long as the app, and streamEnded clears activeStream,
                     // which drops the controller and this closure with it.
                     onEnded: { failure in self.streamEnded(failure) })
+                guard !isBackgrounded else { return }
                 activeStream = controller
                 controller.start()
             } catch {
@@ -215,7 +219,7 @@ final class AppModel {
         DiagnosticLog.note("stream end: \(failure.map { String(describing: $0) } ?? "by the user")")
         failureAfterCover = failure
         activeStream = nil
-        if homeVisible {
+        if homeVisible, !isBackgrounded {
             directory.startPolling()
         } else {
             Task { await directory.refresh() }
@@ -240,9 +244,11 @@ final class AppModel {
     func scenePhaseChanged(_ phase: ScenePhase) {
         switch phase {
         case .background:
+            isBackgrounded = true
             directory.stopPolling()
             activeStream?.disconnect()
         case .active:
+            isBackgrounded = false
             if homeVisible, activeStream == nil, !isStarting { directory.startPolling() }
         default:
             break
