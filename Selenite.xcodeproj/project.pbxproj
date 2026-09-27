@@ -7,9 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		0BF9A5FEDDE308F69811C949 /* MoonlightCore in Frameworks */ = {isa = PBXBuildFile; productRef = 9FE785F1EF1DE3002B7959FE /* MoonlightCore */; };
+		0BF9A5FEDDE308F69811C949 /* AppCore in Frameworks */ = {isa = PBXBuildFile; productRef = 09C91847BF3CE63FF4B9A88E /* AppCore */; };
 		1EF96EFD252F0C8C6146CD9D /* SeleniteApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C17D93938F3EF35FC7048224 /* SeleniteApp.swift */; };
 		2D58FEC6AFD4831CD4B29071 /* InputKit in Frameworks */ = {isa = PBXBuildFile; productRef = 22C051D647308BA6DDCFF816 /* InputKit */; };
+		52AC0336E4A7777DB30D201F /* MoonlightCore in Frameworks */ = {isa = PBXBuildFile; productRef = 9FE785F1EF1DE3002B7959FE /* MoonlightCore */; };
 		5BA01B8EF7A4CAF6F4FBC7AA /* StreamStageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43E33BDCDC3E51312A200C0C /* StreamStageView.swift */; };
 		69D9F74651CAD2AE7B5C3B0D /* HarnessView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 832F66ED4CF85C1E82200D8D /* HarnessView.swift */; };
 		B157748FACCC00CDBDF74094 /* HarnessModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC9C68881F381608C565060B /* HarnessModel.swift */; };
@@ -35,7 +36,8 @@
 				ED786636E3672852C14D4D5B /* HostKit in Frameworks */,
 				F8AAB1581DDCDBB00D69C04C /* StreamKit in Frameworks */,
 				2D58FEC6AFD4831CD4B29071 /* InputKit in Frameworks */,
-				0BF9A5FEDDE308F69811C949 /* MoonlightCore in Frameworks */,
+				0BF9A5FEDDE308F69811C949 /* AppCore in Frameworks */,
+				52AC0336E4A7777DB30D201F /* MoonlightCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -106,6 +108,7 @@
 				CCD3F26D86A723963A2FB2BA /* HostKit */,
 				7469462ED7EB913A8C1A7626 /* StreamKit */,
 				22C051D647308BA6DDCFF816 /* InputKit */,
+				09C91847BF3CE63FF4B9A88E /* AppCore */,
 				9FE785F1EF1DE3002B7959FE /* MoonlightCore */,
 			);
 			productName = "Selenite-tvOS";
@@ -356,6 +359,10 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		09C91847BF3CE63FF4B9A88E /* AppCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AppCore;
+		};
 		22C051D647308BA6DDCFF816 /* InputKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = InputKit;

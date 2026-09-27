@@ -1,7 +1,6 @@
 import Foundation
 import HostKit
 import InputKit
-import MoonlightCore
 import Observation
 import StreamKit
 
@@ -54,7 +53,6 @@ final class HarnessModel {
             status = "Keychain unavailable, pairings will not persist: \(error)"
         }
         hosts = hostStore.all()
-        MLSetLogSink(seleniteLogSink)
     }
 
     func pair() async {
@@ -217,36 +215,5 @@ final class HarnessModel {
         if case .started = event, index == 0 { controllerManager?.reannounce() }
         eventTexts[index] = text
         status = "Side \(index == 0 ? "A" : "B"): \(text)"
-    }
-}
-
-/// moonlight-common-c logs from its own connection threads. A closure written inside the
-/// @MainActor init would inherit main-actor isolation and trap on its first off-main call.
-private nonisolated func seleniteLogSink(_ slot: Int32, _ line: UnsafePointer<CChar>?) {
-    guard let line else { return }
-    let text = "[slot \(slot)] \(String(cString: line))"
-    print(text, terminator: "")
-    DiagnosticLogFile.shared.append(text)
-}
-
-/// Device diagnostics: tvOS drops stdout without a debugger, so log lines also go to
-/// Library/Caches/selenite-log.txt, which `devicectl device copy from` can pull.
-final class DiagnosticLogFile: @unchecked Sendable {
-    static let shared = DiagnosticLogFile()
-    private let queue = DispatchQueue(label: "selenite.diagnostic-log")
-    private let handle: FileHandle?
-    private let start = Date()
-
-    private init() {
-        let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-        let url = caches.appendingPathComponent("selenite-log.txt")
-        FileManager.default.createFile(atPath: url.path, contents: nil)
-        handle = try? FileHandle(forWritingTo: url)
-    }
-
-    func append(_ line: String) {
-        let stamp = String(format: "%9.3f ", Date().timeIntervalSince(start))
-        let text = stamp + (line.hasSuffix("\n") ? line : line + "\n")
-        queue.async { [handle] in try? handle?.write(contentsOf: Data(text.utf8)) }
     }
 }
