@@ -3,6 +3,13 @@ import Foundation
 import Testing
 @testable import StreamKit
 
+private final class FrameBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var frame: CVPixelBuffer?
+    func put(_ f: CVPixelBuffer) { lock.withLock { frame = f } }
+    func take() -> CVPixelBuffer? { lock.withLock { defer { frame = nil }; return frame } }
+}
+
 @Test func splitsThreeAndFourByteStartCodes() {
     let stream = Data([0, 0, 0, 1, 0xAA, 0xBB, 0, 0, 1, 0xCC, 0, 0, 0, 1, 0xDD, 0xEE, 0xFF])
     #expect(NALPackager.splitAnnexB(stream) == [Data([0xAA, 0xBB]), Data([0xCC]), Data([0xDD, 0xEE, 0xFF])])
@@ -15,7 +22,7 @@ func annexBKeyframeDecodesToAPixelBuffer(codec: VideoCodec) throws {
     let format = try NALPackager.formatDescription(codec: codec, parameterSets: parameterSets)
     let sample = try NALPackager.sampleBuffer(annexB: unit.picture, format: format, pts: .zero)
 
-    let received = FrameMailbox<CVPixelBuffer>()
+    let received = FrameBox()
     let decoder = try VideoDecoder(format: format, color: .sdr709) { received.put($0) }
     try decoder.decode(sample)
     decoder.invalidate()
@@ -35,7 +42,26 @@ func annexBKeyframeDecodesToAPixelBuffer(codec: VideoCodec) throws {
             parameterSets: unit.parameterSets.map { $0.withUnsafeBytes(NALPackager.stripStartCode) })
     }
     let decoder = try VideoDecoder(format: try format(small), color: .sdr709) { _ in }
-    #expect(decoder.canAccept(try format(small)))
-    #expect(!decoder.canAccept(try format(large)))
+    #expect(decoder.canAccept(try format(small), color: .sdr709))
+    #expect(!decoder.canAccept(try format(large), color: .sdr709))
+    decoder.invalidate()
+}
+
+@Test func splitAnnexBTrimsTrailingZerosAndSkipsEmptyUnits() {
+    let stream = Data([0, 0, 1, 0xAA, 0, 0, 0, 0, 1, 0, 0, 1, 0xBB, 0, 0])
+    #expect(NALPackager.splitAnnexB(stream) == [Data([0xAA]), Data([0xBB])])
+}
+
+@Test func splitAnnexBRejectsDataWithoutStartCode() {
+    #expect(NALPackager.splitAnnexB(Data([0xAA, 0xBB])) == [])
+}
+
+@Test func decoderRejectsAColorChange() throws {
+    let unit = try TestEncoder.keyframe(codec: .hevc)
+    let format = try NALPackager.formatDescription(codec: .hevc,
+        parameterSets: unit.parameterSets.map { $0.withUnsafeBytes(NALPackager.stripStartCode) })
+    let decoder = try VideoDecoder(format: format, color: .sdr709) { _ in }
+    #expect(decoder.canAccept(format, color: .sdr709))
+    #expect(!decoder.canAccept(format, color: .hdr10))
     decoder.invalidate()
 }

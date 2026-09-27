@@ -53,6 +53,48 @@ import Testing
     #expect(!connectOwnedTeardown.value)
 }
 
+/// moonlight calls connectionStarted inside LiStartConnection, before endConnect runs.
+@Test func markStartedWhileConnectingConnectsAndTheConnectThreadStillOwnsTheSession() throws {
+    let lifecycle = SessionLifecycle()
+    try lifecycle.beginStart()
+    try lifecycle.beginConnect()
+    lifecycle.markStarted()
+    let connected: Bool = lifecycle.isConnected
+    #expect(connected)
+    let owned: Bool = lifecycle.endConnect(succeeded: true)
+    #expect(owned)
+    let state: SessionLifecycle.State = lifecycle.state
+    #expect(state == .connected)
+}
+
+/// The connect thread has not returned yet, so a stop must still wait for it.
+@Test func stopAfterMarkStartedButBeforeTheConnectReturnWaitsForIt() throws {
+    let lifecycle = SessionLifecycle()
+    try lifecycle.beginStart()
+    try lifecycle.beginConnect()
+    lifecycle.markStarted()
+    let found: SessionLifecycle.State? = lifecycle.requestStop()
+    #expect(found == .connecting)
+    let owned: Bool = lifecycle.endConnect(succeeded: true)
+    #expect(!owned)
+}
+
+@Test func whileConnectedRunsOnlyWhileConnected() throws {
+    let lifecycle = SessionLifecycle()
+    try lifecycle.beginStart()
+    try lifecycle.beginConnect()
+    var runs = 0
+    let beforeStart: Int? = lifecycle.whileConnected { runs += 1; return runs }
+    lifecycle.markStarted()
+    let afterStart: Int? = lifecycle.whileConnected { runs += 1; return runs }
+    _ = lifecycle.requestStop()
+    let afterStop: Int? = lifecycle.whileConnected { runs += 1; return runs }
+    #expect(beforeStart == nil)
+    #expect(afterStart == 1)
+    #expect(afterStop == nil)
+    #expect(runs == 1)
+}
+
 private final class Flag: @unchecked Sendable {
     private let lock = NSLock()
     private var raised = false

@@ -30,9 +30,10 @@ public final class VideoDecoder: @unchecked Sendable {
         session = created
     }
 
-    public func canAccept(_ newFormat: CMVideoFormatDescription) -> Bool {
+    public func canAccept(_ newFormat: CMVideoFormatDescription, color newColor: ColorSignal) -> Bool {
         VTDecompressionSessionCanAcceptFormatDescription(session, formatDescription: newFormat)
             && CMVideoFormatDescriptionGetDimensions(newFormat) == CMVideoFormatDescriptionGetDimensions(format)
+            && newColor == color
     }
 
     public func decode(_ sample: CMSampleBuffer) throws {

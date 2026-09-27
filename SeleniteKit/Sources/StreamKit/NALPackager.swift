@@ -20,14 +20,16 @@ public enum NALPackager {
 
     public static func splitAnnexB(_ data: Data) -> [Data] {
         let bytes = [UInt8](data)
+        guard let firstStartCode = startCodeIndex(in: bytes),
+              bytes[0..<firstStartCode].allSatisfy({ $0 == 0 }) else { return [] }
+
         var units: [Data] = []
         var start: Int?
         var i = 0
         while i + 2 < bytes.count {
             if bytes[i] == 0, bytes[i + 1] == 0, bytes[i + 2] == 1 {
                 if let s = start {
-                    let end = (i > s && bytes[i - 1] == 0) ? i - 1 : i
-                    units.append(Data(bytes[s..<end]))
+                    appendTrimmed(bytes, s..<i, to: &units)
                 }
                 i += 3
                 start = i
@@ -35,8 +37,30 @@ public enum NALPackager {
                 i += 1
             }
         }
-        if let s = start, s < bytes.count { units.append(Data(bytes[s...])) }
+        if let s = start {
+            appendTrimmed(bytes, s..<bytes.count, to: &units)
+        }
         return units
+    }
+
+    /// The index of the first `00 00 01` marker, i.e. where the earliest start code begins
+    /// (ignoring any extra zero bytes a 4-byte code is padded with).
+    private static func startCodeIndex(in bytes: [UInt8]) -> Int? {
+        var i = 0
+        while i + 2 < bytes.count {
+            if bytes[i] == 0, bytes[i + 1] == 0, bytes[i + 2] == 1 { return i }
+            i += 1
+        }
+        return nil
+    }
+
+    /// Strips every trailing zero byte from `bytes[range]` and appends the result unless it is
+    /// empty (back-to-back start codes with nothing between them).
+    private static func appendTrimmed(_ bytes: [UInt8], _ range: Range<Int>, to units: inout [Data]) {
+        var end = range.upperBound
+        while end > range.lowerBound, bytes[end - 1] == 0 { end -= 1 }
+        guard end > range.lowerBound else { return }
+        units.append(Data(bytes[range.lowerBound..<end]))
     }
 
     public static func formatDescription(codec: VideoCodec, parameterSets: [Data]) throws -> CMVideoFormatDescription {
@@ -59,23 +83,34 @@ public enum NALPackager {
     }
 
     public static func sampleBuffer(annexB: Data, format: CMVideoFormatDescription, pts: CMTime) throws -> CMSampleBuffer {
-        var avcc = Data(capacity: annexB.count + 16)
-        for unit in splitAnnexB(annexB) {
-            var length = UInt32(unit.count).bigEndian
-            avcc.append(Data(bytes: &length, count: 4))
-            avcc.append(unit)
-        }
+        let units = splitAnnexB(annexB)
+        guard !units.isEmpty else { throw StreamKitError.sampleBuffer(kCMBlockBufferEmptyBBufErr) }
+        let avccLength = units.reduce(0) { $0 + 4 + $1.count }
+
         var block: CMBlockBuffer?
         var status = CMBlockBufferCreateWithMemoryBlock(
-            allocator: nil, memoryBlock: nil, blockLength: avcc.count, blockAllocator: nil,
-            customBlockSource: nil, offsetToData: 0, dataLength: avcc.count, flags: 0, blockBufferOut: &block)
+            allocator: nil, memoryBlock: nil, blockLength: avccLength, blockAllocator: nil,
+            customBlockSource: nil, offsetToData: 0, dataLength: avccLength,
+            flags: kCMBlockBufferAssureMemoryNowFlag, blockBufferOut: &block)
         guard status == noErr, let block else { throw StreamKitError.sampleBuffer(status) }
-        status = avcc.withUnsafeBytes {
-            CMBlockBufferReplaceDataBytes(with: $0.baseAddress!, blockBuffer: block, offsetIntoDestination: 0, dataLength: avcc.count)
+
+        var offset = 0
+        for unit in units {
+            var length = UInt32(unit.count).bigEndian
+            status = withUnsafeBytes(of: &length) {
+                CMBlockBufferReplaceDataBytes(with: $0.baseAddress!, blockBuffer: block, offsetIntoDestination: offset, dataLength: 4)
+            }
+            guard status == noErr else { throw StreamKitError.sampleBuffer(status) }
+            offset += 4
+            status = unit.withUnsafeBytes {
+                CMBlockBufferReplaceDataBytes(with: $0.baseAddress!, blockBuffer: block, offsetIntoDestination: offset, dataLength: unit.count)
+            }
+            guard status == noErr else { throw StreamKitError.sampleBuffer(status) }
+            offset += unit.count
         }
-        guard status == noErr else { throw StreamKitError.sampleBuffer(status) }
+
         var timing = CMSampleTimingInfo(duration: .invalid, presentationTimeStamp: pts, decodeTimeStamp: .invalid)
-        var size = avcc.count
+        var size = avccLength
         var sample: CMSampleBuffer?
         status = CMSampleBufferCreateReady(allocator: nil, dataBuffer: block, formatDescription: format,
                                            sampleCount: 1, sampleTimingEntryCount: 1, sampleTimingArray: &timing,

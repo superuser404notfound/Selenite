@@ -9,9 +9,11 @@ public struct StreamSettings: Sendable {
     public var fps: Int
     public var bitrateKbps: Int
     public var hdr: Bool
+    public var audio: AudioChannels
 
-    public init(width: Int, height: Int, fps: Int, bitrateKbps: Int, hdr: Bool) {
+    public init(width: Int, height: Int, fps: Int, bitrateKbps: Int, hdr: Bool, audio: AudioChannels = .stereo) {
         self.width = width; self.height = height; self.fps = fps; self.bitrateKbps = bitrateKbps; self.hdr = hdr
+        self.audio = audio
     }
 }
 
@@ -26,9 +28,10 @@ public enum StreamEvent: Sendable {
 public struct StreamStats: Sendable {
     public var decodedFrames: Int
     public var networkDroppedFrames: Int
-    public var mailbox: MailboxStats
+    public var pacer: PacerStats
     public var averageDecodeMilliseconds: Double
     public var rttMilliseconds: UInt32?
+    public var audio: AudioRingStats?
 }
 
 public enum StreamSessionError: Error {
@@ -42,7 +45,7 @@ public enum StreamSessionError: Error {
 
 public final class StreamSession: SlotEventSink, @unchecked Sendable {
     public let slot: Slot
-    public let mailbox = FrameMailbox<CMSampleBuffer>()
+    public let pacer = FramePacer<CMSampleBuffer>()
     public let events: AsyncStream<StreamEvent>
     private let eventSink: AsyncStream<StreamEvent>.Continuation
     private let host: PairedHost
@@ -50,10 +53,30 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
     private let settings: StreamSettings
     private let endpoints: NvEndpoints
     private let client: NvHTTPClient
+    private let clientIdentity: SecIdentity
     private let lock = NSLock()
     private var pipeline: VideoPipeline?
-    private let lifecycle = SessionLifecycle()
+    private var audio: AudioStream?
+    /// Set right before the /launch or /resume request is sent, so a stop knows the host may
+    /// already be running the app even if that request never returned.
+    private var launchIssued = false
+    /// The plan decided in start(), stored so stop() can tell a resumed game (never cancelled)
+    /// from one this session launched or force-quit into (cancelled if abandoned before connect).
+    private var issuedPlan: LaunchPlan?
+    /// Latches once the stop-time /cancel has gone out, from whichever of start()/stop() notices
+    /// first, so exactly one is ever sent.
+    private var cancelSent = false
+    // Not private: StreamSession+Controllers.swift sends through `whileConnected`.
+    let lifecycle = SessionLifecycle()
     private var cStrings: [UnsafeMutablePointer<CChar>] = []
+    private weak var _feedbackHandler: (any ControllerFeedbackHandler)?
+
+    /// Host-side receiver for controller feedback (rumble, LED, motion, adaptive triggers) the
+    /// server sends back for this session. Weak: the caller owns the handler's lifetime.
+    public var feedbackHandler: (any ControllerFeedbackHandler)? {
+        get { lock.withLock { _feedbackHandler } }
+        set { lock.withLock { _feedbackHandler = newValue } }
+    }
 
     public init(host: PairedHost, appID: Int, settings: StreamSettings,
                 identity: ClientIdentity, clientIdentity: SecIdentity) throws {
@@ -64,6 +87,7 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
         self.settings = settings
         self.endpoints = NvEndpoints(address: host.address, httpsPort: host.httpsPort, uniqueID: identity.uniqueID)
         self.client = NvHTTPClient(pinnedCertificate: host.serverCertificateDER, clientIdentity: clientIdentity)
+        self.clientIdentity = clientIdentity
         (events, eventSink) = AsyncStream.makeStream()
     }
 
@@ -71,14 +95,30 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
         try lifecycle.beginStart()
         let info = try ServerInfo(NvResponse.parse(try await client.get(endpoints.serverInfo(secure: true), timeout: 10)).requireOK())
         try lifecycle.checkpoint()
+        let plan = LaunchPlan.decide(currentGame: info.currentGame, appID: appID)
+        if plan == .quitThenLaunch {
+            let cancel = try NvResponse.parse(try await client.get(endpoints.cancel(), timeout: 30))
+            guard cancel.statusCode == 200 else {
+                throw StreamSessionError.launchFailed(cancel.statusMessage)
+            }
+            try lifecycle.checkpoint()
+        }
         let riKey = Data((0..<16).map { _ in UInt8.random(in: 0...255) })
         let riKeyID = Int32.random(in: 0...Int32.max)
         let request = LaunchRequest(
             appID: appID, width: settings.width, height: settings.height, fps: settings.fps,
             riKey: riKey, riKeyID: riKeyID, hdr: settings.hdr,
-            surroundAudioInfo: Int(ML_SURROUND_AUDIO_INFO_STEREO), gamepadMask: 1,
+            surroundAudioInfo: Int(settings.audio == .surround51 ? ML_SURROUND_AUDIO_INFO_51 : ML_SURROUND_AUDIO_INFO_STEREO),
+            gamepadMask: 1,
             launchQueryTail: String(cString: slot.api.getLaunchUrlQueryParameters!()!))
-        let launch = try NvResponse.parse(try await client.get(endpoints.launch(request, resume: info.isBusy), timeout: 60))
+        lock.withLock { launchIssued = true; issuedPlan = plan }
+        let launch = try NvResponse.parse(try await client.get(endpoints.launch(request, resume: plan == .resume), timeout: 60))
+        // A stop that arrived too early to see launchIssued (or raced beginConnect) never sent its
+        // own cancel; this call is what closes that gap. sendStopTimeCancelIfNeeded() is idempotent
+        // with stop()'s own call, so it is safe to check unconditionally here.
+        if lifecycle.state == .stopped {
+            sendStopTimeCancelIfNeeded()
+        }
         try lifecycle.checkpoint()
         guard launch.statusCode == 200, let sessionURL = launch["sessionUrl0"] else {
             throw StreamSessionError.launchFailed(launch.statusMessage)
@@ -101,7 +141,7 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
         config.bitrate = Int32(settings.bitrateKbps)
         config.packetSize = 1392
         config.streamingRemotely = STREAM_CFG_AUTO
-        config.audioConfiguration = ML_AUDIO_CONFIGURATION_STEREO
+        config.audioConfiguration = settings.audio == .surround51 ? ML_AUDIO_CONFIGURATION_51 : ML_AUDIO_CONFIGURATION_STEREO
         config.supportedVideoFormats = VIDEO_FORMAT_H264 | VIDEO_FORMAT_H265 | (settings.hdr ? VIDEO_FORMAT_H265_MAIN10 : 0)
         config.clientRefreshRateX100 = 6000
         config.colorSpace = settings.hdr ? COLORSPACE_REC_2020 : COLORSPACE_REC_709
@@ -165,10 +205,49 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
                 }.start()
             }
         }
+        if found == .starting {
+            sendStopTimeCancelIfNeeded()
+        }
+        let stillOpen: AudioStream? = lock.withLock {
+            let stream = audio
+            audio = nil
+            return stream
+        }
+        stillOpen?.close()
         SlotRouter.shared.detach(slot, ifAttached: self)
         SlotAllocator.shared.release(slot)
         freeCStrings()
         eventSink.finish()
+        client.invalidate()
+    }
+
+    /// Best-effort, fire-and-forget /cancel for a session that stopped before (or racing) connect:
+    /// the host would otherwise keep running an app this session launched or force-quit into. Runs
+    /// on its own short-lived client so it never races `self.client.invalidate()`, which stop()
+    /// calls unconditionally right after this. Safe to call from both stop() and start(): the
+    /// cancelSent latch makes it a no-op the second time, from whichever side notices first.
+    private func sendStopTimeCancelIfNeeded() {
+        let shouldSend: Bool = lock.withLock {
+            guard let plan = issuedPlan,
+                  StreamSession.shouldCancelOnStop(plan: plan, launchIssued: launchIssued, cancelSent: cancelSent)
+            else { return false }
+            cancelSent = true
+            return true
+        }
+        guard shouldSend else { return }
+        let cancelClient = NvHTTPClient(pinnedCertificate: host.serverCertificateDER, clientIdentity: clientIdentity)
+        let endpoints = self.endpoints
+        Task {
+            _ = try? await cancelClient.get(endpoints.cancel(), timeout: 30)
+            cancelClient.invalidate()
+        }
+    }
+
+    /// Pure so it is testable without a network stack. A stop-time cancel is warranted only once,
+    /// only after the launch/resume request actually went out, and never for `.resume`: that game
+    /// was already running on the host before this session touched it.
+    static func shouldCancelOnStop(plan: LaunchPlan, launchIssued: Bool, cancelSent: Bool) -> Bool {
+        launchIssued && !cancelSent && plan != .resume
     }
 
     private func freeCStrings() {
@@ -179,15 +258,16 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
     }
 
     public func stats() -> StreamStats {
-        lock.lock(); let pipeline = self.pipeline; lock.unlock()
+        lock.lock(); let pipeline = self.pipeline; let audio = self.audio; lock.unlock()
         var rtt: UInt32 = 0
         var variance: UInt32 = 0
         let hasRTT = slot.api.getEstimatedRttInfo!(&rtt, &variance)
         return StreamStats(decodedFrames: pipeline?.decodedFrames ?? 0,
                            networkDroppedFrames: pipeline?.networkDroppedFrames ?? 0,
-                           mailbox: mailbox.stats,
+                           pacer: pacer.stats,
                            averageDecodeMilliseconds: pipeline?.averageDecodeMilliseconds ?? 0,
-                           rttMilliseconds: hasRTT ? rtt : nil)
+                           rttMilliseconds: hasRTT ? rtt : nil,
+                           audio: audio?.stats)
     }
 
     private func keep(_ string: String) -> UnsafeMutablePointer<CChar> {
@@ -211,7 +291,7 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
         let codec: VideoCodec = (videoFormat & VIDEO_FORMAT_MASK_H264) != 0 ? .h264 : .hevc
         let color: ColorSignal = (videoFormat & VIDEO_FORMAT_MASK_10BIT) != 0 ? .hdr10 : .sdr709
         lock.lock()
-        pipeline = VideoPipeline(slot: slot, codec: codec, color: color, mailbox: mailbox)
+        pipeline = VideoPipeline(slot: slot, codec: codec, color: color, pacer: pacer)
         lock.unlock()
         return 0
     }
@@ -221,8 +301,61 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
     public func stageFailed(stage: Int32, error: Int32) {
         eventSink.yield(.stageFailed(String(cString: slot.api.getStageName!(stage)!), error))
     }
-    public func connectionStarted() { eventSink.yield(.started) }
+    /// Called from inside LiStartConnection, before it returns: mark the session connected first, so
+    /// a controller arrival re-sent on `.started` is not dropped as too early.
+    public func connectionStarted() {
+        lifecycle.markStarted()
+        eventSink.yield(.started)
+    }
     public func connectionTerminated(error: Int32) { eventSink.yield(.terminated(error)) }
     public func connectionStatus(_ status: Int32) { eventSink.yield(.poorConnection(status == CONN_STATUS_POOR)) }
     public func setHdrMode(_ enabled: Bool) { eventSink.yield(.hostHDR(enabled)) }
+
+    public func audioInit(_ config: OPUS_MULTISTREAM_CONFIGURATION) -> Int32 {
+        do {
+            let stream = try AudioStream(config: config)
+            lock.lock(); audio = stream; lock.unlock()
+            return 0
+        } catch {
+            NSLog("StreamSession: audio init failed on slot %@: %@", String(describing: slot), String(describing: error))
+            return -1
+        }
+    }
+
+    /// `data` is nil for a lost packet; passed through unfiltered so `OpusDecoder` can hand libopus
+    /// its packet-loss-concealment call (nil data, zero length).
+    public func audioSample(_ data: UnsafePointer<CChar>?, length: Int32) {
+        lock.lock(); let stream = audio; lock.unlock()
+        stream?.submit(UnsafeRawBufferPointer(start: data, count: Int(length)))
+    }
+
+    public func audioCleanup() {
+        lock.lock(); let stream = audio; audio = nil; lock.unlock()
+        stream?.close()
+    }
+
+    public func rumble(controller: UInt16, low: UInt16, high: UInt16) {
+        lock.lock(); let handler = _feedbackHandler; lock.unlock()
+        handler?.rumble(controller: controller, low: low, high: high)
+    }
+
+    public func rumbleTriggers(controller: UInt16, left: UInt16, right: UInt16) {
+        lock.lock(); let handler = _feedbackHandler; lock.unlock()
+        handler?.rumbleTriggers(controller: controller, left: left, right: right)
+    }
+
+    public func setMotionEventState(controller: UInt16, motionType: UInt8, reportRateHz: UInt16) {
+        lock.lock(); let handler = _feedbackHandler; lock.unlock()
+        handler?.setMotionEventState(controller: controller, motionType: motionType, reportRateHz: reportRateHz)
+    }
+
+    public func setControllerLED(controller: UInt16, r: UInt8, g: UInt8, b: UInt8) {
+        lock.lock(); let handler = _feedbackHandler; lock.unlock()
+        handler?.setControllerLED(controller: controller, r: r, g: g, b: b)
+    }
+
+    public func setAdaptiveTriggers(controller: UInt16, eventFlags: UInt8, typeLeft: UInt8, typeRight: UInt8, left: [UInt8], right: [UInt8]) {
+        lock.lock(); let handler = _feedbackHandler; lock.unlock()
+        handler?.setAdaptiveTriggers(controller: controller, eventFlags: eventFlags, typeLeft: typeLeft, typeRight: typeRight, left: left, right: right)
+    }
 }

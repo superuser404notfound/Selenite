@@ -28,6 +28,9 @@ struct HarnessView: View {
                         Button("Bitrate \(model.bitrateMbps) Mbps: +10") { model.bitrateMbps = min(500, model.bitrateMbps + 10) }
                         Button("Bitrate \(model.bitrateMbps) Mbps: -10") { model.bitrateMbps = max(10, model.bitrateMbps - 10) }
                         Toggle("HDR (solo only)", isOn: $model.hdr)
+                        Button("Audio: \(model.forceStereo ? "stereo forced" : "auto (5.1 when available)")") {
+                            model.forceStereo.toggle()
+                        }
                     }
                     SidePicker(title: "Side A", choice: $model.sideA)
                     if model.layout != .solo { SidePicker(title: "Side B", choice: $model.sideB) }

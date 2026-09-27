@@ -31,6 +31,7 @@ let package = Package(
         .library(name: "HostKit", targets: ["HostKit"]),
         .library(name: "StreamKit", targets: ["StreamKit"]),
         .library(name: "MoonlightCore", targets: ["MoonlightCore"]),
+        .library(name: "InputKit", targets: ["InputKit"]),
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-certificates.git", from: "1.0.0"),
@@ -49,11 +50,25 @@ let package = Package(
             .product(name: "SwiftASN1", package: "swift-asn1"),
         ]),
         .target(name: "MoonlightCore"),
+        .target(name: "InputKit", dependencies: ["MoonlightCore"]),
         .target(name: "MoonlightSlotA", dependencies: ["MoonlightCore", "MbedCrypto"], cSettings: slotSettings),
         .target(name: "MoonlightSlotB", dependencies: ["MoonlightCore", "MbedCrypto"], cSettings: slotSettings),
         .target(
+            name: "OpusCodec",
+            cSettings: [
+                .define("OPUS_BUILD"), .define("USE_ALLOCA"),
+                .define("HAVE_LRINTF", to: "1"), .define("HAVE_LRINT", to: "1"),
+                .headerSearchPath("../../Vendor/opus/include"),
+                .headerSearchPath("../../Vendor/opus/celt"),
+                .headerSearchPath("../../Vendor/opus/silk"),
+                .headerSearchPath("../../Vendor/opus/silk/float"),
+                .headerSearchPath("../../Vendor/opus/src"),
+                .unsafeFlags(["-w"]),
+            ]
+        ),
+        .target(
             name: "StreamKit",
-            dependencies: ["HostKit", "MoonlightCore", "MoonlightSlotA", "MoonlightSlotB"],
+            dependencies: ["HostKit", "MoonlightCore", "MoonlightSlotA", "MoonlightSlotB", "OpusCodec", "InputKit"],
             // UIWindow.avDisplayManager is an AVKit category: nothing links a symbol from it, so
             // without this the framework is never loaded and the call dies in doesNotRecognizeSelector.
             linkerSettings: [.linkedFramework("AVKit", .when(platforms: [.tvOS]))]
@@ -64,5 +79,6 @@ let package = Package(
         ], resources: [.copy("Fixtures")]),
         .testTarget(name: "MoonlightCoreTests", dependencies: ["MbedCrypto", "MoonlightCore", "MoonlightSlotA", "MoonlightSlotB"]),
         .testTarget(name: "StreamKitTests", dependencies: ["StreamKit"]),
+        .testTarget(name: "InputKitTests", dependencies: ["InputKit", "MoonlightCore"]),
     ]
 )

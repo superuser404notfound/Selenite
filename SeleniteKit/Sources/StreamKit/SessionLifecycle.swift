@@ -8,9 +8,22 @@ final class SessionLifecycle: @unchecked Sendable {
 
     private let lock = NSLock()
     private var current: State = .idle
+    /// True from `beginConnect` until `endConnect`: LiStartConnection has not returned yet, even
+    /// after `markStarted`, so a stop must still wait for the connect thread.
+    private var connectPending = false
     private let connectReturned = DispatchSemaphore(value: 0)
 
     var state: State { lock.withLock { current } }
+
+    /// True once the connection started (`markStarted`) or LiStartConnection succeeded, and no
+    /// stop has run yet.
+    var isConnected: Bool { state == .connected }
+
+    /// Runs `body` only while connected, holding the lock throughout, so a stop cannot latch in the
+    /// middle of it. Keep `body` short: controller sends are a cheap enqueue. Nil when not connected.
+    func whileConnected<T>(_ body: () -> T) -> T? {
+        lock.withLock { current == .connected ? body() : nil }
+    }
 
     func beginStart() throws {
         try lock.withLock {
@@ -33,6 +46,15 @@ final class SessionLifecycle: @unchecked Sendable {
         try lock.withLock {
             guard current == .starting else { throw StreamSessionError.cancelled }
             current = .connecting
+            connectPending = true
+        }
+    }
+
+    /// moonlight's connectionStarted, which it calls from inside LiStartConnection before that
+    /// returns. Input sent from here on reaches the host, so the session counts as connected.
+    func markStarted() {
+        lock.withLock {
+            if current == .connecting { current = .connected }
         }
     }
 
@@ -40,7 +62,8 @@ final class SessionLifecycle: @unchecked Sendable {
     /// arrived meanwhile: that stop is waiting and owns the teardown.
     func endConnect(succeeded: Bool) -> Bool {
         lock.withLock {
-            guard current == .connecting else {
+            connectPending = false
+            guard current == .connecting || current == .connected else {
                 connectReturned.signal()
                 return false
             }
@@ -50,11 +73,13 @@ final class SessionLifecycle: @unchecked Sendable {
     }
 
     /// Latches `stopped`. Returns the state the stop found, or nil when a stop already ran.
+    /// Reports `.connecting` while the connect thread has not returned, even after `markStarted`,
+    /// because the stop then has to wait for it.
     func requestStop() -> State? {
         lock.withLock {
             guard current != .stopped else { return nil }
             defer { current = .stopped }
-            return current
+            return connectPending ? .connecting : current
         }
     }
 

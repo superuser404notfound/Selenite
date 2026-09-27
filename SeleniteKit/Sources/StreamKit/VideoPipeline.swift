@@ -4,12 +4,12 @@ import MoonlightCore
 import QuartzCore
 
 /// Pulls decode units from one slot on a dedicated thread, decodes them and hands the newest
-/// frame to the mailbox the display pacer reads.
+/// frames to the pacer the display tick reads.
 public final class VideoPipeline: @unchecked Sendable {
     private let slot: Slot
     private let codec: VideoCodec
     private let color: ColorSignal
-    private let mailbox: FrameMailbox<CMSampleBuffer>
+    private let pacer: FramePacer<CMSampleBuffer>
     private let lock = NSLock()
     private var running = false
     // Signalled when the pull thread has left run(), decoder teardown included; nil while no
@@ -25,8 +25,8 @@ public final class VideoPipeline: @unchecked Sendable {
     private var decodedFramesCount = 0
     private var networkDroppedFramesCount = 0
 
-    public init(slot: Slot, codec: VideoCodec, color: ColorSignal, mailbox: FrameMailbox<CMSampleBuffer>) {
-        self.slot = slot; self.codec = codec; self.color = color; self.mailbox = mailbox
+    public init(slot: Slot, codec: VideoCodec, color: ColorSignal, pacer: FramePacer<CMSampleBuffer>) {
+        self.slot = slot; self.codec = codec; self.color = color; self.pacer = pacer
     }
 
     public var decodedFrames: Int {
@@ -105,16 +105,19 @@ public final class VideoPipeline: @unchecked Sendable {
         do {
             if !parameterSets.isEmpty {
                 let newFormat = try NALPackager.formatDescription(codec: codec, parameterSets: parameterSets)
-                if decoder.map({ !$0.canAccept(newFormat) }) ?? true {
+                if decoder.map({ !$0.canAccept(newFormat, color: color) }) ?? true {
                     decoder?.invalidate()
                     decoder = nil
-                    decoder = try VideoDecoder(format: newFormat, color: color) { [mailbox] pixelBuffer in
-                        if let sample = try? DisplaySample.make(pixelBuffer) { mailbox.put(sample) }
+                    decoder = try VideoDecoder(format: newFormat, color: color) { [pacer] pixelBuffer in
+                        if let sample = try? DisplaySample.make(pixelBuffer) { pacer.put(sample, arrival: CACurrentMediaTime()) }
                     }
                 }
                 format = newFormat
             }
-            guard let format, let decoder else { return DR_NEED_IDR }
+            guard let format, let decoder else {
+                diagnostic("frame \(unit.frameNumber): no decoder yet (format \(format != nil)), requesting IDR")
+                return DR_NEED_IDR
+            }
             let sample = try NALPackager.sampleBuffer(annexB: picture, format: format,
                                                       pts: CMTime(value: Int64(unit.rtpTimestamp), timescale: 90000))
             let started = CACurrentMediaTime()
@@ -125,7 +128,14 @@ public final class VideoPipeline: @unchecked Sendable {
             lock.unlock()
             return DR_OK
         } catch {
+            diagnostic("frame \(unit.frameNumber) type \(unit.frameType) length \(unit.fullLength): \(error), requesting IDR")
             return DR_NEED_IDR
         }
     }
+}
+
+/// Routes a diagnostic line through the moonlight log sink, so it lands wherever the app logs.
+private func diagnostic(_ text: String) {
+    guard let sink = MLGetLogSink() else { return }
+    text.withCString { sink(-1, $0) }
 }

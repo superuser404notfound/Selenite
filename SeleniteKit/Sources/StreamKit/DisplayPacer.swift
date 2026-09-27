@@ -7,7 +7,7 @@ import QuartzCore
 @MainActor
 public final class DisplayPacer {
     private struct Output {
-        let mailbox: FrameMailbox<CMSampleBuffer>
+        let pacer: FramePacer<CMSampleBuffer>
         let renderer: AVSampleBufferVideoRenderer
     }
 
@@ -28,8 +28,8 @@ public final class DisplayPacer {
         target.pacer = self
     }
 
-    public func attach(mailbox: FrameMailbox<CMSampleBuffer>, layer: AVSampleBufferDisplayLayer) {
-        outputs.append(Output(mailbox: mailbox, renderer: layer.sampleBufferRenderer))
+    public func attach(pacer: FramePacer<CMSampleBuffer>, layer: AVSampleBufferDisplayLayer) {
+        outputs.append(Output(pacer: pacer, renderer: layer.sampleBufferRenderer))
     }
 
     public func start() {
@@ -48,7 +48,7 @@ public final class DisplayPacer {
     private func tick() {
         for output in outputs {
             if output.renderer.status == .failed { output.renderer.flush() }
-            if let frame = output.mailbox.take() {
+            if let frame = output.pacer.tick() {
                 output.renderer.enqueue(frame)
             }
         }
