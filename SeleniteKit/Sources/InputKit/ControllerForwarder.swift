@@ -6,6 +6,9 @@ public final class ControllerForwarder {
     private weak var sink: (any ControllerEventSink)?
     private var latest: [UInt8: GamepadState] = [:]
     private var mask: UInt16 = 0
+    /// Buttons each controller held when forwarding resumed (the press that closed the overlay,
+    /// for one). They stay off the host until that controller releases them.
+    private var heldAtResume: [UInt8: Int32] = [:]
     public private(set) var isForwarding = true
 
     public init(sink: any ControllerEventSink) {
@@ -23,7 +26,16 @@ public final class ControllerForwarder {
         self.mask = mask
         latest[number] = state
         guard isForwarding else { return }
-        sink?.controllerState(number: number, mask: mask, state: state)
+        sink?.controllerState(number: number, mask: mask, state: masked(number: number, state))
+    }
+
+    private func masked(number: UInt8, _ state: GamepadState) -> GamepadState {
+        guard let held = heldAtResume[number] else { return state }
+        let still = held & state.buttons
+        heldAtResume[number] = still == 0 ? nil : still
+        var out = state
+        out.buttons &= ~still
+        return out
     }
 
     public func touch(number: UInt8, event: UInt8, pointer: UInt32, x: Float, y: Float, pressure: Float) {
@@ -35,6 +47,7 @@ public final class ControllerForwarder {
     /// the mask update is what tells the host the controller left.
     public func released(number: UInt8, remainingMask: UInt16) {
         latest[number] = nil
+        heldAtResume[number] = nil
         mask = remainingMask
         for event in ControllerRoster.releaseEvents(number: number, remainingMask: remainingMask) {
             sink?.controllerState(number: number, mask: event.mask, state: event.state)
@@ -42,12 +55,19 @@ public final class ControllerForwarder {
     }
 
     /// Pausing sends one neutral state per controller, so nothing stays held on the host while the
-    /// overlay has the input; resuming sends each controller's current state.
+    /// overlay has the input; resuming sends each controller's current axes and triggers, with
+    /// every button it holds at that moment masked until released, so the press that closed the
+    /// overlay never reaches the game.
     public func setForwarding(_ forwarding: Bool) {
         guard forwarding != isForwarding else { return }
         isForwarding = forwarding
+        heldAtResume.removeAll()
         for number in latest.keys.sorted() {
-            let state = forwarding ? (latest[number] ?? GamepadState()) : GamepadState()
+            var state = GamepadState()
+            if forwarding, let current = latest[number] {
+                if current.buttons != 0 { heldAtResume[number] = current.buttons }
+                state = masked(number: number, current)
+            }
             sink?.controllerState(number: number, mask: mask, state: state)
         }
     }
@@ -63,6 +83,7 @@ public final class ControllerForwarder {
             }
         }
         latest.removeAll()
+        heldAtResume.removeAll()
         mask = 0
         isForwarding = true
     }

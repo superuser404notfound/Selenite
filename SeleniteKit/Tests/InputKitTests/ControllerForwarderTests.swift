@@ -71,15 +71,52 @@ private func pressing(_ buttons: Int32) -> GamepadState {
     forwarder.state(number: 0, mask: 0b11, state: pressing(0x1000))
     forwarder.setForwarding(false)
     forwarder.state(number: 0, mask: 0b11, state: GamepadState())
-    forwarder.state(number: 1, mask: 0b11, state: pressing(0x0001))
+    var tilted = pressing(0x0001)
+    tilted.leftX = 1200
+    forwarder.state(number: 1, mask: 0b11, state: tilted)
     sink.states.removeAll()
     forwarder.setForwarding(true)
+    var axesOnly = GamepadState()
+    axesOnly.leftX = 1200
     let expected: [RecordingSink.Sent] = [
         .init(number: 0, mask: 0b11, state: GamepadState()),
-        .init(number: 1, mask: 0b11, state: pressing(0x0001)),
+        .init(number: 1, mask: 0b11, state: axesOnly),
     ]
     #expect(sink.states == expected)
     #expect(forwarder.isForwarding)
+}
+
+@MainActor @Test func aButtonHeldAtResumeStaysMaskedUntilReleased() {
+    // The button that closed the overlay is still down when forwarding resumes.
+    let (sink, forwarder) = twoControllers()
+    forwarder.setForwarding(false)
+    forwarder.state(number: 0, mask: 0b11, state: pressing(0x1000))
+    forwarder.setForwarding(true)
+    sink.states.removeAll()
+    var held = pressing(0x1000 | 0x2000)
+    held.rightY = -500
+    forwarder.state(number: 0, mask: 0b11, state: held)
+    forwarder.state(number: 0, mask: 0b11, state: GamepadState())
+    forwarder.state(number: 0, mask: 0b11, state: pressing(0x1000))
+    var fresh = pressing(0x2000)
+    fresh.rightY = -500
+    let expected: [RecordingSink.Sent] = [
+        .init(number: 0, mask: 0b11, state: fresh),
+        .init(number: 0, mask: 0b11, state: GamepadState()),
+        .init(number: 0, mask: 0b11, state: pressing(0x1000)),
+    ]
+    #expect(sink.states == expected)
+}
+
+@MainActor @Test func theMaskIsPerController() {
+    let (sink, forwarder) = twoControllers()
+    forwarder.setForwarding(false)
+    forwarder.state(number: 0, mask: 0b11, state: pressing(0x1000))
+    forwarder.setForwarding(true)
+    sink.states.removeAll()
+    forwarder.state(number: 1, mask: 0b11, state: pressing(0x1000))
+    let expected: [RecordingSink.Sent] = [.init(number: 1, mask: 0b11, state: pressing(0x1000))]
+    #expect(sink.states == expected)
 }
 
 @MainActor @Test func settingTheSameForwardingTwiceSendsNothing() {
