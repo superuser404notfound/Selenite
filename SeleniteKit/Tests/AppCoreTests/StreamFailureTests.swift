@@ -71,3 +71,11 @@ import Testing
     #expect(summary.rttMilliseconds == nil)
     #expect(summary.audioUnderruns == 0)
 }
+
+@Test func aFailedQuitOffersNoRetry() {
+    // Retrying after a failed quit would relaunch the game just quit.
+    let quit: Bool = StreamFailure.quitFailed.offersRetry
+    let lost: Bool = StreamFailure.unstableConnection.offersRetry
+    #expect(!quit)
+    #expect(lost)
+}

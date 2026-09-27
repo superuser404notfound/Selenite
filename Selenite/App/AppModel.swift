@@ -59,6 +59,8 @@ final class AppModel {
     @ObservationIgnored private var isBackgrounded = false
     @ObservationIgnored private var lastLaunch: (host: PairedHost, app: AppEntry)?
     @ObservationIgnored private var queuedLaunch: (host: PairedHost, app: AppEntry)?
+    @ObservationIgnored private var queuedRetry: (host: PairedHost, app: AppEntry)?
+    @ObservationIgnored private var backgroundTeardown: UIBackgroundTaskIdentifier = .invalid
     @ObservationIgnored private var failureAfterCover: StreamFailure?
 
     init() {
@@ -135,6 +137,7 @@ final class AppModel {
     func removeHost(_ host: PairedHost) {
         pendingRemoval = nil
         directory.remove(id: host.id)
+        catalog.forget(hostID: host.id)
         if settings.selectedHostID == host.id {
             settings.setSelectedHostID(directory.hosts.first?.id)
         }
@@ -146,6 +149,10 @@ final class AppModel {
     /// quit by the launch (LaunchPlan.quitThenLaunch), so that asks first.
     func appSelected(_ app: AppEntry) {
         guard let snapshot = selectedHost else { return }
+        launchOrAskToSwitch(snapshot: snapshot, app: app)
+    }
+
+    private func launchOrAskToSwitch(snapshot: HostSnapshot, app: AppEntry) {
         if LaunchPlan.decide(currentGame: snapshot.currentGame, appID: app.id) == .quitThenLaunch {
             let running = catalog.apps[snapshot.id]?.first { $0.id == snapshot.currentGame }?.title
             pendingSwitch = AppSwitchPrompt(host: snapshot.host, app: app, runningTitle: running)
@@ -159,13 +166,25 @@ final class AppModel {
         pendingSwitch = nil
     }
 
+    /// Runs the same switch check as a tile, against the host as it is now: the host may be
+    /// running another game by the time "Try again" is chosen.
     func retryLastLaunch() {
-        queuedLaunch = lastLaunch
+        queuedRetry = lastLaunch
         errorPanel = nil
     }
 
-    /// `onDismiss` of the switch prompt and the error panel: start what they queued.
+    /// `onDismiss` of the switch prompt and the error panel: start what they queued, or, for a
+    /// retry, ask first when it would quit another game.
     func presentationDismissed() {
+        if let retry = queuedRetry {
+            queuedRetry = nil
+            if let snapshot = directory.snapshot(id: retry.host.id) {
+                launchOrAskToSwitch(snapshot: snapshot, app: retry.app)
+            } else {
+                startStream(host: retry.host, app: retry.app)
+            }
+            return
+        }
         guard let launch = queuedLaunch else { return }
         queuedLaunch = nil
         startStream(host: launch.host, app: launch.app)
@@ -205,6 +224,9 @@ final class AppModel {
                     // Strong: AppModel lives as long as the app, and streamEnded clears activeStream,
                     // which drops the controller and this closure with it.
                     onEnded: { failure in self.streamEnded(failure) })
+                // Unreachable by construction: no await since the check above, so the scene phase
+                // cannot have changed. An await inserted before this line would have to stop the
+                // session here, or the slot it claimed leaks.
                 guard !isBackgrounded else { return }
                 activeStream = controller
                 controller.start()
@@ -219,6 +241,7 @@ final class AppModel {
         DiagnosticLog.note("stream end: \(failure.map { String(describing: $0) } ?? "by the user")")
         failureAfterCover = failure
         activeStream = nil
+        endBackgroundTeardown()
         if homeVisible, !isBackgrounded {
             directory.startPolling()
         } else {
@@ -229,14 +252,14 @@ final class AppModel {
     func streamCoverDismissed() {
         guard let failure = failureAfterCover else { return }
         failureAfterCover = nil
-        errorPanel = ErrorPanelModel(failure: failure, canRetry: lastLaunch != nil)
+        errorPanel = ErrorPanelModel(failure: failure, canRetry: lastLaunch != nil && failure.offersRetry)
     }
 
     /// A start that failed before any cover was shown.
     private func showFailure(_ failure: StreamFailure) {
         DiagnosticLog.note("stream start failed: \(String(describing: failure))")
-        errorPanel = ErrorPanelModel(failure: failure, canRetry: lastLaunch != nil)
-        if homeVisible { directory.startPolling() }
+        errorPanel = ErrorPanelModel(failure: failure, canRetry: lastLaunch != nil && failure.offersRetry)
+        if homeVisible, !isBackgrounded { directory.startPolling() }
     }
 
     /// Backgrounding or sleep disconnects cleanly; the game keeps running on the host and shows as
@@ -246,12 +269,30 @@ final class AppModel {
         case .background:
             isBackgrounded = true
             directory.stopPolling()
-            activeStream?.disconnect()
+            if let stream = activeStream {
+                beginBackgroundTeardown()
+                stream.disconnect()
+            }
         case .active:
             isBackgrounded = false
             if homeVisible, activeStream == nil, !isStarting { directory.startPolling() }
         default:
             break
         }
+    }
+
+    /// Keeps the app running in the background until the stream's stop has returned; ended in
+    /// `streamEnded`, or by the system when the time runs out.
+    private func beginBackgroundTeardown() {
+        guard backgroundTeardown == .invalid else { return }
+        backgroundTeardown = UIApplication.shared.beginBackgroundTask(withName: "stream teardown") { [weak self] in
+            MainActor.assumeIsolated { self?.endBackgroundTeardown() }
+        }
+    }
+
+    private func endBackgroundTeardown() {
+        guard backgroundTeardown != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(backgroundTeardown)
+        backgroundTeardown = .invalid
     }
 }

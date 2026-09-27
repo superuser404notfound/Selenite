@@ -52,7 +52,7 @@ private func temporaryDirectory() -> URL {
     let online = FakeCatalogSource()
     online.setArt(png)
     _ = await AppCatalog(source: online, cacheDirectory: directory).boxArt(for: host, appID: 7)
-    let file = directory.appendingPathComponent("HOST-1").appendingPathComponent("7.png")
+    let file = AppCatalog(source: online, cacheDirectory: directory).fileURL(hostID: "HOST-1", appID: 7)
     let onDisk = FileManager.default.contents(atPath: file.path)
     #expect(onDisk == png)
 
@@ -107,6 +107,37 @@ private func temporaryDirectory() -> URL {
     let apps: [AppEntry]? = catalog.apps["HOST-1"]
     #expect(apps == [desktop])
     #expect(!catalog.failedHosts.contains("HOST-1"))
+}
+
+@MainActor @Test func theHostIDNeverReachesThePathAsIs() {
+    // The uniqueID comes from an unauthenticated reply: "../" must not climb out of the cache.
+    let directory = temporaryDirectory()
+    let catalog = AppCatalog(source: FakeCatalogSource(), cacheDirectory: directory)
+    let file = catalog.fileURL(hostID: "../../escape", appID: 7)
+    let folder: String = file.deletingLastPathComponent().lastPathComponent
+    let parent: String = file.deletingLastPathComponent().deletingLastPathComponent().path
+    #expect(parent == directory.path)
+    #expect(folder.count == 64)
+    #expect(!folder.contains("."))
+}
+
+@MainActor @Test func forgettingAHostDropsItsAppsAndArt() async {
+    let directory = temporaryDirectory()
+    let source = FakeCatalogSource()
+    source.setArt(png)
+    source.setApps([desktop])
+    let catalog = AppCatalog(source: source, cacheDirectory: directory)
+    await catalog.loadApps(for: host)
+    _ = await catalog.boxArt(for: host, appID: 7)
+    let folder = catalog.fileURL(hostID: host.id, appID: 7).deletingLastPathComponent()
+    catalog.forget(hostID: host.id)
+    let apps: [AppEntry]? = catalog.apps[host.id]
+    let folderExists: Bool = FileManager.default.fileExists(atPath: folder.path)
+    #expect(apps == nil)
+    #expect(!folderExists)
+    source.setArt(nil)
+    let art = await catalog.boxArt(for: host, appID: 7)
+    #expect(art == nil)
 }
 
 @Test func imageSignatures() {

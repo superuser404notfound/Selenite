@@ -1,3 +1,4 @@
+import Crypto
 import Foundation
 import Observation
 
@@ -34,7 +35,8 @@ public struct LiveAppCatalogSource: AppCatalogSource {
 }
 
 /// App lists per host and box art cached in memory and on disk
-/// (`Library/Caches/boxart/<hostID>/<appID>.png`). Art that could not be fetched is remembered as
+/// (`Library/Caches/boxart/<SHA-256 of hostID>/<appID>.png`; the host ID comes from an
+/// unauthenticated reply, so it never reaches the path as it is). Art that could not be fetched is remembered as
 /// missing until the host's app list loads again, so an offline host is not asked on every redraw
 /// and a host that comes back gets its art.
 @MainActor @Observable
@@ -86,7 +88,20 @@ public final class AppCatalog {
     }
 
     public func fileURL(hostID: String, appID: Int) -> URL {
-        directory.appendingPathComponent(hostID, isDirectory: true).appendingPathComponent("\(appID).png")
+        hostDirectory(hostID).appendingPathComponent("\(appID).png")
+    }
+
+    /// A removed host: its app list, remembered failures and box art, in memory and on disk.
+    public func forget(hostID: String) {
+        apps[hostID] = nil
+        failedHosts.remove(hostID)
+        memory = memory.filter { !$0.key.hasPrefix(hostID + "/") }
+        misses = misses.filter { !$0.hasPrefix(hostID + "/") }
+        try? FileManager.default.removeItem(at: hostDirectory(hostID))
+    }
+
+    private func hostDirectory(_ hostID: String) -> URL {
+        directory.appendingPathComponent(Data(SHA256.hash(data: Data(hostID.utf8))).hexString, isDirectory: true)
     }
 
     /// PNG or JPEG signature. Sunshine answers a missing asset with an XML error body.

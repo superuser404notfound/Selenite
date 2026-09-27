@@ -54,4 +54,10 @@ public enum StreamFailure: Equatable, Sendable {
         default: .connectionEnded(code)
         }
     }
+
+    /// Whether the error panel offers "Try again". Not after a failed quit: retrying would relaunch
+    /// the game that was just quit.
+    public var offersRetry: Bool {
+        self != .quitFailed
+    }
 }
