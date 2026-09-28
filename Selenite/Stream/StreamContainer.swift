@@ -1,7 +1,9 @@
 import AppCore
 import GameController
+import InputKit
 import Observation
 import QuartzCore
+import StreamKit
 import SwiftUI
 import UIKit
 
@@ -42,6 +44,8 @@ final class StreamContainerController: GCEventViewController {
     private var remotes: [ObjectIdentifier: GCController] = [:]
     /// Release time (CACurrentMediaTime) of the last Siri Remote Menu or gamepad B GameController saw.
     private var lastControllerMenu = -Double.infinity
+    /// One per Siri Remote, keyed like `remotes`.
+    private var pointers: [ObjectIdentifier: RemotePointer] = [:]
 
     init(controller: StreamController, content: AnyView) {
         self.controller = controller
@@ -110,6 +114,7 @@ final class StreamContainerController: GCEventViewController {
         let live = Set(connected.map(ObjectIdentifier.init))
         for id in remotes.keys where !live.contains(id) {
             if let gone = remotes.removeValue(forKey: id) { Self.clearHandlers(gone) }
+            pointers.removeValue(forKey: id)
         }
         for controller in connected where remotes[ObjectIdentifier(controller)] == nil {
             // Handlers run on the main queue.
@@ -121,6 +126,7 @@ final class StreamContainerController: GCEventViewController {
                 pad.buttonMenu.pressedChangedHandler = { [weak self] _, _, pressed in
                     MainActor.assumeIsolated { self?.remoteMenuChanged(pressed: pressed) }
                 }
+                observePointer(pad, id: ObjectIdentifier(controller))
             } else {
                 continue
             }
@@ -131,8 +137,12 @@ final class StreamContainerController: GCEventViewController {
     private static func clearHandlers(_ controller: GCController) {
         if let gamepad = controller.extendedGamepad {
             gamepad.buttonB.pressedChangedHandler = nil
-        } else {
-            controller.microGamepad?.buttonMenu.pressedChangedHandler = nil
+        } else if let pad = controller.microGamepad {
+            pad.buttonMenu.pressedChangedHandler = nil
+            pad.dpad.valueChangedHandler = nil
+            pad.buttonA.pressedChangedHandler = nil
+            pad.buttonX.pressedChangedHandler = nil
+            pad.reportsAbsoluteDpadValues = false
         }
     }
 
@@ -141,6 +151,41 @@ final class StreamContainerController: GCEventViewController {
         remoteObservers.removeAll()
         for controller in remotes.values { Self.clearHandlers(controller) }
         remotes.removeAll()
+        pointers.removeAll()
+    }
+
+    /// The Siri Remote as a trackpad for the host's mouse: the touch surface moves the pointer, its
+    /// click is the left button and Play/Pause the right one. `StreamController` drops all of it
+    /// while the overlay is open or the stream is not running.
+    private func observePointer(_ pad: GCMicroGamepad, id: ObjectIdentifier) {
+        pointers[id] = RemotePointer()
+        pad.reportsAbsoluteDpadValues = true
+        pad.dpad.valueChangedHandler = { [weak self] _, x, y in
+            MainActor.assumeIsolated { self?.pointerTouched(id: id, x: x, y: y) }
+        }
+        pad.buttonA.pressedChangedHandler = { [weak self] _, _, pressed in
+            MainActor.assumeIsolated { self?.pointerClicked(id: id, pressed: pressed) }
+        }
+        pad.buttonX.pressedChangedHandler = { [weak self] _, _, pressed in
+            MainActor.assumeIsolated { self?.pointerButton(.right, pressed: pressed) }
+        }
+    }
+
+    private func pointerTouched(id: ObjectIdentifier, x: Float, y: Float) {
+        guard !tornDown, var pointer = pointers[id] else { return }
+        let move = pointer.touch(x: x, y: y, time: CACurrentMediaTime())
+        pointers[id] = pointer
+        controller.pointerMoved(dx: move.dx, dy: move.dy)
+    }
+
+    private func pointerClicked(id: ObjectIdentifier, pressed: Bool) {
+        pointers[id]?.setClick(pressed: pressed)
+        pointerButton(.left, pressed: pressed)
+    }
+
+    private func pointerButton(_ button: MouseButton, pressed: Bool) {
+        guard !tornDown else { return }
+        controller.pointerButton(button, pressed: pressed)
     }
 
     /// Siri Remote Menu, on release: opens the overlay, and with it open leaves the stream.

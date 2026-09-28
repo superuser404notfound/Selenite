@@ -34,6 +34,8 @@ typedef struct {
                                     float x, float y, float pressure);
     int (*sendControllerMotionEvent)(uint8_t controllerNumber, uint8_t motionType, float x, float y, float z);
     int (*sendControllerBatteryEvent)(uint8_t controllerNumber, uint8_t batteryState, uint8_t batteryPercentage);
+    int (*sendMouseMoveEvent)(short deltaX, short deltaY);
+    int (*sendMouseButtonEvent)(char action, int button);
     // Variadic logger for CONNECTION_LISTENER_CALLBACKS.logMessage; formats and forwards to the log sink.
     ConnListenerLogMessage logMessage;
 } MLSlotAPI;

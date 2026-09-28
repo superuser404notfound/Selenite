@@ -20,5 +20,5 @@ moonlight-common-c keeps all connection state in globals and its callbacks carry
 - Conventional Commits, no em-dashes anywhere.
 - `docs/superpowers/` holds local-only specs and plans and is gitignored.
 - Code lifted from AetherEngine (LGPLv3 with App Store exception, relicensable to GPLv3) carries a header comment naming its source file.
-- Only the Siri Remote controls a stream: Menu opens and closes the overlay (and cancels while loading). Controller buttons, Start and Select included, always go to the host. The stream surface is a `GCEventViewController` with controller user interaction off while the overlay is closed.
+- Only the Siri Remote controls a stream: Menu opens the overlay (and cancels while loading), Menu with the overlay open leaves the stream. Controller buttons, Start and Select included, always go to the host. While the overlay is closed the Siri Remote is also the host's mouse (`RemotePointer`): touch surface moves, click is the left button, Play/Pause the right one. The stream surface is a `GCEventViewController` with controller user interaction off while the overlay is closed.
 - tvOS UI: settings rows are single focusable views that open a list of buttons (a Form `Picker` opens nothing); panel buttons stack vertically; panels present through `.menuPresentation`.
