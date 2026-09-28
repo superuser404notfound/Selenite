@@ -22,6 +22,10 @@ struct RootView: View {
         HomeView()
             .fullScreenCover(item: stream, onDismiss: { model.streamCoverDismissed() }) { controller in
                 StreamCoverView(controller: controller).environment(model)
+                    // Menu must never dismiss the stream: tvOS treats it as an interactive
+                    // dismissal of the presented cover, which the device log caught ending a
+                    // running stream even with the window and view handlers in place.
+                    .interactiveDismissDisabled()
             }
             .menuPresentation(item: $model.pendingRemoval) { host in
                 RemoveHostPrompt(host: host).environment(model)

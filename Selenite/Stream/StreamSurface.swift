@@ -45,7 +45,6 @@ final class StreamSurfaceController: GCEventViewController {
     private weak var displayWindow: UIWindow?
     private var tornDown = false
     private var overlayOpen = false
-    private var menuPressBeganWithOverlayOpen = false
     private var windowMenuCatcher: UITapGestureRecognizer?
     private var remoteObservers: [NSObjectProtocol] = []
     private var remotes: [ObjectIdentifier: GCController] = [:]
@@ -136,40 +135,61 @@ final class StreamSurfaceController: GCEventViewController {
         let connected = GCController.controllers()
         let live = Set(connected.map(ObjectIdentifier.init))
         for id in remotes.keys where !live.contains(id) {
-            remotes.removeValue(forKey: id)?.microGamepad?.buttonMenu.pressedChangedHandler = nil
+            if let gone = remotes.removeValue(forKey: id) { Self.clearHandlers(gone) }
         }
         for controller in connected where remotes[ObjectIdentifier(controller)] == nil {
-            guard controller.extendedGamepad == nil, let pad = controller.microGamepad else { continue }
             // Handlers run on the main queue.
-            pad.buttonMenu.pressedChangedHandler = { [weak self] _, _, pressed in
-                MainActor.assumeIsolated { self?.remoteMenuChanged(pressed: pressed) }
+            if let gamepad = controller.extendedGamepad {
+                gamepad.buttonB.pressedChangedHandler = { [weak self] _, _, pressed in
+                    MainActor.assumeIsolated { self?.gamepadBChanged(pressed: pressed) }
+                }
+            } else if let pad = controller.microGamepad {
+                pad.buttonMenu.pressedChangedHandler = { [weak self] _, _, pressed in
+                    MainActor.assumeIsolated { self?.remoteMenuChanged(pressed: pressed) }
+                }
+            } else {
+                continue
             }
             remotes[ObjectIdentifier(controller)] = controller
+        }
+    }
+
+    private static func clearHandlers(_ controller: GCController) {
+        if let gamepad = controller.extendedGamepad {
+            gamepad.buttonB.pressedChangedHandler = nil
+        } else {
+            controller.microGamepad?.buttonMenu.pressedChangedHandler = nil
         }
     }
 
     private func stopObservingRemotes() {
         remoteObservers.forEach(NotificationCenter.default.removeObserver)
         remoteObservers.removeAll()
-        for controller in remotes.values { controller.microGamepad?.buttonMenu.pressedChangedHandler = nil }
+        for controller in remotes.values { Self.clearHandlers(controller) }
         remotes.removeAll()
     }
 
-    /// One toggle per press, whatever edge UIKit acts on: a press that begins with the overlay open
-    /// belongs to the overlay's `onExitCommand` (controller user interaction is on then), so its
-    /// release is ignored here. Otherwise this path reports it on release.
+    /// The overlay is driven through GameController only, which sees every press whatever UIKit's
+    /// focus is doing: the Siri Remote's Menu toggles it on release, in both states. UIKit also
+    /// receives the Menu while the overlay is open, and there it is only swallowed (the overlay's
+    /// and the cover's exit commands), because acting on it there dismissed the cover on every
+    /// second press on device.
     private func remoteMenuChanged(pressed: Bool) {
-        if pressed {
-            menuPressBeganWithOverlayOpen = controller.isOverlayOpen
-            return
-        }
-        guard !menuPressBeganWithOverlayOpen else { return }
+        guard !pressed else { return }
+        DiagnosticLog.note("[menu] remote, overlay open: \(controller.isOverlayOpen)")
+        menuPressed()
+    }
+
+    /// A gamepad's B closes the overlay (it also arrives in UIKit as Menu, which is swallowed
+    /// there). While the overlay is closed B belongs to the game.
+    private func gamepadBChanged(pressed: Bool) {
+        guard !pressed, controller.isOverlayOpen else { return }
+        DiagnosticLog.note("[menu] gamepad B closes the overlay")
         menuPressed()
     }
 
     @objc private func windowMenuPressed() {
-        DiagnosticLog.note("[menu] caught on the window, overlay open: \(controller.isOverlayOpen)")
-        menuPressed()
+        DiagnosticLog.note("[menu] swallowed on the window, overlay open: \(controller.isOverlayOpen)")
     }
 
     private func menuPressed() {
@@ -185,7 +205,12 @@ final class StreamSurfaceController: GCEventViewController {
 
     override func pressesEnded(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
         if presses.contains(where: { $0.type == .menu }) {
-            menuPressed()
+            // A TV remote over HDMI-CEC is no GameController; the surface only holds focus while
+            // the overlay is closed, so this can only open it.
+            if !overlayOpen {
+                DiagnosticLog.note("[menu] press on the surface opens the overlay")
+                menuPressed()
+            }
             return
         }
         super.pressesEnded(presses, with: event)

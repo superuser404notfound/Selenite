@@ -28,12 +28,8 @@ struct StreamCoverView: View {
         .animation(.easeOut(duration: 0.4), value: controller.phase)
         .animation(.easeOut(duration: 0.4), value: controller.ending)
         .animation(.easeInOut(duration: 0.2), value: controller.isOverlayOpen)
-        // Menu must never reach the cover, or tvOS dismisses it. With the overlay closed the
-        // surface's GameController path reports the press, so this only swallows it; with the
-        // overlay open but focus not yet inside the panel, this is the report the panel misses.
-        .onExitCommand {
-            if controller.isOverlayOpen { controller.menuPressed(now: CACurrentMediaTime()) }
-        }
+        // Menu must never reach the cover, or tvOS dismisses it; GameController drives the overlay.
+        .onExitCommand {}
     }
 
     /// Also while ending: the loading view says what the stop is waiting for.

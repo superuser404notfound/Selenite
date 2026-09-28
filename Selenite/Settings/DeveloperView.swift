@@ -21,6 +21,9 @@ struct DeveloperView: View {
             }
             HarnessView()
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        // Opaque: the cover sits over Settings and Home, which otherwise showed through.
+        .background(Color.Theme.page.ignoresSafeArea())
         .environment(harness)
         // While the harness streams, its stage consumes Menu and ends the stream first.
         .onExitCommand {

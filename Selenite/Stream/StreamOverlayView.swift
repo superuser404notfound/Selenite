@@ -65,10 +65,9 @@ struct StreamOverlayView: View {
         .onChange(of: controller.isConfirmingQuit) { _, confirming in
             focused = confirming ? .cancelQuit : .resume
         }
-        // Menu while the overlay is open (the Siri Remote, or B while controllers drive it). The
-        // surface's GameController path ignores a press that began with the overlay open, so one
-        // press toggles once whichever edge this fires on; StreamController's debounce is a backstop.
-        .onExitCommand { controller.menuPressed(now: CACurrentMediaTime()) }
+        // Swallowed only: the Siri Remote's Menu and a gamepad's B reach the overlay through
+        // GameController (StreamSurface). Acting here too toggled twice.
+        .onExitCommand {}
     }
 }
 
