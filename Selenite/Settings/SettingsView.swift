@@ -21,6 +21,9 @@ struct SettingsView: View {
                 ValuePickerRow(icon: "speedometer", title: "Frame rate",
                                options: FrameRatePreference.allCases, selection: preferences.frameRate,
                                label: \.label) { model.settings.set(\.frameRate, $0) }
+                ValuePickerRow(icon: "metronome", title: "Frame pacing",
+                               options: FramePacingMode.allCases, selection: preferences.pacing,
+                               label: \.label) { model.settings.set(\.pacing, $0) }
                 ValuePickerRow(icon: "antenna.radiowaves.left.and.right", title: "Bitrate",
                                options: StreamPreferences.bitrateChoicesMbps, selection: preferences.bitrateMbps,
                                label: { "\($0) Mbps" }) { model.settings.set(\.bitrateMbps, $0) }
@@ -85,6 +88,15 @@ extension FrameRatePreference {
         case .fps30: "30 fps"
         case .fps60: "60 fps"
         case .matchDisplay: "Match display"
+        }
+    }
+}
+
+extension FramePacingMode {
+    var label: LocalizedStringKey {
+        switch self {
+        case .lowLatency: "Lowest latency"
+        case .smooth: "Smooth"
         }
     }
 }
