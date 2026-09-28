@@ -175,6 +175,9 @@
     "OK" : {
 
     },
+    "On" : {
+
+    },
     "Online" : {
 
     },
@@ -200,6 +203,9 @@
 
     },
     "PIN %@" : {
+
+    },
+    "Present on arrival (experimental)" : {
 
     },
     "Quit %@ on %@? Unsaved progress may be lost." : {
