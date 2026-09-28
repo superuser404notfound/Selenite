@@ -11,8 +11,13 @@ struct AddHostFlowView: View {
 
     var body: some View {
         Group {
+            // Never empty: SwiftUI does not run onAppear for an empty view, so without the
+            // placeholder the model below was never created and the panel stayed blank.
             if let model {
                 AddHostContent(model: model)
+            } else {
+                ProgressView()
+                    .frame(maxWidth: .infinity)
             }
         }
         .frame(width: 1000)
