@@ -41,9 +41,14 @@ public struct PacerStats: Sendable, Equatable {
 /// and cuts one frame when two have stayed queued for `smoothCatchUpFrames` presentations, which
 /// only clock drift between host and display causes.
 ///
-/// Cadence: a stream slower than the display (30 fps on 60 Hz) leaves ticks empty by design. An
-/// empty tick within `ticksPerFrame` of the last presented frame is neither a stall nor a reason to
-/// re-prime; only a frame missing beyond the cadence is.
+/// Cadence: a stream slower than the display (30 fps on 60 Hz) leaves ticks empty by design, and
+/// such an empty tick is no stall. refresh / fps is fractional (30 on 50 is 1.67, shown 2-2-1).
+/// smooth runs a cadence accumulator: each presented frame is owed refresh / fps refreshes, every
+/// tick takes one off, and while a frame is still owed the current one is held and an empty tick
+/// neither stalls nor re-primes. lowLatency shows frames as they come, so its holds follow the
+/// arrivals, not an accumulator phase; an empty tick is a stall there once the current frame has
+/// been up for the longest normal hold, ceil(refresh / fps). A stream at or above the refresh
+/// never waits in either mode.
 ///
 /// `Frame` carries no `Sendable` constraint: `CMSampleBufferRef` is `CM_SWIFT_NONSENDABLE` in this
 /// SDK, but frames still cross from the decode thread to the vsync tick and must be treated as
@@ -74,6 +79,9 @@ public final class FramePacer<Frame>: @unchecked Sendable {
     private var lastVsync = 0.0
     /// When the pacer last ticked: the straddle point arrival phase is measured against.
     private var lastTick = 0.0
+    /// smooth: refreshes the current frame is still owed; at or below zero the next one is due.
+    private var cadenceDue = 0.0
+    /// lowLatency: refreshes since the last presented frame.
     private var ticksSincePresent = Int.max / 2
     private var vsyncDuration = 0.0
     private var vsyncIntervalSum = 0.0
@@ -138,10 +146,10 @@ public final class FramePacer<Frame>: @unchecked Sendable {
     }
 
     private func lowLatencyTick() -> Frame? {
-        advanceCadence()
+        if ticksSincePresent < Int.max / 2 { ticksSincePresent += 1 }
         guard !queue.isEmpty else {
             backlogTicks = 0
-            return withinCadence ? nil : stall()
+            return ticksSincePresent < longestNormalHold ? nil : stall()
         }
         ticksSincePresent = 0
         var frame = queue.removeFirst()
@@ -169,7 +177,7 @@ public final class FramePacer<Frame>: @unchecked Sendable {
             primed = true
         }
         guard !queue.isEmpty else { return stall() }
-        ticksSincePresent = 0
+        presentedOnCadence()
         var frame = queue.removeFirst()
         if queue.count >= 2 {
             backlogTicks += 1
@@ -194,18 +202,34 @@ public final class FramePacer<Frame>: @unchecked Sendable {
         return nil
     }
 
-    /// Refreshes per stream frame: 2 for 30 fps on 60 Hz, 1 when either side is unknown.
-    private var ticksPerFrame: Int {
+    /// Refreshes per stream frame, fractional: 2 for 30 fps on 60 Hz, 1.67 for 30 on 50, 0.83 for
+    /// 60 on 50; 1 when either side is unknown.
+    private var ticksPerFrame: Double {
         guard frameRate > 0, vsyncDuration > 0 else { return 1 }
-        return max(1, Int((1 / (vsyncDuration * Double(frameRate))).rounded()))
+        return 1 / (vsyncDuration * Double(frameRate))
     }
 
+    /// The longest a frame stays up in the normal cadence: 1 at 60 on 60, 2 at 30 on 60 and 30 on 50.
+    private var longestNormalHold: Int {
+        max(1, Int((ticksPerFrame - 1e-6).rounded(.up)))
+    }
+
+    /// smooth: one refresh passed. The floor of -1 keeps a stall from building a debt that would let later
+    /// frames through faster than the cadence, while the fractional remainder (above -1) carries.
     private func advanceCadence() {
-        if ticksSincePresent < Int.max / 2 { ticksSincePresent += 1 }
+        cadenceDue = max(cadenceDue - 1, -1)
     }
 
-    /// The last frame is still due on screen: an empty tick here is the cadence, not a stall.
-    private var withinCadence: Bool { ticksSincePresent < ticksPerFrame }
+    /// A frame went on screen: it is owed refresh / fps refreshes from now. Only an on-time
+    /// remainder in (-1, 0] carries over (that is what makes 30 on 50 come out 2-2-1). A frame shown
+    /// early (lowLatency) or after an idle tick at the floor (start, stall) restarts the cadence.
+    private func presentedOnCadence() {
+        let carry = cadenceDue <= -1 ? 0 : min(cadenceDue, 0)
+        cadenceDue = carry + ticksPerFrame
+    }
+
+    /// The last frame is still owed refreshes: an empty tick here is the cadence, not a stall.
+    private var withinCadence: Bool { cadenceDue > 1e-9 }
 
     private func recordPhaseDistance(_ distance: Double) {
         if phaseDistances.count < Self.phaseWindow {

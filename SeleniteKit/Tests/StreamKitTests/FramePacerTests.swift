@@ -85,20 +85,20 @@ private struct TickRecord {
 
 /// Drives a pacer the way DisplayPacer does: frames that arrive between two refreshes are put
 /// after the earlier vsync was reported, then each refresh reports its vsync and ticks.
-/// `arrivals` are milliseconds on the same clock as the vsyncs, which fire every `vsyncMs` from
+/// `arrivals` are milliseconds on the same clock as the vsyncs, which fire every `refreshMs` from
 /// `startMs`; stats are cumulative after each tick.
 private func simulate(_ mode: FramePacingMode, arrivals: [Double], ticks: Int,
-                      startMs: Double = 1000, frameRate: Int = 60) -> [TickRecord] {
+                      startMs: Double = 1000, frameRate: Int = 60, refreshMs: Double = vsyncMs) -> [TickRecord] {
     let pacer = FramePacer<Int>(mode: mode, frameRate: frameRate)
     var next = 0
     var records: [TickRecord] = []
     for tick in 0..<ticks {
-        let now = startMs + Double(tick) * vsyncMs
+        let now = startMs + Double(tick) * refreshMs
         while next < arrivals.count, arrivals[next] < now {
             pacer.put(next, arrival: arrivals[next] / 1000)
             next += 1
         }
-        pacer.vsync(timestamp: now / 1000, duration: vsyncMs / 1000, tickTime: now / 1000)
+        pacer.vsync(timestamp: now / 1000, duration: refreshMs / 1000, tickTime: now / 1000)
         let frame = pacer.tick()
         let stats = pacer.stats
         records.append(TickRecord(shown: frame, stalls: stats.stalls, catchUpDrops: stats.catchUpDrops,
@@ -324,4 +324,64 @@ private func arrivals30(count: Int, startMs: Double = 1000, offset: (Int) -> Dou
     let stalls: Int = increase(records, from: 60, \.stalls)
     #expect(dropStallPairs == 0)
     #expect(stalls == 0)
+}
+
+// MARK: - Review round 2: refresh / fps is not an integer
+
+private let refresh50Ms = 20.0
+
+/// A stream at `fps` whose frames arrive every 1000 / fps ms, `offsetMs` after the first refresh.
+private func streamArrivals(count: Int, fps: Double, startMs: Double = 1000, offsetMs: Double,
+                            jitter: (Int) -> Double = { _ in 0 }) -> [Double] {
+    (0..<count).map { n in startMs + offsetMs + Double(n) * 1000 / fps + jitter(n) }
+}
+
+@Test func smoothAt30FpsOn50HzShowsAllThirtyFrames() {
+    var noise = Noise(seed: 30)
+    let times = streamArrivals(count: 1000, fps: 30, offsetMs: 7) { _ in 4 * noise.next() }
+    let records = simulate(.smooth, arrivals: times, ticks: 1500, frameRate: 30, refreshMs: refresh50Ms)
+    let firstShown = records.firstIndex { $0.shown != nil } ?? 0
+    let stalls: Int = increase(records, from: firstShown, \.stalls)
+    let overflow: Int = increase(records, from: 0, \.overflowDrops)
+    let catchUp: Int = increase(records, from: 0, \.catchUpDrops)
+    // 1500 ticks at 50 Hz are 30 s: 900 frames arrive, all but the standing ones are shown.
+    let shown: Int = records.compactMap(\.shown).count
+    #expect(stalls == 0)
+    #expect(overflow == 0)
+    #expect(catchUp == 0)
+    #expect(shown >= 895)
+}
+
+@Test func smoothAt30FpsOn50HzHoldsTwoTwoOne() {
+    let times = streamArrivals(count: 400, fps: 30, offsetMs: 7)
+    let records = simulate(.smooth, arrivals: times, ticks: 500, frameRate: 30, refreshMs: refresh50Ms)
+    let shownTicks = records.enumerated().compactMap { $0.element.shown == nil ? nil : $0.offset }
+    for (earlier, later) in zip(shownTicks, shownTicks.dropFirst()) {
+        let spacing: Int = later - earlier
+        #expect(spacing == 1 || spacing == 2)
+    }
+    let span: Int = shownTicks[shownTicks.count - 1] - shownTicks[0]
+    let frames: Int = shownTicks.count - 1
+    // 5 refreshes per 3 frames on average.
+    #expect(abs(span * 3 - frames * 5) <= 5)
+}
+
+@Test func lowLatencyAt30FpsOn50HzCountsNoCadenceGapAsAStall() {
+    var noise = Noise(seed: 31)
+    let times = streamArrivals(count: 1000, fps: 30, offsetMs: 7) { _ in 2 * noise.next() }
+    let records = simulate(.lowLatency, arrivals: times, ticks: 1500, frameRate: 30, refreshMs: refresh50Ms)
+    let firstShown = records.firstIndex { $0.shown != nil } ?? 0
+    let stalls: Int = increase(records, from: firstShown, \.stalls)
+    let shown: Int = records.compactMap(\.shown).count
+    #expect(stalls == 0)
+    #expect(shown >= 895)
+}
+
+@Test func smoothAt60FpsOn50HzNeverWaits() {
+    // More frames than refreshes: every tick after priming shows one, the surplus overflows.
+    let times = streamArrivals(count: 700, fps: 60, offsetMs: 3)
+    let records = simulate(.smooth, arrivals: times, ticks: 500, frameRate: 60, refreshMs: refresh50Ms)
+    let firstShown = records.firstIndex { $0.shown != nil } ?? 0
+    let empty: Int = records[firstShown...].filter { $0.shown == nil }.count
+    #expect(empty == 0)
 }
