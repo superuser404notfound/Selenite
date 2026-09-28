@@ -268,6 +268,7 @@ final class AppModel {
     func scenePhaseChanged(_ phase: ScenePhase) {
         switch phase {
         case .background:
+            DiagnosticLog.note("[app] went to the background, stream active: \(activeStream != nil)")
             isBackgrounded = true
             directory.stopPolling()
             if let stream = activeStream {

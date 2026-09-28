@@ -8,11 +8,23 @@ struct RootView: View {
 
     var body: some View {
         @Bindable var model = model
-        HomeView()
-            // The stream screen is presented by UIKit (StreamPresenter), not a SwiftUI cover, so
-            // the Siri Remote's Menu can never dismiss it; streamEnded clears activeStream once the
-            // session has stopped, which takes the screen down.
-            .background(StreamPresenter(stream: model.activeStream, model: model))
+        let streaming = model.activeStream != nil
+        ZStack {
+            HomeView()
+                // Out of focus reach while a stream runs, so focus can only be on the stream.
+                .disabled(streaming)
+                .opacity(streaming ? 0 : 1)
+            // In place, never presented: tvOS dismisses any presentation on the Siri Remote's
+            // Menu. streamEnded clears activeStream once the session has stopped.
+            if let stream = model.activeStream {
+                StreamContainer(controller: stream, model: model)
+                    .ignoresSafeArea()
+                    .id(ObjectIdentifier(stream))
+            }
+        }
+        .onChange(of: streaming) { _, isStreaming in
+            if !isStreaming { model.streamCoverDismissed() }
+        }
             .menuPresentation(item: $model.pendingRemoval) { host in
                 RemoveHostPrompt(host: host).environment(model)
             }
