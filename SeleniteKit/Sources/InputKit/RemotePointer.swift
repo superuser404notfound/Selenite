@@ -1,8 +1,12 @@
 /// Turns the Siri Remote's touch surface into relative mouse motion, like a laptop trackpad.
 ///
 /// Samples are the surface's absolute position (`reportsAbsoluteDpadValues`), -1...1 on both axes
-/// with y up. The surface reports exactly (0, 0) when the finger lifts, so that sample ends the
-/// touch and the next one only anchors: putting the finger down elsewhere never jumps the pointer.
+/// with y up. Measured on a Siri Remote (2026-09-28):
+/// - The axes update one at a time. A touch starts as (x, 0) and ends through (0, y) to (0, 0), so a
+///   sample with either axis exactly 0 is the edge of a touch, never a position.
+/// - The first position after touching down is a guess the surface corrects 60 to 450 ms later by
+///   up to 0.14 units, while tracking reports every 10 to 15 ms. A sample after a longer gap, and
+///   its other axis arriving right behind it, therefore only re-anchors.
 public struct RemotePointer: Sendable {
     public struct Tuning: Sendable, Equatable {
         /// Pointer pixels per surface unit at slow speed (the surface is 2 units wide).
@@ -22,13 +26,19 @@ public struct RemotePointer: Sendable {
             self.clickDeadzone = clickDeadzone
         }
 
-        public static let standard = Tuning(pixelsPerUnit: 500, maxBoost: 3, fullBoostSpeed: 4, clickDeadzone: 0.12)
+        public static let standard = Tuning(pixelsPerUnit: 350, maxBoost: 2.5, fullBoostSpeed: 4, clickDeadzone: 0.12)
     }
+
+    /// A sample arriving this long after the previous one re-anchors instead of moving.
+    public static let resyncGap = 0.05
+    /// A sample this close behind a re-anchoring one is its other axis and re-anchors too.
+    public static let axisTwinWindow = 0.005
 
     public var tuning: Tuning
     private var last: (x: Float, y: Float, time: Double)?
     private var remainder: (x: Float, y: Float) = (0, 0)
     private var clickTravel: Float?
+    private var anchorTime = -Double.infinity
 
     public init(tuning: Tuning = .standard) {
         self.tuning = tuning
@@ -36,13 +46,17 @@ public struct RemotePointer: Sendable {
 
     /// One surface sample; returns the pointer motion in host pixels, y down. `time` is in seconds.
     public mutating func touch(x: Float, y: Float, time: Double) -> (dx: Int16, dy: Int16) {
-        guard x != 0 || y != 0 else {
+        guard x != 0, y != 0 else {
             last = nil
             remainder = (0, 0)
             return (0, 0)
         }
         defer { last = (x, y, time) }
-        guard let last else { return (0, 0) }
+        guard let last, time - last.time <= Self.resyncGap else {
+            anchorTime = time
+            return (0, 0)
+        }
+        guard time - anchorTime > Self.axisTwinWindow else { return (0, 0) }
         let moveX = x - last.x
         let moveY = y - last.y
         let distance = (moveX * moveX + moveY * moveY).squareRoot()
