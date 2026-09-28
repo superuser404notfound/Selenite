@@ -12,6 +12,12 @@ public struct PacerStats: Sendable, Equatable {
     public var bufferedTicks = 0
     /// Sample standard deviation of frame inter-arrival time.
     public var jitterMilliseconds: Double = 0
+    /// Diagnostics: where in the refresh interval frames arrive, in tenths after the last vsync.
+    public var phaseBins = [Int](repeating: 0, count: 10)
+    /// Diagnostics: running mean of frame inter-arrival time and of the vsync interval.
+    public var arrivalIntervalMilliseconds: Double = 0
+    public var vsyncIntervalMilliseconds: Double = 0
+    public var vsyncs = 0
 
     public init() {}
 }
@@ -35,6 +41,9 @@ public final class FramePacer<Frame>: @unchecked Sendable {
     private var intervalCount = 0
     private var intervalMean = 0.0
     private var intervalM2 = 0.0
+    private var lastVsync = 0.0
+    private var vsyncDuration = 0.0
+    private var vsyncIntervalSum = 0.0
 
     public init(catchUpTicks: Int = 3) {
         self.catchUpTicks = catchUpTicks
@@ -51,11 +60,28 @@ public final class FramePacer<Frame>: @unchecked Sendable {
                 intervalM2 += delta * (interval - intervalMean)
             }
             lastArrival = arrival
+            if lastVsync > 0, vsyncDuration > 0 {
+                let phase = (arrival - lastVsync) / vsyncDuration
+                let fraction = phase - phase.rounded(.down)
+                counters.phaseBins[min(9, max(0, Int(fraction * 10)))] += 1
+            }
             if queue.count == Self.capacity {
                 queue.removeFirst()
                 counters.overflowDrops += 1
             }
             queue.append(frame)
+        }
+    }
+
+    /// Diagnostics: the vsync this tick belongs to, so arrivals can be placed in the refresh interval.
+    public func vsync(timestamp: Double, duration: Double) {
+        lock.withLock {
+            if lastVsync > 0, timestamp > lastVsync {
+                vsyncIntervalSum += (timestamp - lastVsync) * 1000
+                counters.vsyncs += 1
+            }
+            lastVsync = timestamp
+            vsyncDuration = duration
         }
     }
 
@@ -88,6 +114,8 @@ public final class FramePacer<Frame>: @unchecked Sendable {
         lock.withLock {
             var snapshot = counters
             snapshot.jitterMilliseconds = intervalCount > 1 ? (intervalM2 / Double(intervalCount - 1)).squareRoot() : 0
+            snapshot.arrivalIntervalMilliseconds = intervalMean
+            snapshot.vsyncIntervalMilliseconds = counters.vsyncs > 0 ? vsyncIntervalSum / Double(counters.vsyncs) : 0
             return snapshot
         }
     }

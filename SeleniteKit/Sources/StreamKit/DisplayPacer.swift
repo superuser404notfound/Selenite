@@ -16,7 +16,7 @@ public final class DisplayPacer {
     private final class Target: NSObject {
         weak var pacer: DisplayPacer?
         @objc func tick(_ link: CADisplayLink) {
-            pacer?.tick()
+            pacer?.tick(link)
         }
     }
 
@@ -45,8 +45,9 @@ public final class DisplayPacer {
         outputs.removeAll()
     }
 
-    private func tick() {
+    private func tick(_ link: CADisplayLink) {
         for output in outputs {
+            output.pacer.vsync(timestamp: link.timestamp, duration: link.targetTimestamp - link.timestamp)
             if output.renderer.status == .failed { output.renderer.flush() }
             if let frame = output.pacer.tick() {
                 output.renderer.enqueue(frame)
