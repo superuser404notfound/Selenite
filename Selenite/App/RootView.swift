@@ -13,7 +13,11 @@ struct RootView: View {
         // tvOS drop a running controller, which kept its session and slot alive unseen.
         let stream = Binding<StreamController?>(
             get: { model.activeStream },
-            set: { if $0 == nil { model.activeStream?.disconnect() } }
+            set: {
+                guard $0 == nil, let stream = model.activeStream else { return }
+                DiagnosticLog.note("[menu] the system dismissed the stream cover; disconnecting")
+                stream.disconnect()
+            }
         )
         HomeView()
             .fullScreenCover(item: stream, onDismiss: { model.streamCoverDismissed() }) { controller in

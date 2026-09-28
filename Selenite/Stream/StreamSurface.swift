@@ -46,6 +46,7 @@ final class StreamSurfaceController: GCEventViewController {
     private var tornDown = false
     private var overlayOpen = false
     private var menuPressBeganWithOverlayOpen = false
+    private var windowMenuCatcher: UITapGestureRecognizer?
     private var remoteObservers: [NSObjectProtocol] = []
     private var remotes: [ObjectIdentifier: GCController] = [:]
 
@@ -85,6 +86,15 @@ final class StreamSurfaceController: GCEventViewController {
         UIApplication.shared.isIdleTimerDisabled = true
         if let window = view.window {
             displayWindow = window
+            // A Menu that reaches UIKit while no stream view holds focus (the overlay just opened
+            // or closed) would otherwise fall through to the presented cover and dismiss it, which
+            // ends the stream. Catching it on the window routes every such press to the overlay.
+            if windowMenuCatcher == nil {
+                let catcher = UITapGestureRecognizer(target: self, action: #selector(windowMenuPressed))
+                catcher.allowedPressTypes = [NSNumber(value: UIPress.PressType.menu.rawValue)]
+                window.addGestureRecognizer(catcher)
+                windowMenuCatcher = catcher
+            }
             let fps = controller.settings.fps
             DisplayModeController.apply(hdr: false, refreshRate: Float(fps >= 50 ? fps : 60), window: window)
         }
@@ -157,6 +167,11 @@ final class StreamSurfaceController: GCEventViewController {
         menuPressed()
     }
 
+    @objc private func windowMenuPressed() {
+        DiagnosticLog.note("[menu] caught on the window, overlay open: \(controller.isOverlayOpen)")
+        menuPressed()
+    }
+
     private func menuPressed() {
         controller.menuPressed(now: CACurrentMediaTime())
     }
@@ -191,6 +206,8 @@ final class StreamSurfaceController: GCEventViewController {
         guard !tornDown else { return }
         tornDown = true
         UIApplication.shared.isIdleTimerDisabled = false
+        if let catcher = windowMenuCatcher { catcher.view?.removeGestureRecognizer(catcher) }
+        windowMenuCatcher = nil
         stopObservingRemotes()
         controllerUserInteractionEnabled = true
         pacer.stop()

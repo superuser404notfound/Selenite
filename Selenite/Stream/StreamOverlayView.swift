@@ -1,5 +1,6 @@
 import AppCore
 import QuartzCore
+import StreamKit
 import SwiftUI
 
 /// The in-stream overlay (spec 4.4): glass panel at the bottom, live stats, Resume, Disconnect and
@@ -32,7 +33,7 @@ struct StreamOverlayView: View {
                     .foregroundStyle(.secondary)
             }
             if let stats = controller.liveStats {
-                OverlayStats(stats: stats)
+                OverlayStats(stats: stats, pacing: controller.settings.pacing)
             }
             if controller.isConfirmingQuit {
                 Text("Quit \(controller.app.title) on \(controller.host.name)? Unsaved progress may be lost.")
@@ -74,6 +75,7 @@ struct StreamOverlayView: View {
 /// The overlay's stats, refreshed once per second by `StreamController`.
 private struct OverlayStats: View {
     let stats: StreamStatsSummary
+    let pacing: FramePacingMode
 
     var body: some View {
         Grid(alignment: .leading, horizontalSpacing: 40, verticalSpacing: 8) {
@@ -84,6 +86,10 @@ private struct OverlayStats: View {
             GridRow {
                 Text("Frame rate")
                 Text("\(stats.fps) fps")
+            }
+            GridRow {
+                Text("Frame pacing")
+                Text(pacing.label)
             }
             GridRow {
                 Text("Bitrate")
