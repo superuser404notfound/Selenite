@@ -97,8 +97,9 @@ public final class StreamController: Identifiable {
         Task { await self.runStart() }
     }
 
-    /// Siri Remote Menu, from any path. While loading it cancels; while running it opens or closes
-    /// the overlay, and backs out of the quit confirmation first.
+    /// Menu, from any path. While loading it cancels. While running it opens the overlay; with the
+    /// overlay open it backs out of the quit confirmation first, and otherwise disconnects (the game
+    /// keeps running). A gamepad's B closes the overlay through `closeOverlay` instead.
     public func menuPressed(now: Double) {
         guard now - lastMenuPress >= Self.menuDebounceSeconds else { return }
         lastMenuPress = now
@@ -108,15 +109,17 @@ public final class StreamController: Identifiable {
         case .running:
             if isConfirmingQuit {
                 isConfirmingQuit = false
+            } else if isOverlayOpen {
+                disconnect()
             } else {
-                setOverlay(open: !isOverlayOpen)
+                setOverlay(open: true)
             }
         case .ended:
             break
         }
     }
 
-    /// The overlay's "Resume".
+    /// The overlay's "Resume", and a gamepad's B while the overlay is open.
     public func closeOverlay() {
         setOverlay(open: false)
     }

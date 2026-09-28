@@ -175,15 +175,50 @@ private final class FakeCommands: HostCommands, @unchecked Sendable {
     #expect(quits.isEmpty)
 }
 
-@MainActor @Test func menuTogglesTheOverlayAndPausesForwarding() async {
+@MainActor @Test func menuOpensTheOverlayAndPausesForwarding() async {
     let rig = await runningRig()
     #expect(rig.controller.phase == .running)
     rig.controller.menuPressed(now: 10)
     #expect(rig.controller.isOverlayOpen)
-    rig.controller.menuPressed(now: 11)
-    #expect(!rig.controller.isOverlayOpen)
     let forwarding: [Bool] = rig.input.forwarding
-    #expect(forwarding == [false, true])
+    #expect(forwarding == [false])
+}
+
+@MainActor @Test func menuWithTheOverlayOpenDisconnectsAndLeavesTheGameRunning() async {
+    let rig = await runningRig()
+    rig.controller.menuPressed(now: 10)
+    rig.controller.menuPressed(now: 11)
+    let during: StreamEnding? = rig.controller.ending
+    #expect(during == .disconnecting)
+    await rig.controller.endTask?.value
+    let calls: [StreamFailure?] = rig.ended.calls
+    let quits: [Int] = rig.commands.stopsAtQuit
+    #expect(rig.controller.phase == .ended)
+    #expect(calls == [nil])
+    #expect(quits.isEmpty)
+    #expect(rig.session.stopCount == 1)
+    #expect(rig.input.ended == 1)
+}
+
+@MainActor @Test func menuAfterResumeOpensTheOverlayAgain() async {
+    let rig = await runningRig()
+    rig.controller.menuPressed(now: 10)
+    rig.controller.closeOverlay()
+    rig.controller.menuPressed(now: 11)
+    #expect(rig.controller.isOverlayOpen)
+    let ending: StreamEnding? = rig.controller.ending
+    #expect(ending == nil)
+    let forwarding: [Bool] = rig.input.forwarding
+    #expect(forwarding == [false, true, false])
+}
+
+@MainActor @Test func aDoubleReportWithTheOverlayOpenDoesNotDisconnect() async {
+    let rig = await runningRig()
+    rig.controller.menuPressed(now: 10)
+    rig.controller.menuPressed(now: 10.2)
+    let ending: StreamEnding? = rig.controller.ending
+    #expect(ending == nil)
+    #expect(rig.controller.isOverlayOpen)
 }
 
 @MainActor @Test func aSecondReportOfTheSameMenuPressIsIgnored() async {
@@ -226,6 +261,8 @@ private final class FakeCommands: HostCommands, @unchecked Sendable {
     rig.controller.menuPressed(now: 11)
     #expect(!rig.controller.isConfirmingQuit)
     #expect(rig.controller.isOverlayOpen)
+    let afterBackOut: StreamEnding? = rig.controller.ending
+    #expect(afterBackOut == nil)
     rig.controller.requestQuit()
     rig.controller.confirmQuit()
     await rig.controller.endTask?.value
