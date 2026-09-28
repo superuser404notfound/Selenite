@@ -8,24 +8,11 @@ struct RootView: View {
 
     var body: some View {
         @Bindable var model = model
-        // The cover never clears activeStream itself: a system dismissal only asks the stream to
-        // disconnect, and streamEnded clears it once the session has stopped. A plain binding let
-        // tvOS drop a running controller, which kept its session and slot alive unseen.
-        let stream = Binding<StreamController?>(
-            get: { model.activeStream },
-            set: {
-                guard $0 == nil, let stream = model.activeStream else { return }
-                DiagnosticLog.note("[menu] the system dismissed the stream cover; disconnecting")
-                stream.disconnect()
-            }
-        )
         HomeView()
-            .fullScreenCover(item: stream, onDismiss: { model.streamCoverDismissed() }) { controller in
-                // The container is a GCEventViewController around the whole stream screen and
-                // swallows every Menu press, so none reaches this cover's presentation.
-                StreamContainer(controller: controller, model: model)
-                    .ignoresSafeArea()
-            }
+            // The stream screen is presented by UIKit (StreamPresenter), not a SwiftUI cover, so
+            // the Siri Remote's Menu can never dismiss it; streamEnded clears activeStream once the
+            // session has stopped, which takes the screen down.
+            .background(StreamPresenter(stream: model.activeStream, model: model))
             .menuPresentation(item: $model.pendingRemoval) { host in
                 RemoveHostPrompt(host: host).environment(model)
             }

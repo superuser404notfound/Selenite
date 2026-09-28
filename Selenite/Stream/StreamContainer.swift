@@ -5,19 +5,71 @@ import QuartzCore
 import SwiftUI
 import UIKit
 
-/// The stream cover's content: one `GCEventViewController` that hosts the whole stream screen, so
-/// every focused item on it (the surface, the overlay's buttons) has this controller in its
-/// responder chain and a Menu press can never travel up to the cover's presentation.
-struct StreamContainer: UIViewControllerRepresentable {
-    let controller: StreamController
+/// Presents the stream screen with UIKit instead of SwiftUI's fullScreenCover. On device the
+/// cover's own presentation dismissed itself on the Siri Remote's Menu before any handler inside it
+/// ran (even a GCEventViewController around its content). Presented directly, the container is the
+/// top view controller: Menu reaches nothing above it, and it swallows every Menu itself.
+struct StreamPresenter: UIViewControllerRepresentable {
+    let stream: StreamController?
     let model: AppModel
 
-    func makeUIViewController(context: Context) -> StreamContainerController {
-        StreamContainerController(controller: controller,
-                                  content: AnyView(StreamCoverView(controller: controller).environment(model).tint(.cyan)))
+    func makeUIViewController(context: Context) -> StreamPresenterController {
+        StreamPresenterController()
     }
 
-    func updateUIViewController(_ container: StreamContainerController, context: Context) {}
+    func updateUIViewController(_ presenter: StreamPresenterController, context: Context) {
+        presenter.update(stream: stream, model: model)
+    }
+}
+
+@MainActor
+final class StreamPresenterController: UIViewController {
+    private var shown: StreamController?
+    private weak var container: StreamContainerController?
+    private var pending: (StreamController, AppModel)?
+
+    override func loadView() {
+        view = UIView()
+        view.isUserInteractionEnabled = false
+    }
+
+    func update(stream: StreamController?, model: AppModel) {
+        if let stream {
+            guard stream !== shown else { return }
+            present(stream, model: model)
+        } else if let container, shown != nil {
+            shown = nil
+            pending = nil
+            container.dismissByApp { model.streamCoverDismissed() }
+        } else {
+            pending = nil
+        }
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        if let (stream, model) = pending { present(stream, model: model) }
+    }
+
+    private func present(_ stream: StreamController, model: AppModel) {
+        guard view.window != nil else {
+            pending = (stream, model)
+            return
+        }
+        pending = nil
+        shown = stream
+        let content = AnyView(StreamCoverView(controller: stream).environment(model).tint(.cyan))
+        let container = StreamContainerController(controller: stream, content: content)
+        container.modalPresentationStyle = .fullScreen
+        container.onDismissedBySystem = {
+            DiagnosticLog.note("[menu] the system dismissed the stream screen; disconnecting")
+            stream.disconnect()
+        }
+        self.container = container
+        var top: UIViewController = view.window?.rootViewController ?? self
+        while let presented = top.presentedViewController, !presented.isBeingDismissed { top = presented }
+        top.present(container, animated: true)
+    }
 }
 
 /// Controller user interaction is off while the overlay is closed, so every controller button and
@@ -37,6 +89,9 @@ final class StreamContainerController: GCEventViewController {
     private let controller: StreamController
     private let host: UIHostingController<AnyView>
     private var tornDown = false
+    private var dismissingByApp = false
+    /// Called when tvOS takes the screen down without the app asking (should not happen now).
+    var onDismissedBySystem: (() -> Void)?
     private var remoteObservers: [NSObjectProtocol] = []
     private var remotes: [ObjectIdentifier: GCController] = [:]
     /// Release time (CACurrentMediaTime) of the last Siri Remote Menu or gamepad B GameController saw.
@@ -65,7 +120,14 @@ final class StreamContainerController: GCEventViewController {
 
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
+        if isBeingDismissed, !dismissingByApp { onDismissedBySystem?() }
         teardown()
+    }
+
+    /// The app ends the stream screen once the session has stopped.
+    func dismissByApp(completion: @escaping () -> Void) {
+        dismissingByApp = true
+        dismiss(animated: true, completion: completion)
     }
 
     /// Follows `isOverlayOpen` for as long as the container lives.
