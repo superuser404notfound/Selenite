@@ -208,6 +208,9 @@
     "Present on arrival (experimental)" : {
 
     },
+    "Press Menu again to leave the stream." : {
+
+    },
     "Quit %@ on %@? Unsaved progress may be lost." : {
 
     },

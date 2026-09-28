@@ -55,6 +55,13 @@ struct StreamOverlayView: View {
                 }
                 .frame(maxWidth: .infinity)
             }
+            // Menu backs out of the confirmation instead, so the hint only shows without it.
+            if !controller.isConfirmingQuit {
+                Text("Press Menu again to leave the stream.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity)
+            }
         }
         .padding(48)
         .frame(width: 960)
@@ -65,9 +72,6 @@ struct StreamOverlayView: View {
         .onChange(of: controller.isConfirmingQuit) { _, confirming in
             focused = confirming ? .cancelQuit : .resume
         }
-        // Swallowed only: the Siri Remote's Menu and a gamepad's B reach the overlay through
-        // GameController (StreamSurface). Acting here too toggled twice.
-        .onExitCommand {}
     }
 }
 

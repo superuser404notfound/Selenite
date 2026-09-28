@@ -3,7 +3,8 @@ import QuartzCore
 import SwiftUI
 
 /// The full-screen stream (spec 4.4): the surface, the loading view until the first frame, the
-/// compact stats and poor-connection indicators, and the overlay.
+/// compact stats and poor-connection indicators, and the overlay. Hosted by `StreamContainer`,
+/// which owns every Menu press on this screen.
 struct StreamCoverView: View {
     @Environment(AppModel.self) private var model
     let controller: StreamController
@@ -28,8 +29,6 @@ struct StreamCoverView: View {
         .animation(.easeOut(duration: 0.4), value: controller.phase)
         .animation(.easeOut(duration: 0.4), value: controller.ending)
         .animation(.easeInOut(duration: 0.2), value: controller.isOverlayOpen)
-        // Menu must never reach the cover, or tvOS dismisses it; GameController drives the overlay.
-        .onExitCommand {}
     }
 
     /// Also while ending: the loading view says what the stop is waiting for.

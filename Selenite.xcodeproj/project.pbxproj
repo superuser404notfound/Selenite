@@ -32,6 +32,7 @@
 		A08C4B6DDBD4B39B48DCAF35 /* Prompts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AFF32ECFE4F5B57C7D3376D /* Prompts.swift */; };
 		BB47697DDEA70547D1DCAC7D /* DeveloperView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45EAB5CCA5EF274867374D67 /* DeveloperView.swift */; };
 		C44E78C4EDFB53E5C70B370F /* MenuPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95FB195CF38E94D64367E7C8 /* MenuPresentation.swift */; };
+		C9D3D7D4294509AB483C9F86 /* StreamContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31071BC9355E89A5E5CA7339 /* StreamContainer.swift */; };
 		D2F2FB6D3F9FB933330C3A2F /* ErrorPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A94CE08B4C9A3E680A947E22 /* ErrorPanel.swift */; };
 		D994CAFD234138F65277521A /* StreamSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF77301DC333661362D4FEB7 /* StreamSurface.swift */; };
 		E4CBC4B4BCE309F4E1F5AE83 /* AsyncCachedImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45E145C40671B3024384F31F /* AsyncCachedImage.swift */; };
@@ -51,6 +52,7 @@
 		273A08E874EAF5433651BECB /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		29084BD577B639C217599362 /* ColorTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorTheme.swift; sourceTree = "<group>"; };
 		2A6A866C8C288C7F96C4E477 /* HarnessView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessView.swift; sourceTree = "<group>"; };
+		31071BC9355E89A5E5CA7339 /* StreamContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamContainer.swift; sourceTree = "<group>"; };
 		31D65A510D94364F3B5D7626 /* AddHostFlowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddHostFlowView.swift; sourceTree = "<group>"; };
 		45E145C40671B3024384F31F /* AsyncCachedImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AsyncCachedImage.swift; sourceTree = "<group>"; };
 		45EAB5CCA5EF274867374D67 /* DeveloperView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperView.swift; sourceTree = "<group>"; };
@@ -132,6 +134,7 @@
 			isa = PBXGroup;
 			children = (
 				A94CE08B4C9A3E680A947E22 /* ErrorPanel.swift */,
+				31071BC9355E89A5E5CA7339 /* StreamContainer.swift */,
 				10D449D417CA0BAC6F70C675 /* StreamCoverView.swift */,
 				DA2DB4429BE59BAC3854583B /* StreamLoadingView.swift */,
 				56AEAF6F7A60D4EE01BA1587 /* StreamOverlayView.swift */,
@@ -302,6 +305,7 @@
 				4722FE1A787E162F5C3448F6 /* RootView.swift in Sources */,
 				1EF96EFD252F0C8C6146CD9D /* SeleniteApp.swift in Sources */,
 				254805DE344BBFCC597A314F /* SettingsView.swift in Sources */,
+				C9D3D7D4294509AB483C9F86 /* StreamContainer.swift in Sources */,
 				3444C9834442D162D4AFDEE1 /* StreamCoverView.swift in Sources */,
 				37E4DAF36DD2A84FC1F1BFD5 /* StreamLoadingView.swift in Sources */,
 				993D6AFA841889D22673347E /* StreamOverlayView.swift in Sources */,
