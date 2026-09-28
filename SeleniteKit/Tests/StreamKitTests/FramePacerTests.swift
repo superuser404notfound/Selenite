@@ -88,8 +88,8 @@ private struct TickRecord {
 /// `arrivals` are milliseconds on the same clock as the vsyncs, which fire every `vsyncMs` from
 /// `startMs`; stats are cumulative after each tick.
 private func simulate(_ mode: FramePacingMode, arrivals: [Double], ticks: Int,
-                      startMs: Double = 1000) -> [TickRecord] {
-    let pacer = FramePacer<Int>(mode: mode)
+                      startMs: Double = 1000, frameRate: Int = 60) -> [TickRecord] {
+    let pacer = FramePacer<Int>(mode: mode, frameRate: frameRate)
     var next = 0
     var records: [TickRecord] = []
     for tick in 0..<ticks {
@@ -98,7 +98,7 @@ private func simulate(_ mode: FramePacingMode, arrivals: [Double], ticks: Int,
             pacer.put(next, arrival: arrivals[next] / 1000)
             next += 1
         }
-        pacer.vsync(timestamp: now / 1000, duration: vsyncMs / 1000)
+        pacer.vsync(timestamp: now / 1000, duration: vsyncMs / 1000, tickTime: now / 1000)
         let frame = pacer.tick()
         let stats = pacer.stats
         records.append(TickRecord(shown: frame, stalls: stats.stalls, catchUpDrops: stats.catchUpDrops,
@@ -231,4 +231,97 @@ private func increase(_ records: [TickRecord], from start: Int, _ value: (TickRe
     #expect(gap >= 3)
     #expect(after == 0)
     #expect(catchUp == 0)
+}
+
+// MARK: - Review round 1
+
+/// Frame n of a 30 fps stream arrives `offset` refreshes (plus jitter) after tick 2n.
+private func arrivals30(count: Int, startMs: Double = 1000, offset: (Int) -> Double) -> [Double] {
+    (0..<count).map { n in startMs + (Double(2 * n) + offset(n)) * vsyncMs }
+}
+
+@Test func smoothAt30FpsOn60HzHoldsEveryFrameForTwoTicks() {
+    var noise = Noise(seed: 20)
+    let times = arrivals30(count: 700) { _ in 1 + 0.8 * noise.next() }
+    let records = simulate(.smooth, arrivals: times, ticks: 1200, frameRate: 30)
+    let shownTicks = records.enumerated().compactMap { $0.element.shown == nil ? nil : $0.offset }
+    let firstShown = shownTicks.first ?? 0
+    let stalls: Int = increase(records, from: firstShown, \.stalls)
+    let catchUp: Int = increase(records, from: 0, \.catchUpDrops)
+    #expect(stalls == 0)
+    #expect(catchUp == 0)
+    for (earlier, later) in zip(shownTicks, shownTicks.dropFirst()) {
+        let spacing: Int = later - earlier
+        #expect(spacing == 2)
+    }
+}
+
+@Test func smoothAt30FpsReprimesOnlyWhenAFrameIsMissing() {
+    // Frames 100 and 101 never arrive: more than the standing frame can cover (one missing frame
+    // is absorbed by it), the rest is on time.
+    let times = arrivals30(count: 400) { _ in 1.5 }.enumerated().filter { ![100, 101].contains($0.offset) }.map(\.element)
+    let records = simulate(.smooth, arrivals: times, ticks: 700, frameRate: 30)
+    let firstShown = records.firstIndex { $0.shown != nil } ?? 0
+    let before: Int = increase(Array(records[..<190]), from: firstShown, \.stalls)
+    let gap: Int = records[215].stalls - records[190].stalls
+    let after: Int = increase(records, from: 230, \.stalls)
+    #expect(before == 0)
+    #expect(gap >= 1)
+    #expect(after == 0)
+}
+
+@Test func lowLatencyAt30FpsOn60HzCountsNoCadenceGapAsAStall() {
+    var noise = Noise(seed: 21)
+    // Arrivals stay inside one refresh interval (between ticks 2n + 1 and 2n + 2): jitter that
+    // straddles a tick holds a frame for three refreshes, which is a real stall.
+    let times = arrivals30(count: 700) { _ in 1.5 + 0.4 * noise.next() }
+    let records = simulate(.lowLatency, arrivals: times, ticks: 1200, frameRate: 30)
+    let firstShown = records.firstIndex { $0.shown != nil } ?? 0
+    let stalls: Int = increase(records, from: firstShown, \.stalls)
+    let shown: Int = records.compactMap(\.shown).count
+    #expect(stalls == 0)
+    #expect(shown >= 590)
+}
+
+@Test func lowLatencyAt30FpsCountsAMissingFrameAsAStall() {
+    let times = arrivals30(count: 400) { _ in 1.5 }.enumerated().filter { $0.offset != 100 }.map(\.element)
+    let records = simulate(.lowLatency, arrivals: times, ticks: 700, frameRate: 30)
+    let firstShown = records.firstIndex { $0.shown != nil } ?? 0
+    let stalls: Int = increase(records, from: firstShown, \.stalls)
+    #expect(stalls >= 1)
+    #expect(stalls <= 2)
+}
+
+@Test func arrivalPhaseIsMeasuredAgainstTheTickNotTheRefresh() {
+    let pacer = FramePacer<Int>()
+    let duration = 1.0 / 60
+    // The tick callback runs 8 ms after the refresh it reports.
+    pacer.vsync(timestamp: 1.0, duration: duration, tickTime: 1.008)
+    pacer.put(0, arrival: 1.008 + 0.25 * duration)
+    let bins: [Int] = pacer.stats.phaseBins
+    let second: Int = bins[2]
+    #expect(second == 1)
+}
+
+@Test func lowLatencyKeepsTheLagWhileTheArrivalTailTouchesTheTick() {
+    // Mean distance from the tick about 0.25, but with a tail: most frames arrive around phase
+    // 0.75, every 8th comes within 0.05 of the tick and every 48th lands just after it. One frame
+    // of lag stands from the start. The mean alone clears the old 0.2 gate, so a catch-up would cut
+    // the lag and the next late frame would leave its tick empty; the tail criterion keeps the lag.
+    var noise = Noise(seed: 22)
+    let lag = [1000 - 0.5 * vsyncMs]
+    let times = lag + arrivals(count: 6000) { n -> Double in
+        if n % 48 == 47 { return 1.03 + 0.01 * noise.next() }
+        if n % 8 == 7 { return 0.97 + 0.02 * noise.next() }
+        return 0.75 + 0.04 * noise.next()
+    }
+    let records = simulate(.lowLatency, arrivals: times, ticks: 5500)
+    var pairs = 0
+    for tick in 1..<(records.count - 1) where records[tick].catchUpDrops > records[tick - 1].catchUpDrops {
+        if records[tick + 1].stalls > records[tick].stalls { pairs += 1 }
+    }
+    let dropStallPairs: Int = pairs
+    let stalls: Int = increase(records, from: 60, \.stalls)
+    #expect(dropStallPairs == 0)
+    #expect(stalls == 0)
 }

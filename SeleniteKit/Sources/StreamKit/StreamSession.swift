@@ -114,7 +114,7 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
         self.host = host
         self.appID = appID
         self.settings = settings
-        self.pacer = FramePacer(mode: settings.pacing)
+        self.pacer = FramePacer(mode: settings.pacing, frameRate: settings.fps)
         self.endpoints = NvEndpoints(address: host.address, httpsPort: host.httpsPort, uniqueID: identity.uniqueID)
         self.client = NvHTTPClient(pinnedCertificate: host.serverCertificateDER, clientIdentity: clientIdentity)
         self.clientIdentity = clientIdentity

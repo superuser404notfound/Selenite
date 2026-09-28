@@ -46,8 +46,12 @@ public final class DisplayPacer {
     }
 
     private func tick(_ link: CADisplayLink) {
+        // The moment this callback runs is where a late frame misses, not link.timestamp (the
+        // refresh that already happened), so arrival phase is measured against it.
+        let now = CACurrentMediaTime()
         for output in outputs {
-            output.pacer.vsync(timestamp: link.timestamp, duration: link.targetTimestamp - link.timestamp)
+            output.pacer.vsync(timestamp: link.timestamp, duration: link.targetTimestamp - link.timestamp,
+                               tickTime: now)
             if output.renderer.status == .failed { output.renderer.flush() }
             if let frame = output.pacer.tick() {
                 output.renderer.enqueue(frame)
