@@ -32,6 +32,7 @@ let package = Package(
         .library(name: "StreamKit", targets: ["StreamKit"]),
         .library(name: "MoonlightCore", targets: ["MoonlightCore"]),
         .library(name: "InputKit", targets: ["InputKit"]),
+        .library(name: "AppCore", targets: ["AppCore"]),
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-certificates.git", from: "1.0.0"),
@@ -73,6 +74,7 @@ let package = Package(
             // without this the framework is never loaded and the call dies in doesNotRecognizeSelector.
             linkerSettings: [.linkedFramework("AVKit", .when(platforms: [.tvOS]))]
         ),
+        .target(name: "AppCore", dependencies: ["HostKit", "StreamKit", "MoonlightCore"]),
         .testTarget(name: "HostKitTests", dependencies: [
             "HostKit",
             .product(name: "X509", package: "swift-certificates"),
@@ -80,5 +82,6 @@ let package = Package(
         .testTarget(name: "MoonlightCoreTests", dependencies: ["MbedCrypto", "MoonlightCore", "MoonlightSlotA", "MoonlightSlotB"]),
         .testTarget(name: "StreamKitTests", dependencies: ["StreamKit"]),
         .testTarget(name: "InputKitTests", dependencies: ["InputKit", "MoonlightCore"]),
+        .testTarget(name: "AppCoreTests", dependencies: ["AppCore", "HostKit", "StreamKit"]),
     ]
 )

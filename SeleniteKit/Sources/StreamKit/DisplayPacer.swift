@@ -2,13 +2,37 @@
 import AVFoundation
 import QuartzCore
 
+/// The one path to a renderer: the vsync tick enqueues on the main thread, a direct present on
+/// the decode thread (see FramePacer), so every enqueue and the failure flush take this lock.
+final class FramePresenter: @unchecked Sendable {
+    private let renderer: AVSampleBufferVideoRenderer
+    private let lock = NSLock()
+
+    init(renderer: AVSampleBufferVideoRenderer) {
+        self.renderer = renderer
+    }
+
+    func enqueue(_ frame: CMSampleBuffer) {
+        lock.withLock {
+            if renderer.status == .failed { renderer.flush() }
+            renderer.enqueue(frame)
+        }
+    }
+
+    func flushIfFailed() {
+        lock.withLock {
+            if renderer.status == .failed { renderer.flush() }
+        }
+    }
+}
+
 /// One CADisplayLink for all sessions: on every vsync each layer gets the newest decoded frame,
 /// so split-screen halves change on the same refresh.
 @MainActor
 public final class DisplayPacer {
     private struct Output {
         let pacer: FramePacer<CMSampleBuffer>
-        let renderer: AVSampleBufferVideoRenderer
+        let presenter: FramePresenter
     }
 
     // CADisplayLink fires on the main run loop it was added to.
@@ -16,7 +40,7 @@ public final class DisplayPacer {
     private final class Target: NSObject {
         weak var pacer: DisplayPacer?
         @objc func tick(_ link: CADisplayLink) {
-            pacer?.tick()
+            pacer?.tick(link)
         }
     }
 
@@ -29,7 +53,9 @@ public final class DisplayPacer {
     }
 
     public func attach(pacer: FramePacer<CMSampleBuffer>, layer: AVSampleBufferDisplayLayer) {
-        outputs.append(Output(pacer: pacer, renderer: layer.sampleBufferRenderer))
+        let presenter = FramePresenter(renderer: layer.sampleBufferRenderer)
+        pacer.setPresenter { presenter.enqueue($0) }
+        outputs.append(Output(pacer: pacer, presenter: presenter))
     }
 
     public func start() {
@@ -42,14 +68,20 @@ public final class DisplayPacer {
     public func stop() {
         link?.invalidate()
         link = nil
+        for output in outputs { output.pacer.setPresenter(nil) }
         outputs.removeAll()
     }
 
-    private func tick() {
+    private func tick(_ link: CADisplayLink) {
+        // The moment this callback runs is where a late frame misses, not link.timestamp (the
+        // refresh that already happened), so arrival phase is measured against it.
+        let now = CACurrentMediaTime()
         for output in outputs {
-            if output.renderer.status == .failed { output.renderer.flush() }
+            output.pacer.vsync(timestamp: link.timestamp, duration: link.targetTimestamp - link.timestamp,
+                               tickTime: now)
+            output.presenter.flushIfFailed()
             if let frame = output.pacer.tick() {
-                output.renderer.enqueue(frame)
+                output.presenter.enqueue(frame)
             }
         }
     }

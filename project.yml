@@ -27,11 +27,15 @@ targets:
       - package: SeleniteKit
         product: InputKit
       - package: SeleniteKit
+        product: AppCore
+      - package: SeleniteKit
         product: MoonlightCore
     info:
       path: Selenite/Info.plist
       properties:
         CFBundleDisplayName: Selenite
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         NSLocalNetworkUsageDescription: Selenite connects to Sunshine hosts on your local network.
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true

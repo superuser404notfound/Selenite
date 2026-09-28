@@ -1,0 +1,348 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "4K" : {
+
+    },
+    "30 fps" : {
+
+    },
+    "60 fps" : {
+
+    },
+    "720p" : {
+
+    },
+    "1080p" : {
+
+    },
+    "1440p" : {
+
+    },
+    "%@ is offline." : {
+
+    },
+    "%@ is running on %@. Starting %@ quits it." : {
+
+    },
+    "%@ ms" : {
+
+    },
+    "%@ ms decode" : {
+
+    },
+    "%lld drops" : {
+
+    },
+    "%lld fps" : {
+
+    },
+    "%lld Mbps" : {
+
+    },
+    "%lld ms" : {
+
+    },
+    "%lld network, %lld pacer" : {
+
+    },
+    "Add host" : {
+
+    },
+    "Address" : {
+
+    },
+    "Another game is running on %@. Starting %@ quits it." : {
+
+    },
+    "Another stream is still running in Selenite." : {
+
+    },
+    "Audio" : {
+
+    },
+    "Audio underruns" : {
+
+    },
+    "Audio: %@" : {
+
+    },
+    "Automatic" : {
+
+    },
+    "Automatic (5.1 when available)" : {
+
+    },
+    "Bitrate" : {
+
+    },
+    "Bitrate %lld Mbps: +10" : {
+
+    },
+    "Bitrate %lld Mbps: -10" : {
+
+    },
+    "Busy" : {
+
+    },
+    "Cancel" : {
+
+    },
+    "Checking…" : {
+
+    },
+    "Codec" : {
+
+    },
+    "Compact" : {
+
+    },
+    "Connecting…" : {
+
+    },
+    "Connection ended (code %lld)" : {
+
+    },
+    "Contacting the host…" : {
+
+    },
+    "Continue" : {
+
+    },
+    "Decode time" : {
+
+    },
+    "Developer" : {
+
+    },
+    "Disconnect" : {
+
+    },
+    "Disconnecting…" : {
+
+    },
+    "Dropped frames" : {
+
+    },
+    "Enter the IP address or hostname of the PC running Sunshine." : {
+
+    },
+    "Enter this PIN in Sunshine's web UI (PIN tab)" : {
+
+    },
+    "Frame pacing" : {
+
+    },
+    "Frame rate" : {
+
+    },
+    "Free software under the GNU GPLv3. Streaming is built on moonlight-common-c by the Moonlight Game Streaming Project, also GPLv3." : {
+
+    },
+    "H.264" : {
+
+    },
+    "HDR (solo only)" : {
+
+    },
+    "HEVC" : {
+
+    },
+    "IP address" : {
+
+    },
+    "Layout" : {
+
+    },
+    "Lowest latency" : {
+
+    },
+    "Match display" : {
+
+    },
+    "n/a" : {
+
+    },
+    "No video arrived from the host. A firewall may be blocking UDP port 47998." : {
+
+    },
+    "Off" : {
+
+    },
+    "Offline" : {
+
+    },
+    "OK" : {
+
+    },
+    "On" : {
+
+    },
+    "Online" : {
+
+    },
+    "Pair" : {
+
+    },
+    "Pair again" : {
+
+    },
+    "Pair Selenite with a PC running Sunshine." : {
+
+    },
+    "Paired." : {
+
+    },
+    "Pairing failed: %@" : {
+
+    },
+    "Pairing timed out. Enter the PIN in Sunshine's web UI within two minutes." : {
+
+    },
+    "Pairing was cancelled." : {
+
+    },
+    "PIN %@" : {
+
+    },
+    "Present on arrival (experimental)" : {
+
+    },
+    "Press Menu again to leave the stream." : {
+
+    },
+    "Quit %@ on %@? Unsaved progress may be lost." : {
+
+    },
+    "Quit and start %@" : {
+
+    },
+    "Quit game" : {
+
+    },
+    "Quit the running game?" : {
+
+    },
+    "Quitting game…" : {
+
+    },
+    "Remove" : {
+
+    },
+    "Remove %@?" : {
+
+    },
+    "Resolution" : {
+
+    },
+    "Resume" : {
+
+    },
+    "Round trip" : {
+
+    },
+    "RTT %lld ms" : {
+
+    },
+    "RTT n/a" : {
+
+    },
+    "Running" : {
+
+    },
+    "Selenite" : {
+
+    },
+    "Selenite %@" : {
+
+    },
+    "Selenite forgets this host. Pair it again to stream from it." : {
+
+    },
+    "Selenite M0 harness" : {
+
+    },
+    "Settings" : {
+
+    },
+    "Smooth" : {
+
+    },
+    "Something went wrong: %@" : {
+
+    },
+    "Stalls" : {
+
+    },
+    "Start" : {
+
+    },
+    "Starting game…" : {
+
+    },
+    "Stereo" : {
+
+    },
+    "Stream ended" : {
+
+    },
+    "Stream stats" : {
+
+    },
+    "Sunshine is already pairing with another device. Finish or cancel that first." : {
+
+    },
+    "The app list could not be loaded." : {
+
+    },
+    "The connection became too unstable. Try a lower bitrate or a wired network." : {
+
+    },
+    "The connection could not be set up (code %lld)." : {
+
+    },
+    "The connection failed during %@ (code %lld)." : {
+
+    },
+    "The game could not be quit on the host." : {
+
+    },
+    "The game was closed on the host." : {
+
+    },
+    "The host could not be reached. Check that it is on and connected to the network." : {
+
+    },
+    "The host could not convert the picture for streaming." : {
+
+    },
+    "The host declined pairing: %@" : {
+
+    },
+    "The host did not answer. Check the address and that Sunshine is running." : {
+
+    },
+    "The host ended the stream right after it started." : {
+
+    },
+    "The host refused to start the game: %@" : {
+
+    },
+    "The host stopped the stream because protected content was on screen." : {
+
+    },
+    "The host took too long to answer." : {
+
+    },
+    "The PIN did not match. Try again with the new PIN." : {
+
+    },
+    "Try again" : {
+
+    },
+    "Waiting for picture…" : {
+
+    }
+  },
+  "version" : "1.0"
+}

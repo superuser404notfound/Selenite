@@ -3,21 +3,45 @@ import Foundation
 import HostKit
 import MoonlightCore
 
-public struct StreamSettings: Sendable {
+public struct StreamSettings: Sendable, Equatable {
     public var width: Int
     public var height: Int
     public var fps: Int
     public var bitrateKbps: Int
     public var hdr: Bool
     public var audio: AudioChannels
+    public var codec: VideoCodec
+    public var pacing: FramePacingMode
+    /// Experimental, lowLatency only: a decoded frame goes to the renderer on arrival when its
+    /// refresh interval has not been served yet (see FramePacer).
+    public var directPresent: Bool
 
-    public init(width: Int, height: Int, fps: Int, bitrateKbps: Int, hdr: Bool, audio: AudioChannels = .stereo) {
+    public init(width: Int, height: Int, fps: Int, bitrateKbps: Int, hdr: Bool,
+                audio: AudioChannels = .stereo, codec: VideoCodec = .hevc, pacing: FramePacingMode = .lowLatency,
+                directPresent: Bool = false) {
         self.width = width; self.height = height; self.fps = fps; self.bitrateKbps = bitrateKbps; self.hdr = hdr
         self.audio = audio
+        self.codec = codec
+        self.pacing = pacing
+        self.directPresent = directPresent
+    }
+
+    /// moonlight-common-c's `supportedVideoFormats`. H.264 is always offered, so a host without
+    /// HEVC still negotiates a stream; HEVC only when asked for, Main10 only with HDR.
+    public var supportedVideoFormats: Int32 {
+        var formats = Int32(VIDEO_FORMAT_H264)
+        if codec == .hevc {
+            formats |= Int32(VIDEO_FORMAT_H265)
+            if hdr { formats |= Int32(VIDEO_FORMAT_H265_MAIN10) }
+        }
+        return formats
     }
 }
 
 public enum StreamEvent: Sendable {
+    /// serverinfo answered and the host is about to be asked to launch or resume the app (before
+    /// any /cancel, /launch or /resume): what the loading screen calls "Starting game".
+    case launching
     case started
     case stageFailed(String, Int32)
     case terminated(Int32)
@@ -32,6 +56,16 @@ public struct StreamStats: Sendable {
     public var averageDecodeMilliseconds: Double
     public var rttMilliseconds: UInt32?
     public var audio: AudioRingStats?
+
+    public init(decodedFrames: Int = 0, networkDroppedFrames: Int = 0, pacer: PacerStats = PacerStats(),
+                averageDecodeMilliseconds: Double = 0, rttMilliseconds: UInt32? = nil, audio: AudioRingStats? = nil) {
+        self.decodedFrames = decodedFrames
+        self.networkDroppedFrames = networkDroppedFrames
+        self.pacer = pacer
+        self.averageDecodeMilliseconds = averageDecodeMilliseconds
+        self.rttMilliseconds = rttMilliseconds
+        self.audio = audio
+    }
 }
 
 public enum StreamSessionError: Error {
@@ -45,7 +79,7 @@ public enum StreamSessionError: Error {
 
 public final class StreamSession: SlotEventSink, @unchecked Sendable {
     public let slot: Slot
-    public let pacer = FramePacer<CMSampleBuffer>()
+    public let pacer: FramePacer<CMSampleBuffer>
     public let events: AsyncStream<StreamEvent>
     private let eventSink: AsyncStream<StreamEvent>.Continuation
     private let host: PairedHost
@@ -85,6 +119,7 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
         self.host = host
         self.appID = appID
         self.settings = settings
+        self.pacer = FramePacer(mode: settings.pacing, frameRate: settings.fps, directPresent: settings.directPresent)
         self.endpoints = NvEndpoints(address: host.address, httpsPort: host.httpsPort, uniqueID: identity.uniqueID)
         self.client = NvHTTPClient(pinnedCertificate: host.serverCertificateDER, clientIdentity: clientIdentity)
         self.clientIdentity = clientIdentity
@@ -96,6 +131,7 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
         let info = try ServerInfo(NvResponse.parse(try await client.get(endpoints.serverInfo(secure: true), timeout: 10)).requireOK())
         try lifecycle.checkpoint()
         let plan = LaunchPlan.decide(currentGame: info.currentGame, appID: appID)
+        eventSink.yield(.launching)
         if plan == .quitThenLaunch {
             let cancel = try NvResponse.parse(try await client.get(endpoints.cancel(), timeout: 30))
             guard cancel.statusCode == 200 else {
@@ -142,7 +178,7 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
         config.packetSize = 1392
         config.streamingRemotely = STREAM_CFG_AUTO
         config.audioConfiguration = settings.audio == .surround51 ? ML_AUDIO_CONFIGURATION_51 : ML_AUDIO_CONFIGURATION_STEREO
-        config.supportedVideoFormats = VIDEO_FORMAT_H264 | VIDEO_FORMAT_H265 | (settings.hdr ? VIDEO_FORMAT_H265_MAIN10 : 0)
+        config.supportedVideoFormats = settings.supportedVideoFormats
         config.clientRefreshRateX100 = 6000
         config.colorSpace = settings.hdr ? COLORSPACE_REC_2020 : COLORSPACE_REC_709
         config.colorRange = COLOR_RANGE_LIMITED

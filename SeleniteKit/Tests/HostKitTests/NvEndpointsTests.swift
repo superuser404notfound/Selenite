@@ -49,3 +49,9 @@ import Testing
     let value = url.components(separatedBy: "devicename=")[1].components(separatedBy: "&updateState")[0]
     #expect(!value.contains("&"))
 }
+
+@Test func appAssetAsksForTheBoxArt() {
+    let e = NvEndpoints(address: "192.168.1.20", uniqueID: "0123456789abcdef")
+    let url: String = e.appAsset(appID: 881448767).absoluteString
+    #expect(url == "https://192.168.1.20:47984/appasset?uniqueid=0123456789abcdef&appid=881448767&AssetType=2&AssetIdx=0")
+}
