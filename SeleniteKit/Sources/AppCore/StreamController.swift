@@ -188,19 +188,7 @@ public final class StreamController: Identifiable {
     func sampleStats() {
         let current = session.stats()
         liveStats = StreamStatsSummary(current: current, previous: previousStats, settings: settings)
-        if phase == .running, let previous = previousStats {
-            Self.logPacer(current.pacer, since: previous.pacer)
-        }
         previousStats = current
-    }
-
-    /// Diagnostics for the frame pacing round: one line per second.
-    private static func logPacer(_ now: PacerStats, since then: PacerStats) {
-        let bins = zip(now.phaseBins, then.phaseBins).map { String($0 - $1) }.joined(separator: " ")
-        DiagnosticLog.note(String(format: "[pacer] shown %d direct %d stall %d overflow %d catchup %d buffered %d | jitter %.2f ms, arrival %.3f ms, vsync %.3f ms | phase %@",
-            now.presented - then.presented, now.directPresents - then.directPresents, now.stalls - then.stalls, now.overflowDrops - then.overflowDrops,
-            now.catchUpDrops - then.catchUpDrops, now.bufferedTicks - then.bufferedTicks,
-            now.jitterMilliseconds, now.arrivalIntervalMilliseconds, now.vsyncIntervalMilliseconds, bins))
     }
 
     private func consumeEvents() async {

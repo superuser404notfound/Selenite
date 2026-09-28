@@ -148,7 +148,6 @@ final class StreamContainerController: GCEventViewController {
         guard !pressed, !tornDown else { return }
         let now = CACurrentMediaTime()
         lastControllerMenu = now
-        DiagnosticLog.note("[menu] remote, overlay open: \(controller.isOverlayOpen)")
         controller.menuPressed(now: now)
     }
 
@@ -158,7 +157,6 @@ final class StreamContainerController: GCEventViewController {
         guard !pressed, !tornDown else { return }
         lastControllerMenu = CACurrentMediaTime()
         guard controller.isOverlayOpen else { return }
-        DiagnosticLog.note("[menu] gamepad B closes the overlay")
         controller.closeOverlay()
     }
 
@@ -193,10 +191,8 @@ final class StreamContainerController: GCEventViewController {
     private func uikitMenuReleased(at released: Double) {
         guard !tornDown else { return }
         if abs(released - lastControllerMenu) < StreamController.menuDebounceSeconds {
-            DiagnosticLog.note("[menu] press swallowed, GameController already handled it")
             return
         }
-        DiagnosticLog.note("[menu] TV remote press, overlay open: \(controller.isOverlayOpen)")
         controller.menuPressed(now: released)
     }
 
