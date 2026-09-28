@@ -45,5 +45,8 @@ const MLSlotAPI SLOT_TABLE = {
     .sendControllerTouchEvent = LiSendControllerTouchEvent,
     .sendControllerMotionEvent = LiSendControllerMotionEvent,
     .sendControllerBatteryEvent = LiSendControllerBatteryEvent,
+    .sendMouseMoveEvent = LiSendMouseMoveEvent,
+    .sendMouseButtonEvent = LiSendMouseButtonEvent,
+    .sendHighResScrollEvent = LiSendHighResScrollEvent,
     .logMessage = slotLog,
 };

@@ -33,3 +33,13 @@ import MoonlightSlotB
     #expect(ML_AUDIO_CONFIGURATION_51 == (0x3F << 16 | 6 << 8 | 0xCA))
     #expect(ML_SURROUND_AUDIO_INFO_51 == (0x3F << 16 | 6))
 }
+
+@Test func mouseSendersPointAtDistinctCopies() {
+    let a = unsafeBitCast(MLSlotA.sendMouseMoveEvent, to: UnsafeRawPointer.self)
+    let b = unsafeBitCast(MLSlotB.sendMouseMoveEvent, to: UnsafeRawPointer.self)
+    #expect(a != b)
+    #expect(MLSlotA.sendMouseButtonEvent != nil)
+    #expect(MLSlotB.sendMouseButtonEvent != nil)
+    #expect(MLSlotA.sendHighResScrollEvent != nil)
+    #expect(MLSlotB.sendHighResScrollEvent != nil)
+}

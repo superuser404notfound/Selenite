@@ -11,6 +11,9 @@ public protocol StreamSessionHandle: AnyObject, Sendable {
     func start() async throws
     func stop() async
     func stats() -> StreamStats
+    func sendMouseMove(dx: Int16, dy: Int16)
+    func sendMouseButton(_ button: MouseButton, pressed: Bool)
+    func sendScroll(amount: Int16)
 }
 
 extension StreamSession: StreamSessionHandle {}
@@ -73,6 +76,7 @@ public final class StreamController: Identifiable {
     @ObservationIgnored private var previousStats: StreamStats?
     @ObservationIgnored private var stageFailure: StreamFailure?
     @ObservationIgnored private var started = false
+    @ObservationIgnored private var heldButtons: Set<MouseButton> = []
     @ObservationIgnored private(set) var endTask: Task<Void, Never>?
 
     public init(host: PairedHost, app: AppEntry, settings: StreamSettings, session: any StreamSessionHandle,
@@ -122,6 +126,37 @@ public final class StreamController: Identifiable {
     /// The overlay's "Resume", and a gamepad's B while the overlay is open.
     public func closeOverlay() {
         setOverlay(open: false)
+    }
+
+    /// Siri Remote touch surface motion, forwarded only while the stream runs with the overlay closed.
+    public func pointerMoved(dx: Int16, dy: Int16) {
+        guard acceptsPointer else { return }
+        session.sendMouseMove(dx: dx, dy: dy)
+    }
+
+    /// Siri Remote ring scrolling, in wheel units; gated like `pointerMoved`.
+    public func pointerScrolled(amount: Int16) {
+        guard acceptsPointer else { return }
+        session.sendScroll(amount: amount)
+    }
+
+    /// A press is forwarded only while the pointer is accepted; the release of a held button always is.
+    public func pointerButton(_ button: MouseButton, pressed: Bool) {
+        if pressed {
+            guard acceptsPointer, heldButtons.insert(button).inserted else { return }
+        } else {
+            guard heldButtons.remove(button) != nil else { return }
+        }
+        session.sendMouseButton(button, pressed: pressed)
+    }
+
+    private var acceptsPointer: Bool {
+        phase == .running && ending == nil && !isOverlayOpen
+    }
+
+    private func releasePointerButtons() {
+        for button in heldButtons { session.sendMouseButton(button, pressed: false) }
+        heldButtons.removeAll()
     }
 
     /// Menu while loading. A game this attempt launched is cancelled on the host by the session.
@@ -224,6 +259,7 @@ public final class StreamController: Identifiable {
 
     private func setOverlay(open: Bool) {
         guard phase == .running, ending == nil, open != isOverlayOpen else { return }
+        if open { releasePointerButtons() }
         isOverlayOpen = open
         if !open { isConfirmingQuit = false }
         input.setForwarding(!open)
@@ -231,6 +267,7 @@ public final class StreamController: Identifiable {
 
     private func finish(failure: StreamFailure?, quitGame: Bool = false) {
         guard ending == nil else { return }
+        releasePointerButtons()
         ending = quitGame ? .quittingGame : .disconnecting
         isOverlayOpen = false
         isConfirmingQuit = false
