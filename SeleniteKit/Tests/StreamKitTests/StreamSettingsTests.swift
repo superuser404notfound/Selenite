@@ -43,3 +43,9 @@ import Testing
     let underruns: Int? = withAudio.audio?.underruns
     #expect(underruns == 2)
 }
+
+@Test func pacingDefaultsToLowestLatency() {
+    let settings = StreamSettings(width: 1920, height: 1080, fps: 60, bitrateKbps: 20_000, hdr: false)
+    let pacing: FramePacingMode = settings.pacing
+    #expect(pacing == .lowLatency)
+}

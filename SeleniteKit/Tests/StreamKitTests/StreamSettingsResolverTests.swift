@@ -21,6 +21,7 @@ private func resolve(_ preferences: StreamPreferences, display: DisplayMode = di
     #expect(preferences.codec == .automatic)
     #expect(preferences.audio == .automatic)
     #expect(preferences.stats == .off)
+    #expect(preferences.pacing == .lowLatency)
 }
 
 @Test func bitrateChoicesMatchTheSpec() {
@@ -127,4 +128,13 @@ private func resolve(_ preferences: StreamPreferences, display: DisplayMode = di
 @Test func hdrIsAlwaysOff() {
     let hdr: Bool = resolve(StreamPreferences()).hdr
     #expect(!hdr)
+}
+
+@Test func framePacingReachesTheSession() {
+    for mode in FramePacingMode.allCases {
+        var preferences = StreamPreferences()
+        preferences.pacing = mode
+        let pacing: FramePacingMode = resolve(preferences).pacing
+        #expect(pacing == mode)
+    }
 }

@@ -30,6 +30,7 @@ public struct StreamPreferences: Equatable, Sendable {
     public var codec: CodecPreference = .automatic
     public var audio: AudioPreference = .automatic
     public var stats: StatsPreference = .off
+    public var pacing: FramePacingMode = .lowLatency
 
     public init() {}
 }
@@ -63,7 +64,8 @@ public enum StreamSettingsResolver {
             bitrateKbps: preferences.bitrateMbps * 1000,
             hdr: false,
             audio: audio,
-            codec: codec(for: preferences.codec, hostCodecModeSupport: hostCodecModeSupport))
+            codec: codec(for: preferences.codec, hostCodecModeSupport: hostCodecModeSupport),
+            pacing: preferences.pacing)
     }
 
     static func size(for resolution: ResolutionPreference, display: DisplayMode) -> (Int, Int) {

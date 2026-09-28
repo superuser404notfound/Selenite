@@ -17,6 +17,7 @@ public final class SettingsStore {
         static let codec = "settings.codec"
         static let audio = "settings.audio"
         static let stats = "settings.stats"
+        static let pacing = "settings.pacing"
         static let selectedHost = "home.selectedHostID"
     }
 
@@ -57,6 +58,9 @@ public final class SettingsStore {
         if let value = defaults.string(forKey: Key.stats).flatMap(StatsPreference.init(rawValue:)) {
             preferences.stats = value
         }
+        if let value = defaults.string(forKey: Key.pacing).flatMap(FramePacingMode.init(rawValue:)) {
+            preferences.pacing = value
+        }
         return preferences
     }
 
@@ -67,5 +71,6 @@ public final class SettingsStore {
         defaults.set(preferences.codec.rawValue, forKey: Key.codec)
         defaults.set(preferences.audio.rawValue, forKey: Key.audio)
         defaults.set(preferences.stats.rawValue, forKey: Key.stats)
+        defaults.set(preferences.pacing.rawValue, forKey: Key.pacing)
     }
 }

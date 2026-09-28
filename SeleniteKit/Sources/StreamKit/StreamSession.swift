@@ -11,12 +11,14 @@ public struct StreamSettings: Sendable, Equatable {
     public var hdr: Bool
     public var audio: AudioChannels
     public var codec: VideoCodec
+    public var pacing: FramePacingMode
 
     public init(width: Int, height: Int, fps: Int, bitrateKbps: Int, hdr: Bool,
-                audio: AudioChannels = .stereo, codec: VideoCodec = .hevc) {
+                audio: AudioChannels = .stereo, codec: VideoCodec = .hevc, pacing: FramePacingMode = .lowLatency) {
         self.width = width; self.height = height; self.fps = fps; self.bitrateKbps = bitrateKbps; self.hdr = hdr
         self.audio = audio
         self.codec = codec
+        self.pacing = pacing
     }
 
     /// moonlight-common-c's `supportedVideoFormats`. H.264 is always offered, so a host without
@@ -72,7 +74,7 @@ public enum StreamSessionError: Error {
 
 public final class StreamSession: SlotEventSink, @unchecked Sendable {
     public let slot: Slot
-    public let pacer = FramePacer<CMSampleBuffer>()
+    public let pacer: FramePacer<CMSampleBuffer>
     public let events: AsyncStream<StreamEvent>
     private let eventSink: AsyncStream<StreamEvent>.Continuation
     private let host: PairedHost
@@ -112,6 +114,7 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
         self.host = host
         self.appID = appID
         self.settings = settings
+        self.pacer = FramePacer(mode: settings.pacing)
         self.endpoints = NvEndpoints(address: host.address, httpsPort: host.httpsPort, uniqueID: identity.uniqueID)
         self.client = NvHTTPClient(pinnedCertificate: host.serverCertificateDER, clientIdentity: clientIdentity)
         self.clientIdentity = clientIdentity
