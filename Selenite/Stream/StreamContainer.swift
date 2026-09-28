@@ -14,7 +14,7 @@ struct StreamContainer: UIViewControllerRepresentable {
 
     func makeUIViewController(context: Context) -> StreamContainerController {
         StreamContainerController(controller: controller,
-                                  content: AnyView(StreamCoverView(controller: controller).environment(model)))
+                                  content: AnyView(StreamCoverView(controller: controller).environment(model).tint(.cyan)))
     }
 
     func updateUIViewController(_ container: StreamContainerController, context: Context) {}
@@ -76,7 +76,15 @@ final class StreamContainerController: GCEventViewController {
         } onChange: { [weak self] in
             Task { @MainActor in self?.observeOverlay() }
         }
+        let wasOpen = controllerUserInteractionEnabled
         controllerUserInteractionEnabled = open
+        // After the overlay closes, pull focus back inside the stream screen. The request must come
+        // from the container: UIKit ignores it from the surface, which does not hold the focused
+        // Resume button, and a focus left nowhere let Menu bypass this controller before.
+        if wasOpen, !open {
+            setNeedsFocusUpdate()
+            updateFocusIfNeeded()
+        }
     }
 
     // MARK: GameController
