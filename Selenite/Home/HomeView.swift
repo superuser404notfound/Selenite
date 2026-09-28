@@ -8,18 +8,26 @@ struct HomeView: View {
     @Namespace private var focusScope
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 40) {
-            header
-            if model.directory.hosts.isEmpty {
-                EmptyHostsView()
-            } else {
-                HostRow(focusScope: focusScope)
-                AppSection()
+        // One vertical scroll for the whole page, so the grid never slides over the host row.
+        ScrollView(.vertical) {
+            VStack(alignment: .leading, spacing: 40) {
+                header
+                    .focusSection()
+                if model.directory.hosts.isEmpty {
+                    EmptyHostsView()
+                } else {
+                    HostRow(focusScope: focusScope)
+                        .focusSection()
+                    AppSection()
+                        .focusSection()
+                }
             }
+            .padding(.horizontal, 80)
+            .padding(.top, 40)
+            .padding(.bottom, 80)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
-        .padding(.horizontal, 80)
-        .padding(.top, 40)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .scrollClipDisabled()
         .background(Color.Theme.page.ignoresSafeArea())
         .focusScope(focusScope)
         .onAppear { model.homeAppeared() }
@@ -112,19 +120,16 @@ private struct AppSection: View {
             notice(systemImage: "exclamationmark.triangle", text: Text("The app list could not be loaded."))
         } else if apps.isEmpty {
             ProgressView()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .frame(maxWidth: .infinity, minHeight: 400)
         } else {
-            ScrollView {
-                LazyVGrid(columns: columns, alignment: .leading, spacing: 56) {
-                    ForEach(apps) { app in
-                        AppTile(host: snapshot.host, app: app, isRunning: app.id == snapshot.currentGame) {
-                            model.appSelected(app)
-                        }
+            LazyVGrid(columns: columns, alignment: .leading, spacing: 56) {
+                ForEach(apps) { app in
+                    AppTile(host: snapshot.host, app: app, isRunning: app.id == snapshot.currentGame) {
+                        model.appSelected(app)
                     }
                 }
-                .padding(30)
             }
-            .scrollClipDisabled()
+            .padding(30)
         }
     }
 
@@ -137,7 +142,7 @@ private struct AppSection: View {
                 .font(.title3)
                 .foregroundStyle(.secondary)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity, minHeight: 400)
     }
 }
 
@@ -147,7 +152,6 @@ private struct EmptyHostsView: View {
 
     var body: some View {
         VStack {
-            Spacer()
             FocusableCard(action: { model.addHostRequest = .new }) { focused in
                 VStack(spacing: 24) {
                     Image(systemName: "plus.circle.fill")
@@ -163,8 +167,7 @@ private struct EmptyHostsView: View {
                 .frame(width: 720)
                 .background(RoundedRectangle(cornerRadius: 28).fill(focused ? Color.Theme.surfaceElevated : Color.Theme.surface))
             }
-            Spacer()
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, minHeight: 700)
     }
 }
