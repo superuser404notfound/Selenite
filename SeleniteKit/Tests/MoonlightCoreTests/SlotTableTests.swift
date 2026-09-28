@@ -40,4 +40,6 @@ import MoonlightSlotB
     #expect(a != b)
     #expect(MLSlotA.sendMouseButtonEvent != nil)
     #expect(MLSlotB.sendMouseButtonEvent != nil)
+    #expect(MLSlotA.sendHighResScrollEvent != nil)
+    #expect(MLSlotB.sendHighResScrollEvent != nil)
 }

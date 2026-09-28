@@ -36,6 +36,7 @@ typedef struct {
     int (*sendControllerBatteryEvent)(uint8_t controllerNumber, uint8_t batteryState, uint8_t batteryPercentage);
     int (*sendMouseMoveEvent)(short deltaX, short deltaY);
     int (*sendMouseButtonEvent)(char action, int button);
+    int (*sendHighResScrollEvent)(short scrollAmount);
     // Variadic logger for CONNECTION_LISTENER_CALLBACKS.logMessage; formats and forwards to the log sink.
     ConnListenerLogMessage logMessage;
 } MLSlotAPI;

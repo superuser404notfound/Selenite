@@ -13,6 +13,7 @@ public protocol StreamSessionHandle: AnyObject, Sendable {
     func stats() -> StreamStats
     func sendMouseMove(dx: Int16, dy: Int16)
     func sendMouseButton(_ button: MouseButton, pressed: Bool)
+    func sendScroll(amount: Int16)
 }
 
 extension StreamSession: StreamSessionHandle {}
@@ -131,6 +132,12 @@ public final class StreamController: Identifiable {
     public func pointerMoved(dx: Int16, dy: Int16) {
         guard acceptsPointer else { return }
         session.sendMouseMove(dx: dx, dy: dy)
+    }
+
+    /// Siri Remote ring scrolling, in wheel units; gated like `pointerMoved`.
+    public func pointerScrolled(amount: Int16) {
+        guard acceptsPointer else { return }
+        session.sendScroll(amount: amount)
     }
 
     /// A press is forwarded only while the pointer is accepted; the release of a held button always is.

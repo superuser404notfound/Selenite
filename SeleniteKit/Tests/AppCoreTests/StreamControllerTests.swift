@@ -33,6 +33,8 @@ private final class FakeSession: StreamSessionHandle, @unchecked Sendable {
 
     func sendMouseMove(dx: Int16, dy: Int16) { lock.withLock { _mouse.append("move \(dx),\(dy)") } }
 
+    func sendScroll(amount: Int16) { lock.withLock { _mouse.append("scroll \(amount)") } }
+
     func sendMouseButton(_ button: MouseButton, pressed: Bool) {
         lock.withLock { _mouse.append("\(button) \(pressed ? "down" : "up")") }
     }
@@ -361,17 +363,19 @@ private final class FakeCommands: HostCommands, @unchecked Sendable {
 @MainActor @Test func pointerForwardsWhileRunningWithTheOverlayClosed() async {
     let rig = await runningRig()
     rig.controller.pointerMoved(dx: 3, dy: -2)
+    rig.controller.pointerScrolled(amount: -120)
     rig.controller.pointerButton(.left, pressed: true)
     rig.controller.pointerButton(.left, pressed: false)
     rig.controller.pointerButton(.right, pressed: true)
     rig.controller.pointerButton(.right, pressed: false)
-    #expect(rig.session.mouse == ["move 3,-2", "left down", "left up", "right down", "right up"])
+    #expect(rig.session.mouse == ["move 3,-2", "scroll -120", "left down", "left up", "right down", "right up"])
 }
 
 @MainActor @Test func pointerIsDroppedWhileLoading() {
     let rig = makeRig()
     rig.controller.start()
     rig.controller.pointerMoved(dx: 3, dy: 3)
+    rig.controller.pointerScrolled(amount: 120)
     rig.controller.pointerButton(.left, pressed: true)
     rig.controller.pointerButton(.left, pressed: false)
     #expect(rig.session.mouse.isEmpty)
@@ -382,6 +386,7 @@ private final class FakeCommands: HostCommands, @unchecked Sendable {
     rig.controller.pointerButton(.left, pressed: true)
     rig.controller.menuPressed(now: 10)
     rig.controller.pointerMoved(dx: 5, dy: 5)
+    rig.controller.pointerScrolled(amount: 120)
     rig.controller.pointerButton(.right, pressed: true)
     rig.controller.pointerButton(.left, pressed: false)
     #expect(rig.session.mouse == ["left down", "left up"])

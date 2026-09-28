@@ -24,4 +24,10 @@ extension StreamSession {
         let action = CChar(pressed ? BUTTON_ACTION_PRESS : BUTTON_ACTION_RELEASE)
         _ = lifecycle.whileConnected { slot.api.sendMouseButtonEvent!(action, button.moonlightButton) }
     }
+
+    /// Wheel units, 120 per notch, positive scrolls up.
+    public func sendScroll(amount: Int16) {
+        guard amount != 0 else { return }
+        _ = lifecycle.whileConnected { slot.api.sendHighResScrollEvent!(amount) }
+    }
 }

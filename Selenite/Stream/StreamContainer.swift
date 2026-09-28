@@ -154,9 +154,9 @@ final class StreamContainerController: GCEventViewController {
         pointers.removeAll()
     }
 
-    /// The Siri Remote as a trackpad for the host's mouse: the touch surface moves the pointer, its
-    /// click is the left button and Play/Pause the right one. `StreamController` drops all of it
-    /// while the overlay is open or the stream is not running.
+    /// The Siri Remote as a trackpad for the host's mouse: the touch surface moves the pointer, a
+    /// circle on its ring scrolls, its click is the left button and Play/Pause the right one.
+    /// `StreamController` drops all of it while the overlay is open or the stream is not running.
     private func observePointer(_ pad: GCMicroGamepad, id: ObjectIdentifier) {
         pointers[id] = RemotePointer()
         pad.reportsAbsoluteDpadValues = true
@@ -176,6 +176,7 @@ final class StreamContainerController: GCEventViewController {
         let move = pointer.touch(x: x, y: y, time: CACurrentMediaTime())
         pointers[id] = pointer
         controller.pointerMoved(dx: move.dx, dy: move.dy)
+        controller.pointerScrolled(amount: move.scroll)
     }
 
     private func pointerClicked(id: ObjectIdentifier, pressed: Bool) {
