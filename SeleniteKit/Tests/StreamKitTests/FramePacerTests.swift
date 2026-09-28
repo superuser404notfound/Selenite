@@ -1,4 +1,5 @@
 import Testing
+import Foundation
 @testable import StreamKit
 
 /// Feeds `arrivals[i]` frames before tick i and records what each tick presents.
@@ -384,4 +385,196 @@ private func streamArrivals(count: Int, fps: Double, startMs: Double = 1000, off
     let firstShown = records.firstIndex { $0.shown != nil } ?? 0
     let empty: Int = records[firstShown...].filter { $0.shown == nil }.count
     #expect(empty == 0)
+}
+
+// MARK: - Direct present on arrival (experimental, lowLatency only)
+
+/// Collects what the pacer hands the renderer directly, from whichever thread puts.
+private final class PresentSink: @unchecked Sendable {
+    private let lock = NSLock()
+    private var frames: [Int] = []
+    var presented: [Int] { lock.withLock { frames } }
+    func present(_ frame: Int) { lock.withLock { frames.append(frame) } }
+}
+
+private func directPacer(mode: FramePacingMode = .lowLatency, frameRate: Int = 60,
+                         directPresent: Bool = true) -> (FramePacer<Int>, PresentSink) {
+    let pacer = FramePacer<Int>(mode: mode, frameRate: frameRate, directPresent: directPresent)
+    let sink = PresentSink()
+    pacer.setPresenter { sink.present($0) }
+    return (pacer, sink)
+}
+
+/// `simulate` with a present sink attached: records what each tick returns, stats after each tick,
+/// and the order of every frame that reached the renderer (direct or tick).
+private func simulateDirect(_ mode: FramePacingMode = .lowLatency, directPresent: Bool = true, arrivals: [Double],
+                            ticks: Int, startMs: Double = 1000, frameRate: Int = 60,
+                            refreshMs: Double = vsyncMs) -> (records: [TickRecord], rendered: [Int], stats: PacerStats) {
+    let pacer = FramePacer<Int>(mode: mode, frameRate: frameRate, directPresent: directPresent)
+    let sink = PresentSink()
+    pacer.setPresenter { sink.present($0) }
+    var next = 0
+    var records: [TickRecord] = []
+    for tick in 0..<ticks {
+        let now = startMs + Double(tick) * refreshMs
+        while next < arrivals.count, arrivals[next] < now {
+            pacer.put(next, arrival: arrivals[next] / 1000)
+            next += 1
+        }
+        pacer.vsync(timestamp: now / 1000, duration: refreshMs / 1000, tickTime: now / 1000)
+        let frame = pacer.tick()
+        if let frame { sink.present(frame) }
+        let stats = pacer.stats
+        records.append(TickRecord(shown: frame, stalls: stats.stalls, catchUpDrops: stats.catchUpDrops,
+                                  overflowDrops: stats.overflowDrops))
+    }
+    return (records, sink.presented, pacer.stats)
+}
+
+@Test func directPresentShowsMidIntervalFramesOnArrival() {
+    var noise = Noise(seed: 40)
+    let times = arrivals(count: 700) { _ in 0.5 + 0.2 * noise.next() }
+    let (records, rendered, stats) = simulateDirect(arrivals: times, ticks: 600)
+    let stalls: Int = increase(records, from: 1, \.stalls)
+    let tickShown: Int = records.compactMap(\.shown).count
+    let direct: Int = stats.directPresents
+    let presented: Int = stats.presented
+    let inOrder: Bool = rendered == rendered.sorted()
+    #expect(stalls == 0)
+    #expect(tickShown == 0)
+    #expect(direct == presented)
+    #expect(direct >= 598)
+    #expect(inOrder)
+}
+
+@Test func directPresentSendsTheSecondFrameOfAnIntervalToTheNextTick() {
+    let (pacer, sink) = directPacer()
+    let d = 1.0 / 60
+    pacer.vsync(timestamp: 1.0, duration: d)
+    _ = pacer.tick()
+    let stallsBefore: Int = pacer.stats.stalls
+    pacer.put(0, arrival: 1.0 + 0.4 * d)
+    pacer.put(1, arrival: 1.0 + 0.6 * d)
+    let directAfterPut: [Int] = sink.presented
+    #expect(directAfterPut == [0])
+    pacer.vsync(timestamp: 1.0 + d, duration: d)
+    let second: Int? = pacer.tick()
+    #expect(second == 1)
+    // Nothing arrives in the interval the tick served; the next tick is no stall.
+    pacer.vsync(timestamp: 1.0 + 2 * d, duration: d)
+    let empty: Int? = pacer.tick()
+    #expect(empty == nil)
+    let stalls: Int = pacer.stats.stalls - stallsBefore
+    let direct: Int = pacer.stats.directPresents
+    let presented: Int = pacer.stats.presented
+    #expect(stalls == 0)
+    #expect(direct == 1)
+    #expect(presented == 2)
+}
+
+@Test func directPresentResumesInTheIntervalAfterAServedOne() {
+    let (pacer, sink) = directPacer()
+    let d = 1.0 / 60
+    pacer.vsync(timestamp: 1.0, duration: d)
+    _ = pacer.tick()
+    pacer.put(0, arrival: 1.0 + 0.5 * d)
+    pacer.vsync(timestamp: 1.0 + d, duration: d)
+    let tick1: Int? = pacer.tick()
+    pacer.put(1, arrival: 1.0 + 1.5 * d)
+    pacer.vsync(timestamp: 1.0 + 2 * d, duration: d)
+    let tick2: Int? = pacer.tick()
+    let rendered: [Int] = sink.presented
+    let stalls: Int = pacer.stats.stalls
+    #expect(tick1 == nil)
+    #expect(tick2 == nil)
+    #expect(rendered == [0, 1])
+    // Only the very first tick, before any frame, counts as a stall.
+    #expect(stalls == 1)
+}
+
+@Test func aDirectPresentBetweenVsyncAndTickKeepsArrivalOrder() {
+    let (pacer, sink) = directPacer()
+    let d = 1.0 / 60
+    pacer.vsync(timestamp: 1.0, duration: d)
+    _ = pacer.tick()
+    pacer.put(0, arrival: 1.0 + 0.3 * d)
+    pacer.put(1, arrival: 1.0 + 0.6 * d)
+    // The decode thread wins the race against the tick that follows this vsync.
+    pacer.vsync(timestamp: 1.0 + d, duration: d)
+    pacer.put(2, arrival: 1.0 + d + 0.001)
+    let tick: Int? = pacer.tick()
+    let rendered: [Int] = sink.presented
+    #expect(tick == nil)
+    #expect(rendered == [0, 1])
+    pacer.vsync(timestamp: 1.0 + 2 * d, duration: d)
+    let next: Int? = pacer.tick()
+    #expect(next == 2)
+}
+
+@Test func directPresentCutsTheLagABurstLeavesBehind() {
+    // Two frames in the interval before the first tick (the first goes out directly, the second
+    // waits), then one per interval mid-interval: without a cut every frame would go out on the
+    // tick (one refresh late) for the rest of the stream.
+    let times = [1000 - 0.6 * vsyncMs, 1000 - 0.4 * vsyncMs] + arrivals(count: 700) { _ in 0.5 }
+    let (records, rendered, _) = simulateDirect(arrivals: times, ticks: 600)
+    let catchUp: Int = increase(records, from: 0, \.catchUpDrops)
+    let stalls: Int = increase(records, from: 1, \.stalls)
+    let lateTickShown: Int = records[100...].compactMap(\.shown).count
+    let inOrder: Bool = rendered == rendered.sorted()
+    #expect(catchUp == 1)
+    #expect(stalls == 0)
+    #expect(lateTickShown == 0)
+    #expect(inOrder)
+}
+
+@Test func directPresentAt30FpsOn60HzCountsNoCadenceGapAsAStall() {
+    var noise = Noise(seed: 41)
+    let times = arrivals30(count: 700) { _ in 1.5 + 0.3 * noise.next() }
+    let (records, rendered, stats) = simulateDirect(arrivals: times, ticks: 1200, frameRate: 30)
+    let stalls: Int = increase(records, from: 3, \.stalls)
+    let direct: Int = stats.directPresents
+    #expect(stalls == 0)
+    #expect(direct >= 595)
+    #expect(rendered.count >= 595)
+}
+
+@Test func directPresentOffLeavesThePacerAsToday() {
+    var noise = Noise(seed: 42)
+    let times = arrivals(count: 700) { _ in 0.5 + 0.25 * noise.next() }
+    let (records, rendered, stats) = simulateDirect(directPresent: false, arrivals: times, ticks: 600)
+    let reference = simulate(.lowLatency, arrivals: times, ticks: 600)
+    let shown: [Int?] = records.map(\.shown)
+    let expected: [Int?] = reference.map(\.shown)
+    let direct: Int = stats.directPresents
+    let renderedCount: Int = rendered.count
+    let tickCount: Int = shown.compactMap { $0 }.count
+    #expect(shown == expected)
+    #expect(direct == 0)
+    #expect(renderedCount == tickCount)
+}
+
+@Test func smoothIgnoresDirectPresent() {
+    var noise = Noise(seed: 43)
+    let times = arrivals(count: 700) { _ in 0.5 + 0.25 * noise.next() }
+    let (records, _, stats) = simulateDirect(.smooth, arrivals: times, ticks: 600)
+    let reference = simulate(.smooth, arrivals: times, ticks: 600)
+    let shown: [Int?] = records.map(\.shown)
+    let expected: [Int?] = reference.map(\.shown)
+    let direct: Int = stats.directPresents
+    #expect(shown == expected)
+    #expect(direct == 0)
+}
+
+@Test func directPresentNeedsAPresenter() {
+    // Switch on but nothing attached (a pacer the harness never shows): frames wait for the tick.
+    let pacer = FramePacer<Int>(mode: .lowLatency, frameRate: 60, directPresent: true)
+    let d = 1.0 / 60
+    pacer.vsync(timestamp: 1.0, duration: d)
+    _ = pacer.tick()
+    pacer.put(0, arrival: 1.0 + 0.5 * d)
+    pacer.vsync(timestamp: 1.0 + d, duration: d)
+    let shown: Int? = pacer.tick()
+    let direct: Int = pacer.stats.directPresents
+    #expect(shown == 0)
+    #expect(direct == 0)
 }

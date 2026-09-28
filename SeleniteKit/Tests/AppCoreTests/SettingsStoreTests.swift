@@ -24,6 +24,7 @@ private func freshDefaults() -> UserDefaults {
     store.set(\.audio, .stereo)
     store.set(\.stats, .compact)
     store.set(\.pacing, .smooth)
+    store.set(\.directPresent, true)
     store.setSelectedHostID("HOST-1")
     var expected = StreamPreferences()
     expected.resolution = .p1440
@@ -33,6 +34,7 @@ private func freshDefaults() -> UserDefaults {
     expected.audio = .stereo
     expected.stats = .compact
     expected.pacing = .smooth
+    expected.directPresent = true
     let reloaded = SettingsStore(defaults: defaults)
     let preferences: StreamPreferences = reloaded.preferences
     #expect(preferences == expected)
@@ -44,6 +46,7 @@ private func freshDefaults() -> UserDefaults {
     defaults.set("8K", forKey: "settings.resolution")
     defaults.set(123, forKey: "settings.bitrateMbps")
     defaults.set("vsync", forKey: "settings.pacing")
+    defaults.set("yes", forKey: "settings.directPresent")
     let preferences: StreamPreferences = SettingsStore(defaults: defaults).preferences
     #expect(preferences == StreamPreferences())
 }

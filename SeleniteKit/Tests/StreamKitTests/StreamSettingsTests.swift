@@ -49,3 +49,9 @@ import Testing
     let pacing: FramePacingMode = settings.pacing
     #expect(pacing == .lowLatency)
 }
+
+@Test func directPresentDefaultsToOff() {
+    let settings = StreamSettings(width: 1920, height: 1080, fps: 60, bitrateKbps: 20_000, hdr: false)
+    let directPresent: Bool = settings.directPresent
+    #expect(!directPresent)
+}

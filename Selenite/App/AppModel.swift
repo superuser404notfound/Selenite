@@ -213,7 +213,8 @@ final class AppModel {
                                                                 hostCodecModeSupport: codecs)
             DiagnosticLog.note("stream start: \(host.name) app \(app.id) \(streamSettings.width)x\(streamSettings.height)"
                 + " at \(streamSettings.fps) fps, \(streamSettings.bitrateKbps) kbps, \(streamSettings.codec),"
-                + " audio \(streamSettings.audio), pacing \(streamSettings.pacing.rawValue), display \(display.width)x\(display.height) at \(display.refreshRate) Hz")
+                + " audio \(streamSettings.audio), pacing \(streamSettings.pacing.rawValue),"
+                + " direct present \(streamSettings.directPresent ? "on" : "off"), display \(display.width)x\(display.height) at \(display.refreshRate) Hz")
             do {
                 let session = try StreamSession(host: host, appID: app.id, settings: streamSettings,
                                                 identity: identity, clientIdentity: secIdentity)

@@ -16,6 +16,8 @@ public struct PacerStats: Sendable, Equatable {
     public var catchUpDrops = 0
     /// Ticks that presented a frame while another waited: one frame of latency paid.
     public var bufferedTicks = 0
+    /// Frames handed to the renderer on arrival instead of on a tick (direct present).
+    public var directPresents = 0
     /// Sample standard deviation of frame inter-arrival time.
     public var jitterMilliseconds: Double = 0
     /// Diagnostics: where in the refresh interval frames arrive, in tenths after the last tick.
@@ -49,6 +51,18 @@ public struct PacerStats: Sendable, Equatable {
 /// arrivals, not an accumulator phase; an empty tick is a stall there once the current frame has
 /// been up for the longest normal hold, ceil(refresh / fps). A stream at or above the refresh
 /// never waits in either mode.
+///
+/// Direct present (experimental, lowLatency only, needs `directPresent` and a presenter): the
+/// renderer shows whatever was enqueued before a vsync at that vsync, so a frame enqueued as soon as
+/// it is decoded is shown one refresh earlier than one that waits for the tick after the vsync. The
+/// span between two `vsync` calls is one interval, and at most one frame is enqueued per interval:
+/// the first arrival of an interval goes to the presenter from `put` (under the pacer's lock, so a
+/// tick can never overtake it), a second one waits for the next tick as before. A tick presents a
+/// waiting frame only while its interval is still unserved, and it judges stalls on the interval
+/// that just ended: served by a present (tick or direct) is no stall, unserved is one under the
+/// lowLatency hold rule. A frame the tick presents paid a refresh against a direct present; when
+/// that happens `lowLatencyCatchUpTicks` intervals in a row with arrivals away from the tick, the
+/// waiting frame is cut so the next arrival presents directly again.
 ///
 /// `Frame` carries no `Sendable` constraint: `CMSampleBufferRef` is `CM_SWIFT_NONSENDABLE` in this
 /// SDK, but frames still cross from the decode thread to the vsync tick and must be treated as
@@ -87,38 +101,59 @@ public final class FramePacer<Frame>: @unchecked Sendable {
     private var vsyncIntervalSum = 0.0
     private var phaseDistances: [Double] = []
     private var phaseDistanceIndex = 0
+    /// Direct present: a frame was enqueued in the current interval, and whether the interval that
+    /// ended at the last vsync had one.
+    private var intervalServed = false
+    private var endedIntervalServed = false
+    /// Direct present: intervals in a row that enqueued nothing.
+    private var idleIntervals = 0
 
-    public init(mode: FramePacingMode = .lowLatency, frameRate: Int = 0) {
+    public let directPresent: Bool
+    private var present: ((Frame) -> Void)?
+
+    public init(mode: FramePacingMode = .lowLatency, frameRate: Int = 0, directPresent: Bool = false) {
         self.mode = mode
         self.frameRate = frameRate
+        self.directPresent = directPresent
         queue.reserveCapacity(capacity + 1)
         phaseDistances.reserveCapacity(Self.phaseWindow)
     }
 
+    public func setPresenter(_ present: (@Sendable (Frame) -> Void)?) {
+        lock.withLock { self.present = present }
+    }
+
     public func put(_ frame: Frame, arrival: Double) {
         lock.withLock {
-            if let last = lastArrival {
-                let interval = (arrival - last) * 1000
-                intervalCount += 1
-                let delta = interval - intervalMean
-                intervalMean += delta / Double(intervalCount)
-                intervalM2 += delta * (interval - intervalMean)
-            }
-            lastArrival = arrival
-            var distance = 0.5
-            if lastTick > 0, vsyncDuration > 0 {
-                let phase = (arrival - lastTick) / vsyncDuration
-                let fraction = phase - phase.rounded(.down)
-                counters.phaseBins[min(9, max(0, Int(fraction * 10)))] += 1
-                distance = min(fraction, 1 - fraction)
-            }
-            recordPhaseDistance(distance)
+            record(arrival: arrival)
             if queue.count >= capacity {
                 queue.removeFirst()
                 counters.overflowDrops += 1
             }
             queue.append(frame)
+            if isDirect, !intervalServed, let present {
+                present(presentNext(direct: true))
+            }
         }
+    }
+
+    private func record(arrival: Double) {
+        if let last = lastArrival {
+            let interval = (arrival - last) * 1000
+            intervalCount += 1
+            let delta = interval - intervalMean
+            intervalMean += delta / Double(intervalCount)
+            intervalM2 += delta * (interval - intervalMean)
+        }
+        lastArrival = arrival
+        var distance = 0.5
+        if lastTick > 0, vsyncDuration > 0 {
+            let phase = (arrival - lastTick) / vsyncDuration
+            let fraction = phase - phase.rounded(.down)
+            counters.phaseBins[min(9, max(0, Int(fraction * 10)))] += 1
+            distance = min(fraction, 1 - fraction)
+        }
+        recordPhaseDistance(distance)
     }
 
     /// The refresh this tick belongs to (`timestamp`, `duration`: the vsync interval stat and the
@@ -133,13 +168,15 @@ public final class FramePacer<Frame>: @unchecked Sendable {
             lastVsync = timestamp
             lastTick = tickTime ?? timestamp
             vsyncDuration = duration
+            endedIntervalServed = intervalServed
+            intervalServed = false
         }
     }
 
     public func tick() -> Frame? {
         lock.withLock {
             switch mode {
-            case .lowLatency: lowLatencyTick()
+            case .lowLatency: isDirect ? directTick() : lowLatencyTick()
             case .smooth: smoothTick()
             }
         }
@@ -166,6 +203,49 @@ public final class FramePacer<Frame>: @unchecked Sendable {
             }
         }
         counters.presented += 1
+        return frame
+    }
+
+    /// Direct present is on for this pacer: lowLatency, switched on, and a presenter attached.
+    private var isDirect: Bool { mode == .lowLatency && directPresent && present != nil }
+
+    private func directTick() -> Frame? {
+        if endedIntervalServed {
+            idleIntervals = 0
+        } else {
+            if idleIntervals < Int.max / 2 { idleIntervals += 1 }
+            if idleIntervals >= longestNormalHold { _ = stall() }
+        }
+        // A frame already went out directly after this vsync: the tick lost the race, not a stall.
+        guard !intervalServed else { return nil }
+        guard !queue.isEmpty else {
+            backlogTicks = 0
+            return nil
+        }
+        // This frame waited through an interval that was already served: one refresh of latency.
+        backlogTicks += 1
+        if backlogTicks >= Self.lowLatencyCatchUpTicks, arrivalsAreAwayFromTheTick {
+            queue.removeFirst()
+            counters.catchUpDrops += 1
+            backlogTicks = 0
+            // Left unserved on purpose: the next arrival in this interval presents directly.
+            guard !queue.isEmpty else { return nil }
+        }
+        return presentNext(direct: false)
+    }
+
+    /// Direct present: the oldest waiting frame is enqueued in this interval.
+    private func presentNext(direct: Bool) -> Frame {
+        intervalServed = true
+        let frame = queue.removeFirst()
+        if queue.isEmpty {
+            if direct { backlogTicks = 0 }
+        } else {
+            counters.bufferedTicks += 1
+            if direct { backlogTicks += 1 }
+        }
+        counters.presented += 1
+        if direct { counters.directPresents += 1 }
         return frame
     }
 

@@ -22,6 +22,7 @@ private func resolve(_ preferences: StreamPreferences, display: DisplayMode = di
     #expect(preferences.audio == .automatic)
     #expect(preferences.stats == .off)
     #expect(preferences.pacing == .lowLatency)
+    #expect(!preferences.directPresent)
 }
 
 @Test func bitrateChoicesMatchTheSpec() {
@@ -136,5 +137,14 @@ private func resolve(_ preferences: StreamPreferences, display: DisplayMode = di
         preferences.pacing = mode
         let pacing: FramePacingMode = resolve(preferences).pacing
         #expect(pacing == mode)
+    }
+}
+
+@Test func directPresentReachesTheSession() {
+    for value in [false, true] {
+        var preferences = StreamPreferences()
+        preferences.directPresent = value
+        let directPresent: Bool = resolve(preferences).directPresent
+        #expect(directPresent == value)
     }
 }

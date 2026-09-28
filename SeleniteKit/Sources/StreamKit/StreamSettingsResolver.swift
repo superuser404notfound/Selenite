@@ -31,6 +31,8 @@ public struct StreamPreferences: Equatable, Sendable {
     public var audio: AudioPreference = .automatic
     public var stats: StatsPreference = .off
     public var pacing: FramePacingMode = .lowLatency
+    /// Developer setting, experimental: present frames on arrival in lowLatency pacing.
+    public var directPresent = false
 
     public init() {}
 }
@@ -65,7 +67,8 @@ public enum StreamSettingsResolver {
             hdr: false,
             audio: audio,
             codec: codec(for: preferences.codec, hostCodecModeSupport: hostCodecModeSupport),
-            pacing: preferences.pacing)
+            pacing: preferences.pacing,
+            directPresent: preferences.directPresent)
     }
 
     static func size(for resolution: ResolutionPreference, display: DisplayMode) -> (Int, Int) {

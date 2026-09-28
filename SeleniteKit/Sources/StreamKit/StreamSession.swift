@@ -12,13 +12,18 @@ public struct StreamSettings: Sendable, Equatable {
     public var audio: AudioChannels
     public var codec: VideoCodec
     public var pacing: FramePacingMode
+    /// Experimental, lowLatency only: a decoded frame goes to the renderer on arrival when its
+    /// refresh interval has not been served yet (see FramePacer).
+    public var directPresent: Bool
 
     public init(width: Int, height: Int, fps: Int, bitrateKbps: Int, hdr: Bool,
-                audio: AudioChannels = .stereo, codec: VideoCodec = .hevc, pacing: FramePacingMode = .lowLatency) {
+                audio: AudioChannels = .stereo, codec: VideoCodec = .hevc, pacing: FramePacingMode = .lowLatency,
+                directPresent: Bool = false) {
         self.width = width; self.height = height; self.fps = fps; self.bitrateKbps = bitrateKbps; self.hdr = hdr
         self.audio = audio
         self.codec = codec
         self.pacing = pacing
+        self.directPresent = directPresent
     }
 
     /// moonlight-common-c's `supportedVideoFormats`. H.264 is always offered, so a host without
@@ -114,7 +119,7 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
         self.host = host
         self.appID = appID
         self.settings = settings
-        self.pacer = FramePacer(mode: settings.pacing, frameRate: settings.fps)
+        self.pacer = FramePacer(mode: settings.pacing, frameRate: settings.fps, directPresent: settings.directPresent)
         self.endpoints = NvEndpoints(address: host.address, httpsPort: host.httpsPort, uniqueID: identity.uniqueID)
         self.client = NvHTTPClient(pinnedCertificate: host.serverCertificateDER, clientIdentity: clientIdentity)
         self.clientIdentity = clientIdentity
