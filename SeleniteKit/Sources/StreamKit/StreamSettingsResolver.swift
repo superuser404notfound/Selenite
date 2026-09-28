@@ -32,7 +32,8 @@ public struct StreamPreferences: Equatable, Sendable {
     public var stats: StatsPreference = .off
     public var pacing: FramePacingMode = .lowLatency
     /// Developer setting, experimental: present frames on arrival in lowLatency pacing.
-    public var directPresent = false
+    /// On by default since the 2026-09-28 device round: most frames skip one refresh of waiting.
+    public var directPresent = true
 
     public init() {}
 }

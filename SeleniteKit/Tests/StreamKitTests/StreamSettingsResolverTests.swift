@@ -22,7 +22,7 @@ private func resolve(_ preferences: StreamPreferences, display: DisplayMode = di
     #expect(preferences.audio == .automatic)
     #expect(preferences.stats == .off)
     #expect(preferences.pacing == .lowLatency)
-    #expect(!preferences.directPresent)
+    #expect(preferences.directPresent)
 }
 
 @Test func bitrateChoicesMatchTheSpec() {
