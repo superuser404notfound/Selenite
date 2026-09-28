@@ -53,8 +53,11 @@ public final class AudioOutput: @unchecked Sendable {
         try? session.setPreferredIOBufferDuration(0.005)
         #endif
         let center = NotificationCenter.default
+        // Never rewire inside the notification: it is posted on the engine's own queue while the
+        // engine is still reconfiguring, and any graph change there (connect or disconnect)
+        // aborts with an AVFAudio exception. Hop off that queue first.
         observers.append(center.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine, queue: nil) { [weak self] _ in
-            self?.rewire()
+            DispatchQueue.main.async { self?.rewire() }
         })
     }
 
@@ -188,6 +191,9 @@ public final class AudioOutput: @unchecked Sendable {
     private func rewire() {
         lock.withLock {
             guard !nodes.isEmpty else { return }
+            // A configuration change has already stopped the engine; stop it explicitly anyway so
+            // the graph is never edited while it renders.
+            engine.stop()
             let outputChannels = connectOutput()
             do {
                 try engine.start()
