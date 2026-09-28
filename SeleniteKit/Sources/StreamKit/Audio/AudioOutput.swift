@@ -145,14 +145,22 @@ public final class AudioOutput: @unchecked Sendable {
         #if os(tvOS)
         // Ask the route for exactly what the content needs, so stereo reaches the receiver as
         // 2-channel PCM (a receiver shows and treats it as stereo) and 5.1 as 6 channels.
+        // Only when it changes: setting it reconfigures the route, which posts another
+        // configuration change and would bring us straight back here.
+        let session = AVAudioSession.sharedInstance()
         do {
-            try AVAudioSession.sharedInstance().setPreferredOutputNumberOfChannels(wanted)
+            if session.preferredOutputNumberOfChannels != wanted {
+                try session.setPreferredOutputNumberOfChannels(wanted)
+            }
         } catch {
             NSLog("[Selenite] AudioOutput: setPreferredOutputNumberOfChannels(%d) failed: %@",
                   Int32(wanted), String(describing: error))
         }
         #endif
         let format = Self.outputFormat(sampleRate: sampleRate, channelCount: AVAudioChannelCount(wanted))
+        // AVAudioEngine refuses to connect a node that is still connected to the output node
+        // ("!isSrcNodeConnectedToIONode"), which a rewire after a configuration change always is.
+        engine.disconnectNodeOutput(engine.mainMixerNode)
         engine.connect(engine.mainMixerNode, to: engine.outputNode, format: format)
         return format.channelCount
     }
