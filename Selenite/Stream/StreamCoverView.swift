@@ -1,4 +1,5 @@
 import AppCore
+import QuartzCore
 import SwiftUI
 
 /// The full-screen stream (spec 4.4): the surface, the loading view until the first frame, the
@@ -27,6 +28,12 @@ struct StreamCoverView: View {
         .animation(.easeOut(duration: 0.4), value: controller.phase)
         .animation(.easeOut(duration: 0.4), value: controller.ending)
         .animation(.easeInOut(duration: 0.2), value: controller.isOverlayOpen)
+        // Menu must never reach the cover, or tvOS dismisses it. With the overlay closed the
+        // surface's GameController path reports the press, so this only swallows it; with the
+        // overlay open but focus not yet inside the panel, this is the report the panel misses.
+        .onExitCommand {
+            if controller.isOverlayOpen { controller.menuPressed(now: CACurrentMediaTime()) }
+        }
     }
 
     /// Also while ending: the loading view says what the stop is waiting for.

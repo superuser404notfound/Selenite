@@ -8,8 +8,15 @@ struct RootView: View {
 
     var body: some View {
         @Bindable var model = model
+        // The cover never clears activeStream itself: a system dismissal only asks the stream to
+        // disconnect, and streamEnded clears it once the session has stopped. A plain binding let
+        // tvOS drop a running controller, which kept its session and slot alive unseen.
+        let stream = Binding<StreamController?>(
+            get: { model.activeStream },
+            set: { if $0 == nil { model.activeStream?.disconnect() } }
+        )
         HomeView()
-            .fullScreenCover(item: $model.activeStream, onDismiss: { model.streamCoverDismissed() }) { controller in
+            .fullScreenCover(item: stream, onDismiss: { model.streamCoverDismissed() }) { controller in
                 StreamCoverView(controller: controller).environment(model)
             }
             .menuPresentation(item: $model.pendingRemoval) { host in
