@@ -39,6 +39,7 @@ struct StreamOverlayView: View {
                 Text("Quit \(controller.app.title) on \(controller.host.name)? Unsaved progress may be lost.")
                 VStack(spacing: 16) {
                     Button("Quit game", role: .destructive) { controller.confirmQuit() }
+                        .tint(Color.Theme.destructive)
                         .focused($focused, equals: .confirmQuit)
                     Button("Cancel") { controller.cancelQuit() }
                         .focused($focused, equals: .cancelQuit)
@@ -49,8 +50,10 @@ struct StreamOverlayView: View {
                     Button("Resume") { controller.closeOverlay() }
                         .focused($focused, equals: .resume)
                     Button("Disconnect") { controller.disconnect() }
+                        .tint(Color.Theme.destructive)
                         .focused($focused, equals: .disconnect)
                     Button("Quit game") { controller.requestQuit() }
+                        .tint(Color.Theme.destructive)
                         .focused($focused, equals: .quit)
                 }
                 .frame(maxWidth: .infinity)
