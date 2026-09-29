@@ -48,23 +48,25 @@ public struct LivePlainServerInfoProbe: PlainServerInfoProbe {
 }
 
 /// Sunshine hosts announced over Bonjour (M1-C spec, section 3). A paired host found at a new IP
-/// gets that IP (its pinned certificate still guards every connection); a host saved by name keeps
-/// the name. Every other host that answers serverinfo is published in `discovered`.
+/// gets that IP once its pinned certificate answers there; a host saved by name keeps the name.
+/// Every other host that answers serverinfo is published in `discovered`.
 @MainActor @Observable
 public final class HostDiscovery {
     public private(set) var discovered: [DiscoveredHost] = []
     private let browser: any ServiceBrowsing
     private let probe: any PlainServerInfoProbe
+    private let pinnedProbe: any ServerInfoProbe
     private let store: HostStore
     private let onKnownHostMoved: @MainActor () -> Void
     @ObservationIgnored private var byService: [String: DiscoveredHost] = [:]
     @ObservationIgnored private var task: Task<Void, Never>?
     @ObservationIgnored private var browseGeneration = 0
 
-    public init(browser: any ServiceBrowsing, probe: any PlainServerInfoProbe, store: HostStore,
-                onKnownHostMoved: @escaping @MainActor () -> Void) {
+    public init(browser: any ServiceBrowsing, probe: any PlainServerInfoProbe, pinnedProbe: any ServerInfoProbe,
+                store: HostStore, onKnownHostMoved: @escaping @MainActor () -> Void) {
         self.browser = browser
         self.probe = probe
+        self.pinnedProbe = pinnedProbe
         self.store = store
         self.onKnownHostMoved = onKnownHostMoved
     }
@@ -113,12 +115,10 @@ public final class HostDiscovery {
         case .found(let service, let address):
             guard let info = try? await probe.serverInfo(at: address), !info.uniqueID.isEmpty,
                   !Task.isCancelled, task != nil else { return }
-            if var known = store.all().first(where: { $0.id == info.uniqueID }) {
+            if let known = store.all().first(where: { $0.id == info.uniqueID }) {
                 byService[service] = nil
                 if known.address != address, Self.isIPLiteral(known.address) {
-                    known.address = address
-                    store.update(known)
-                    onKnownHostMoved()
+                    await moveIfPinned(known, to: address)
                 }
             } else {
                 byService[service] = DiscoveredHost(id: info.uniqueID, name: info.hostname.isEmpty ? service : info.hostname,
@@ -126,6 +126,20 @@ public final class HostDiscovery {
             }
         }
         publish()
+    }
+
+    /// The plain answer is unauthenticated, so anyone on the LAN could claim the uniqueID: the host
+    /// moves only when its pinned certificate answers at the new address with the same uniqueID.
+    private func moveIfPinned(_ known: PairedHost, to address: String) async {
+        var candidate = known
+        candidate.address = address
+        guard let pinned = try? await pinnedProbe.serverInfo(for: candidate), pinned.uniqueID == known.id,
+              !Task.isCancelled, task != nil,
+              var current = store.all().first(where: { $0.id == known.id }), Self.isIPLiteral(current.address),
+              current.address != address else { return }
+        current.address = address
+        store.update(current)
+        onKnownHostMoved()
     }
 
     private func publish() {

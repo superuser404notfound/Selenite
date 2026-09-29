@@ -99,6 +99,7 @@ final class AppModel {
         self.directory = directory
         self.discovery = HostDiscovery(browser: BonjourBrowser(),
                                        probe: LivePlainServerInfoProbe(uniqueID: identity.uniqueID, clients: clients),
+                                       pinnedProbe: LiveServerInfoProbe(uniqueID: identity.uniqueID, clients: clients),
                                        store: hostStore,
                                        onKnownHostMoved: { directory.reload() })
         self.catalog = AppCatalog(source: LiveAppCatalogSource(uniqueID: identity.uniqueID, clients: clients),

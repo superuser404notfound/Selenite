@@ -32,15 +32,35 @@ private final class FakePlainProbe: PlainServerInfoProbe, @unchecked Sendable {
     }
 }
 
+/// Pinned HTTPS serverinfo, answered per address: a spoofer at an address has no answer here.
+private final class FakePinnedProbe: ServerInfoProbe, @unchecked Sendable {
+    private let lock = NSLock()
+    private var answers: [String: ServerInfo] = [:]
+
+    func set(_ address: String, id: String) throws {
+        let xml = "<root status_code=\"200\"><hostname>PC</hostname><appversion>7.1.431.-1</appversion>"
+            + "<uniqueid>\(id)</uniqueid><PairStatus>1</PairStatus><state>SUNSHINE_SERVER_FREE</state></root>"
+        let info = try ServerInfo(NvResponse.parse(Data(xml.utf8)).requireOK())
+        lock.withLock { answers[address] = info }
+    }
+
+    func serverInfo(for host: PairedHost) async throws -> ServerInfo {
+        guard let info = lock.withLock({ answers[host.address] }) else { throw URLError(.secureConnectionFailed) }
+        return info
+    }
+}
+
 private final class MoveLog { var count = 0 }
 
-@MainActor private func makeDiscovery(saved: [PairedHost] = []) -> (HostDiscovery, FakeBrowser, FakePlainProbe, HostStore, MoveLog) {
+@MainActor private func makeDiscovery(saved: [PairedHost] = [], pinned: FakePinnedProbe = FakePinnedProbe())
+    -> (HostDiscovery, FakeBrowser, FakePlainProbe, HostStore, MoveLog) {
     let store = HostStore(defaults: UserDefaults(suiteName: "HostDiscoveryTests-\(UUID().uuidString)")!)
     saved.forEach(store.save)
     let browser = FakeBrowser()
     let probe = FakePlainProbe()
     let moves = MoveLog()
-    let discovery = HostDiscovery(browser: browser, probe: probe, store: store, onKnownHostMoved: { moves.count += 1 })
+    let discovery = HostDiscovery(browser: browser, probe: probe, pinnedProbe: pinned, store: store,
+                                  onKnownHostMoved: { moves.count += 1 })
     return (discovery, browser, probe, store, moves)
 }
 
@@ -61,7 +81,9 @@ private func paired(_ id: String, at address: String) -> PairedHost {
 }
 
 @MainActor @Test func aKnownHostAtANewIPIsMovedNotDiscovered() async throws {
-    let (discovery, browser, probe, store, moves) = makeDiscovery(saved: [paired("A", at: "192.168.1.20")])
+    let pinned = FakePinnedProbe()
+    try pinned.set("192.168.1.33", id: "A")
+    let (discovery, browser, probe, store, moves) = makeDiscovery(saved: [paired("A", at: "192.168.1.20")], pinned: pinned)
     try probe.set("192.168.1.33", id: "A", name: "PC A")
     discovery.start()
     browser.emit(.found(service: "PC A", address: "192.168.1.33"))
@@ -69,6 +91,19 @@ private func paired(_ id: String, at address: String) -> PairedHost {
     #expect(moved)
     #expect(moves.count == 1)
     #expect(discovery.discovered.isEmpty)
+}
+
+@MainActor @Test func aSpoofedUniqueIDWithoutThePinnedCertificateMovesNothing() async throws {
+    let (discovery, browser, probe, store, moves) = makeDiscovery(saved: [paired("A", at: "192.168.1.20")])
+    try probe.set("192.168.1.66", id: "A", name: "PC A")
+    try probe.set("192.168.1.40", id: "SENTINEL", name: "SENTINEL")
+    discovery.start()
+    browser.emit(.found(service: "PC A", address: "192.168.1.66"))
+    browser.emit(.found(service: "SENTINEL", address: "192.168.1.40"))
+    let sentinelSeen = await eventually { discovery.discovered.map(\.id) == ["SENTINEL"] }
+    #expect(sentinelSeen)
+    #expect(store.all().first?.address == "192.168.1.20")
+    #expect(moves.count == 0)
 }
 
 @MainActor @Test func aKnownHostSavedByNameKeepsItsName() async throws {
