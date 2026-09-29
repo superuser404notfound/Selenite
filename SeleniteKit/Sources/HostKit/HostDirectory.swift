@@ -94,6 +94,14 @@ public final class HostDirectory {
         }
     }
 
+    /// Every status goes back to unknown (the app left, so what it saw may be stale); the codecs stay.
+    public func forgetStatus() {
+        for index in hosts.indices {
+            hosts[index].status = .unknown
+            hosts[index].currentGame = 0
+        }
+    }
+
     public func remove(id: String) {
         store.remove(id: id)
         reload()

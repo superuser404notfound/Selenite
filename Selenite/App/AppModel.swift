@@ -141,7 +141,7 @@ final class AppModel {
     /// A click on a host card; focus alone only selects. A sleeping host that can be woken is.
     func hostCardClicked(_ snapshot: HostSnapshot) {
         select(snapshot.id)
-        if snapshot.status == .offline && HostWaker.canWake(snapshot.host) {
+        if Self.shouldWake(snapshot) {
             wakeAndLaunch(host: snapshot.host, app: nil)
         }
     }
@@ -201,7 +201,7 @@ final class AppModel {
     /// quit by the launch (LaunchPlan.quitThenLaunch), so that asks first.
     func appSelected(_ app: AppEntry) {
         guard let snapshot = selectedHost else { return }
-        if snapshot.status == .offline && HostWaker.canWake(snapshot.host) {
+        if Self.shouldWake(snapshot) {
             wakeAndLaunch(host: snapshot.host, app: app)
             return
         }
@@ -211,7 +211,7 @@ final class AppModel {
     /// A recent entry: the game on its own host, woken first when it sleeps.
     func recentSelected(_ entry: RecentEntry) {
         guard let snapshot = directory.snapshot(id: entry.hostID) else { return }
-        if snapshot.status == .offline, HostWaker.canWake(snapshot.host) {
+        if Self.shouldWake(snapshot) {
             wakeAndLaunch(host: snapshot.host, app: entry.app)
         } else {
             launchOrAskToSwitch(snapshot: snapshot, app: entry.app)
@@ -254,7 +254,7 @@ final class AppModel {
         if let retry = queuedRetry {
             queuedRetry = nil
             if let snapshot = directory.snapshot(id: retry.host.id) {
-                if snapshot.status == .offline && HostWaker.canWake(snapshot.host) {
+                if Self.shouldWake(snapshot) {
                     wakeAndLaunch(host: snapshot.host, app: retry.app)
                     return
                 }
@@ -270,6 +270,12 @@ final class AppModel {
     }
 
     // MARK: Waking
+
+    /// Unknown counts as asleep: on a cold launch or a resume nothing has answered yet, and an
+    /// awake host answers the waker's first probe in milliseconds.
+    private static func shouldWake(_ snapshot: HostSnapshot) -> Bool {
+        (snapshot.status == .offline || snapshot.status == .unknown) && HostWaker.canWake(snapshot.host)
+    }
 
     /// A sleeping host with a known MAC is woken first; the launch (or just the refresh, for a
     /// host card) continues once it answers (M1-C spec, section 4).
@@ -409,6 +415,7 @@ final class AppModel {
             isBackgrounded = true
             waker.cancel()
             directory.stopPolling()
+            directory.forgetStatus()
             discovery.stop()
             if let stream = activeStream {
                 beginBackgroundTeardown()

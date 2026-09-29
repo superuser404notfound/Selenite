@@ -173,3 +173,17 @@ private func info(id: String, currentGame: Int = 0, mac: String? = nil) throws -
     await refresh.value
     #expect(store.all().isEmpty)
 }
+
+@MainActor @Test func forgetStatusMakesEveryHostUnknownAndKeepsItsCodecs() async throws {
+    let (directory, probe, _) = makeDirectory(["A", "B"])
+    probe.set("A", try info(id: "A", currentGame: 42))
+    await directory.refresh()
+    directory.forgetStatus()
+    let statuses: [HostStatus] = directory.hosts.map(\.status)
+    let games: [Int] = directory.hosts.map(\.currentGame)
+    let codecs: Int32? = directory.snapshot(id: "A")?.codecModeSupport
+    #expect(statuses == [.unknown, .unknown])
+    #expect(games == [0, 0])
+    #expect(codecs == 259)
+    #expect(directory.hosts.map(\.id) == ["A", "B"])
+}
