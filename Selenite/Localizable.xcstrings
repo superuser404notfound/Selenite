@@ -262,6 +262,9 @@
     "Selenite M0 harness" : {
 
     },
+    "Send Wake-on-LAN to saved hosts" : {
+
+    },
     "Settings" : {
 
     },
