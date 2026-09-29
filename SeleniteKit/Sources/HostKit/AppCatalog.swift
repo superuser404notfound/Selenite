@@ -35,10 +35,10 @@ public struct LiveAppCatalogSource: AppCatalogSource {
 }
 
 /// App lists per host and box art cached in memory and on disk
-/// (`Library/Caches/boxart/<SHA-256 of hostID>/<appID>.png`; the host ID comes from an
+/// (`Library/Caches/boxart/<SHA-256 of hostID>/<appID>.png` and `apps.json`; the host ID comes from an
 /// unauthenticated reply, so it never reaches the path as it is). Art that could not be fetched is remembered as
 /// missing until the host's app list loads again, so an offline host is not asked on every redraw
-/// and a host that comes back gets its art.
+/// and a host that comes back gets its art. App lists are cached so an offline host can show its games.
 @MainActor @Observable
 public final class AppCatalog {
     public private(set) var apps: [String: [AppEntry]] = [:]
@@ -60,7 +60,11 @@ public final class AppCatalog {
 
     public func loadApps(for host: PairedHost) async {
         do {
-            apps[host.id] = try await source.apps(on: host)
+            let list = try await source.apps(on: host)
+            apps[host.id] = list
+            let file = appListURL(hostID: host.id)
+            try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try? JSONEncoder().encode(list).write(to: file, options: .atomic)
             failedHosts.remove(host.id)
             misses = misses.filter { !$0.hasPrefix(host.id + "/") }
         } catch {
@@ -98,6 +102,19 @@ public final class AppCatalog {
         memory = memory.filter { !$0.key.hasPrefix(hostID + "/") }
         misses = misses.filter { !$0.hasPrefix(hostID + "/") }
         try? FileManager.default.removeItem(at: hostDirectory(hostID))
+    }
+
+    /// The list saved at the last successful load, for a host that cannot answer now. A list
+    /// already loaded this launch is newer and stays.
+    public func restoreApps(for hostID: String) {
+        guard apps[hostID] == nil,
+              let data = FileManager.default.contents(atPath: appListURL(hostID: hostID).path),
+              let list = try? JSONDecoder().decode([AppEntry].self, from: data) else { return }
+        apps[hostID] = list
+    }
+
+    private func appListURL(hostID: String) -> URL {
+        hostDirectory(hostID).appendingPathComponent("apps.json")
     }
 
     private func hostDirectory(_ hostID: String) -> URL {

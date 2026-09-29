@@ -31,11 +31,17 @@ struct RootView: View {
             .menuPresentation(item: $model.pendingSwitch, onDismiss: { model.presentationDismissed() }) { prompt in
                 SwitchAppPrompt(prompt: prompt).environment(model)
             }
+            .menuPresentation(item: $model.pendingQuit, onDismiss: { model.quitPromptDismissed() }) { prompt in
+                QuitGamePrompt(prompt: prompt).environment(model)
+            }
             .menuPresentation(item: $model.errorPanel, onDismiss: { model.presentationDismissed() }) { panel in
                 ErrorPanel(panel: panel).environment(model)
             }
             .menuPresentation(item: $model.addHostRequest) { request in
                 AddHostFlowView(request: request).environment(model)
+            }
+            .menuPresentation(isPresented: $model.isShowingWake, onDismiss: { model.wakePanelDismissed() }) {
+                WakePanel(hostName: model.wakingHostName, forGame: model.isWakingForGame).environment(model)
             }
             .menuPresentation(isPresented: $model.isShowingSettings) {
                 SettingsView().environment(model)

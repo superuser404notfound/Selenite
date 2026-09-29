@@ -13,13 +13,17 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: 40) {
                 header
                     .focusSection()
-                if model.directory.hosts.isEmpty {
+                if model.directory.hosts.isEmpty && model.discovery.discovered.isEmpty {
                     EmptyHostsView()
                 } else {
                     HostRow(focusScope: focusScope)
                         .focusSection()
-                    AppSection()
+                    RecentsRow()
                         .focusSection()
+                    if !model.directory.hosts.isEmpty {
+                        AppSection()
+                            .focusSection()
+                    }
                 }
             }
             .padding(.horizontal, 80)
@@ -50,10 +54,12 @@ struct HomeView: View {
     }
 }
 
-/// The saved hosts, then the "Add host" card. Focus selects a host.
+/// The saved hosts, then the "Add host" card. Focus only highlights; a click selects a host. Focus
+/// entering the row lands on the selected host.
 private struct HostRow: View {
     @Environment(AppModel.self) private var model
     let focusScope: Namespace.ID
+    @FocusState private var focusedHostID: String?
 
     var body: some View {
         ScrollView(.horizontal) {
@@ -61,10 +67,16 @@ private struct HostRow: View {
                 ForEach(model.directory.hosts) { snapshot in
                     let isSelected = snapshot.id == model.selectedHost?.id
                     HostCard(snapshot: snapshot, isSelected: isSelected,
-                             onSelect: { model.select(snapshot.id) },
+                             onClick: { model.hostCardClicked(snapshot) },
                              onRemove: { model.pendingRemoval = snapshot.host },
-                             onPairAgain: { model.addHostRequest = .pairAgain(snapshot.host) })
+                             onPairAgain: { model.addHostRequest = .pairAgain(snapshot.host) },
+                             onToggleWakeOnLAN: { model.setWakeOnLAN(snapshot.host, enabled: !snapshot.host.wakesOnLAN) })
+                        .focused($focusedHostID, equals: snapshot.id)
+                        // Initial focus of the scope; the row's defaultFocus covers a move into the row.
                         .prefersDefaultFocus(isSelected, in: focusScope)
+                }
+                ForEach(model.discovery.discovered) { host in
+                    DiscoveredHostCard(host: host) { model.addHostRequest = .discovered(host) }
                 }
                 AddHostCard { model.addHostRequest = .new }
             }
@@ -72,6 +84,7 @@ private struct HostRow: View {
             .padding(.horizontal, 12)
         }
         .scrollClipDisabled()
+        .defaultFocus($focusedHostID, model.selectedHost?.id, priority: .userInitiated)
         .frame(height: 250)
     }
 }
@@ -89,7 +102,7 @@ private struct AddHostCard: View {
             }
             .frame(width: 240, height: 170)
             .background(RoundedRectangle(cornerRadius: 20).fill(focused ? Color.Theme.surfaceElevated : Color.Theme.surface))
-            .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Color.Theme.panelEdge, lineWidth: 1))
+            .overlay(HostRowCardEdge(isFocused: focused))
         }
     }
 }
@@ -98,8 +111,12 @@ private struct AddHostCard: View {
 private struct AppSection: View {
     @Environment(AppModel.self) private var model
 
+    // Adaptive, not a fixed column count: six fixed-width columns plus their gaps and padding
+    // (1740pt) exceed the width left after the page's own horizontal padding and the tvOS safe
+    // area (about 1580pt), which pushed the whole page's content wider than the screen. The
+    // columns take as many as fit and share the rest; each tile sits centered in its column.
     private var columns: [GridItem] {
-        Array(repeating: GridItem(.fixed(AppTile.size.width), spacing: 48), count: 6)
+        [GridItem(.adaptive(minimum: AppTile.size.width), spacing: 48, alignment: .center)]
     }
 
     var body: some View {
@@ -114,7 +131,16 @@ private struct AppSection: View {
     @ViewBuilder
     private func content(for snapshot: HostSnapshot) -> some View {
         let apps = model.catalog.apps[snapshot.id] ?? []
-        if snapshot.status == .offline {
+        if snapshot.status == .offline && HostWaker.canWake(snapshot.host) && !apps.isEmpty {
+            LazyVGrid(columns: columns, alignment: .center, spacing: 56) {
+                ForEach(apps) { app in
+                    AppTile(host: snapshot.host, app: app, isRunning: false, isDimmed: true) {
+                        model.appSelected(app)
+                    }
+                }
+            }
+            .padding(30)
+        } else if snapshot.status == .offline {
             notice(systemImage: "wifi.slash", text: Text("\(snapshot.host.name) is offline."))
         } else if apps.isEmpty && model.catalog.failedHosts.contains(snapshot.id) {
             notice(systemImage: "exclamationmark.triangle", text: Text("The app list could not be loaded."))
@@ -122,9 +148,11 @@ private struct AppSection: View {
             ProgressView()
                 .frame(maxWidth: .infinity, minHeight: 400)
         } else {
-            LazyVGrid(columns: columns, alignment: .leading, spacing: 56) {
+            LazyVGrid(columns: columns, alignment: .center, spacing: 56) {
                 ForEach(apps) { app in
-                    AppTile(host: snapshot.host, app: app, isRunning: app.id == snapshot.currentGame) {
+                    let isRunning = app.id == snapshot.currentGame
+                    AppTile(host: snapshot.host, app: app, isRunning: isRunning,
+                            onQuit: isRunning ? { model.requestQuit(host: snapshot.host, app: app) } : nil) {
                         model.appSelected(app)
                     }
                 }

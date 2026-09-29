@@ -94,6 +94,14 @@ public final class HostDirectory {
         }
     }
 
+    /// Every status goes back to unknown (the app left, so what it saw may be stale); the codecs stay.
+    public func forgetStatus() {
+        for index in hosts.indices {
+            hosts[index].status = .unknown
+            hosts[index].currentGame = 0
+        }
+    }
+
     public func remove(id: String) {
         store.remove(id: id)
         reload()
@@ -117,6 +125,15 @@ public final class HostDirectory {
         for index in hosts.indices {
             guard let answer = answers[hosts[index].id] else { continue }
             hosts[index].apply(answer)
+            if let info = answer, info.uniqueID == hosts[index].id,
+               let mac = info.macAddress?.description, mac != hosts[index].host.macAddress {
+                hosts[index].host.macAddress = mac
+                // Only the MAC: the stored entry may be newer than this snapshot (a Pair again meanwhile).
+                if var stored = store.all().first(where: { $0.id == hosts[index].id }) {
+                    stored.macAddress = mac
+                    store.update(stored)
+                }
+            }
         }
     }
 

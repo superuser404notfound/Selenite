@@ -17,19 +17,21 @@ public final class AddHostModel {
     public var address: String
     public private(set) var phase: AddHostPhase
     public let isPairAgain: Bool
+    private let startsAtOnce: Bool
     private let flow: PairingFlow
     @ObservationIgnored private var task: Task<Void, Never>?
 
-    public init(flow: PairingFlow, pairAgainAddress: String? = nil) {
+    public init(flow: PairingFlow, pairAgainAddress: String? = nil, discoveredAddress: String? = nil) {
         self.flow = flow
-        self.address = pairAgainAddress ?? ""
+        self.address = pairAgainAddress ?? discoveredAddress ?? ""
         self.isPairAgain = pairAgainAddress != nil
-        self.phase = pairAgainAddress != nil ? .checking : .enterAddress
+        self.startsAtOnce = pairAgainAddress != nil || discoveredAddress != nil
+        self.phase = startsAtOnce ? .checking : .enterAddress
     }
 
-    /// Pair again starts right away; a new host waits for `submit()`.
+    /// Pair again and a discovered host start right away; a new host waits for `submit()`.
     public func begin() {
-        if isPairAgain { submit() }
+        if startsAtOnce { submit() }
     }
 
     public func submit() {
@@ -41,10 +43,10 @@ public final class AddHostModel {
     }
 
     /// "Try again": a new host goes back to the address (kept, so a typo can be fixed), pair again
-    /// retries at once.
+    /// and a discovered host retry at once.
     public func retry() {
         guard task == nil else { return }
-        if isPairAgain {
+        if startsAtOnce {
             submit()
         } else {
             phase = .enterAddress

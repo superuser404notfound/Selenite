@@ -124,7 +124,8 @@ private final class FakeCommands: HostCommands, @unchecked Sendable {
 }
 
 @MainActor private func makeRig(session: FakeSession = FakeSession(), quitError: (any Error)? = nil,
-                                firstFrameTimeout: Duration = .seconds(20)) -> Rig {
+                                firstFrameTimeout: Duration = .seconds(20),
+                                onRunning: @escaping @MainActor () -> Void = {}) -> Rig {
     let input = FakeInput()
     let commands = FakeCommands(session: session, error: quitError)
     let ended = EndLog()
@@ -133,7 +134,7 @@ private final class FakeCommands: HostCommands, @unchecked Sendable {
         app: AppEntry(id: 7, title: "Game", supportsHDR: false),
         settings: StreamSettings(width: 1920, height: 1080, fps: 60, bitrateKbps: 20_000, hdr: false),
         session: session, input: input, commands: commands, firstFrameTimeout: firstFrameTimeout,
-        onEnded: { failure in ended.calls.append(failure) })
+        onRunning: onRunning, onEnded: { failure in ended.calls.append(failure) })
     return Rig(session: session, input: input, commands: commands, ended: ended, controller: controller)
 }
 
@@ -400,4 +401,29 @@ private final class FakeCommands: HostCommands, @unchecked Sendable {
     #expect(rig.session.stopCount == 0)
     rig.controller.pointerButton(.right, pressed: false)
     #expect(rig.session.mouse == ["right down", "right up"])
+}
+
+@MainActor @Test func onRunningFiresOnceAtTheFirstFrame() async {
+    var running = 0
+    let rig = makeRig(onRunning: { running += 1 })
+    rig.controller.start()
+    rig.session.send(.started)
+    _ = await eventually { rig.controller.phase == .waitingForPicture }
+    rig.controller.checkFirstFrame()
+    #expect(running == 0)
+    rig.session.presentFirstFrame()
+    rig.controller.checkFirstFrame()
+    rig.controller.checkFirstFrame()
+    #expect(running == 1)
+}
+
+@MainActor @Test func aStartCancelledBeforeThePictureNeverCountsAsPlayed() async {
+    var running = 0
+    let rig = makeRig(onRunning: { running += 1 })
+    rig.controller.start()
+    rig.controller.menuPressed(now: 0)
+    _ = await eventually { !rig.ended.calls.isEmpty }
+    rig.session.presentFirstFrame()
+    rig.controller.checkFirstFrame()
+    #expect(running == 0)
 }

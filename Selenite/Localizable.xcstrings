@@ -19,6 +19,9 @@
     "1440p" : {
 
     },
+    "%@ did not wake up. Check that Wake-on-LAN is enabled on the PC." : {
+
+    },
     "%@ is offline." : {
 
     },
@@ -56,6 +59,9 @@
 
     },
     "Another stream is still running in Selenite." : {
+
+    },
+    "Asleep" : {
 
     },
     "Audio" : {
@@ -139,6 +145,9 @@
     "Free software under the GNU GPLv3. Streaming is built on moonlight-common-c by the Moonlight Game Streaming Project, also GPLv3." : {
 
     },
+    "Game did not quit" : {
+
+    },
     "H.264" : {
 
     },
@@ -146,6 +155,9 @@
 
     },
     "HEVC" : {
+
+    },
+    "Host did not wake up" : {
 
     },
     "IP address" : {
@@ -161,6 +173,9 @@
 
     },
     "n/a" : {
+
+    },
+    "New" : {
 
     },
     "No video arrived from the host. A firewall may be blocking UDP port 47998." : {
@@ -214,6 +229,9 @@
     "Quit %@ on %@? Unsaved progress may be lost." : {
 
     },
+    "Quit %@?" : {
+
+    },
     "Quit and start %@" : {
 
     },
@@ -226,10 +244,16 @@
     "Quitting game…" : {
 
     },
+    "Recently played" : {
+
+    },
     "Remove" : {
 
     },
     "Remove %@?" : {
+
+    },
+    "Remove from list" : {
 
     },
     "Resolution" : {
@@ -256,10 +280,16 @@
     "Selenite %@" : {
 
     },
+    "Selenite continues as soon as the PC answers." : {
+
+    },
     "Selenite forgets this host. Pair it again to stream from it." : {
 
     },
     "Selenite M0 harness" : {
+
+    },
+    "Send Wake-on-LAN to saved hosts" : {
 
     },
     "Settings" : {
@@ -307,6 +337,9 @@
     "The game could not be quit on the host." : {
 
     },
+    "The game starts as soon as the PC answers." : {
+
+    },
     "The game was closed on the host." : {
 
     },
@@ -341,6 +374,15 @@
 
     },
     "Waiting for picture…" : {
+
+    },
+    "Wake-on-LAN: Off" : {
+
+    },
+    "Wake-on-LAN: On" : {
+
+    },
+    "Waking %@…" : {
 
     }
   },

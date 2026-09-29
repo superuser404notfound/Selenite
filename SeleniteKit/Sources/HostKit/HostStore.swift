@@ -21,6 +21,14 @@ public final class HostStore: @unchecked Sendable {
         write(hosts)
     }
 
+    /// Replaces a stored host in place. A host removed meanwhile stays removed.
+    public func update(_ host: PairedHost) {
+        var hosts = all()
+        guard let index = hosts.firstIndex(where: { $0.id == host.id }) else { return }
+        hosts[index] = host
+        write(hosts)
+    }
+
     public func remove(id: String) {
         write(all().filter { $0.id != id })
     }

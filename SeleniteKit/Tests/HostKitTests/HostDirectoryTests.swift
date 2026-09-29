@@ -23,11 +23,12 @@ private final class FakeProbe: ServerInfoProbe, @unchecked Sendable {
     }
 }
 
-private func info(id: String, currentGame: Int = 0) throws -> ServerInfo {
+private func info(id: String, currentGame: Int = 0, mac: String? = nil) throws -> ServerInfo {
     let state = currentGame == 0 ? "SUNSHINE_SERVER_FREE" : "SUNSHINE_SERVER_BUSY"
     let xml = "<root status_code=\"200\"><hostname>PC</hostname><appversion>7.1.431.-1</appversion>"
         + "<uniqueid>\(id)</uniqueid><ServerCodecModeSupport>259</ServerCodecModeSupport>"
-        + "<PairStatus>1</PairStatus><currentgame>\(currentGame)</currentgame><state>\(state)</state></root>"
+        + "<PairStatus>1</PairStatus><currentgame>\(currentGame)</currentgame><state>\(state)</state>"
+        + (mac.map { "<mac>\($0)</mac>" } ?? "") + "</root>"
     return try ServerInfo(NvResponse.parse(Data(xml.utf8)).requireOK())
 }
 
@@ -142,4 +143,69 @@ private func info(id: String, currentGame: Int = 0) throws -> ServerInfo {
     let calls: Int = probe.calls
     #expect(calls >= 3)
     #expect(!directory.isPolling)
+}
+
+@MainActor @Test func aPollKeepsTheHostsMAC() async throws {
+    let (directory, probe, store) = makeDirectory(["A", "B"])
+    probe.set("A", try info(id: "A", mac: "00:11:22:33:44:55"))
+    await directory.refresh()
+    #expect(directory.snapshot(id: "A")?.host.macAddress == "00:11:22:33:44:55")
+    #expect(store.all().map(\.id) == ["A", "B"])
+    #expect(store.all().first?.macAddress == "00:11:22:33:44:55")
+}
+
+@MainActor @Test func aZeroMACNeverReplacesAKnownOne() async throws {
+    let (directory, probe, store) = makeDirectory(["A"])
+    probe.set("A", try info(id: "A", mac: "00:11:22:33:44:55"))
+    await directory.refresh()
+    probe.set("A", try info(id: "A", mac: "00:00:00:00:00:00"))
+    await directory.refresh()
+    #expect(store.all().first?.macAddress == "00:11:22:33:44:55")
+}
+
+@MainActor @Test func aHostRemovedDuringARefreshStaysRemoved() async throws {
+    let (directory, probe, store) = makeDirectory(["A"])
+    probe.set("A", try info(id: "A", mac: "00:11:22:33:44:55"))
+    probe.setDelay(.milliseconds(100))
+    let refresh = Task { await directory.refresh() }
+    try await Task.sleep(for: .milliseconds(20))
+    store.remove(id: "A")
+    await refresh.value
+    #expect(store.all().isEmpty)
+}
+
+@MainActor @Test func forgetStatusMakesEveryHostUnknownAndKeepsItsCodecs() async throws {
+    let (directory, probe, _) = makeDirectory(["A", "B"])
+    probe.set("A", try info(id: "A", currentGame: 42))
+    await directory.refresh()
+    directory.forgetStatus()
+    let statuses: [HostStatus] = directory.hosts.map(\.status)
+    let games: [Int] = directory.hosts.map(\.currentGame)
+    let codecs: Int32? = directory.snapshot(id: "A")?.codecModeSupport
+    #expect(statuses == [.unknown, .unknown])
+    #expect(games == [0, 0])
+    #expect(codecs == 259)
+    #expect(directory.hosts.map(\.id) == ["A", "B"])
+}
+
+@MainActor @Test func aPollKeepsTheWakeOnLANSwitch() async throws {
+    let (directory, probe, store) = makeDirectory(["A"])
+    var stored = try #require(store.all().first)
+    stored.wakeOnLAN = false
+    store.update(stored)
+    probe.set("A", try info(id: "A", mac: "00:11:22:33:44:55"))
+    await directory.refresh()
+    #expect(store.all().first?.wakeOnLAN == false)
+    #expect(store.all().first?.macAddress == "00:11:22:33:44:55")
+}
+
+@MainActor @Test func recordingAMACKeepsANewerStoredCertificate() async throws {
+    let (directory, probe, store) = makeDirectory(["A"])
+    var repaired = try #require(store.all().first)
+    repaired.serverCertificateDER = Data([9])
+    store.update(repaired)
+    probe.set("A", try info(id: "A", mac: "00:11:22:33:44:55"))
+    await directory.refresh()
+    #expect(store.all().first?.serverCertificateDER == Data([9]))
+    #expect(store.all().first?.macAddress == "00:11:22:33:44:55")
 }
