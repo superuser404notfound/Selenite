@@ -56,6 +56,7 @@ final class AppModel {
     var isShowingWake = false
     /// Kept after the wake ends, so the panel does not lose its title while it animates out.
     private(set) var wakingHostName = ""
+    private(set) var isWakingForGame = false
 
     private let hostStore: HostStore
     private let clients: NvHTTPClientFactory
@@ -72,6 +73,8 @@ final class AppModel {
     private var wakeTarget: (host: PairedHost, app: AppEntry?)?
     @ObservationIgnored private var queuedWakeLaunch: (host: PairedHost, app: AppEntry)?
     @ObservationIgnored private var queuedWakeFailure: StreamFailure?
+    @ObservationIgnored private var lastWakeTarget: (host: PairedHost, app: AppEntry?)?
+    @ObservationIgnored private var queuedWakeRetry: (host: PairedHost, app: AppEntry?)?
 
     init() {
         let identity: ClientIdentity
@@ -219,13 +222,22 @@ final class AppModel {
     /// Runs the same switch check as a tile, against the host as it is now: the host may be
     /// running another game by the time "Try again" is chosen.
     func retryLastLaunch() {
-        queuedRetry = lastLaunch
+        if case .hostDidNotWake = errorPanel?.failure {
+            queuedWakeRetry = lastWakeTarget
+        } else {
+            queuedRetry = lastLaunch
+        }
         errorPanel = nil
     }
 
     /// `onDismiss` of the switch prompt and the error panel: start what they queued, or, for a
     /// retry, ask first when it would quit another game.
     func presentationDismissed() {
+        if let wake = queuedWakeRetry {
+            queuedWakeRetry = nil
+            wakeAndLaunch(host: wake.host, app: wake.app)
+            return
+        }
         if let retry = queuedRetry {
             queuedRetry = nil
             if let snapshot = directory.snapshot(id: retry.host.id) {
@@ -252,6 +264,8 @@ final class AppModel {
         guard HostWaker.canWake(host), activeStream == nil, !isStarting else { return }
         wakeTarget = (host, app)
         wakingHostName = host.name
+        isWakingForGame = app != nil
+        lastWakeTarget = (host, app)
         lastLaunch = app.map { (host, $0) }
         isShowingWake = true
         waker.wake(host) { [weak self] outcome in self?.wakeEnded(outcome) }
@@ -284,7 +298,7 @@ final class AppModel {
         waker.cancel()
         if let failure = queuedWakeFailure {
             queuedWakeFailure = nil
-            errorPanel = ErrorPanelModel(failure: failure, canRetry: lastLaunch != nil)
+            errorPanel = ErrorPanelModel(failure: failure, canRetry: lastWakeTarget != nil)
             return
         }
         guard let launch = queuedWakeLaunch else { return }
@@ -379,6 +393,7 @@ final class AppModel {
         switch phase {
         case .background:
             isBackgrounded = true
+            waker.cancel()
             directory.stopPolling()
             discovery.stop()
             if let stream = activeStream {

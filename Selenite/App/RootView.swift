@@ -38,7 +38,7 @@ struct RootView: View {
                 AddHostFlowView(request: request).environment(model)
             }
             .menuPresentation(isPresented: $model.isShowingWake, onDismiss: { model.wakePanelDismissed() }) {
-                WakePanel(hostName: model.wakingHostName).environment(model)
+                WakePanel(hostName: model.wakingHostName, forGame: model.isWakingForGame).environment(model)
             }
             .menuPresentation(isPresented: $model.isShowingSettings) {
                 SettingsView().environment(model)
