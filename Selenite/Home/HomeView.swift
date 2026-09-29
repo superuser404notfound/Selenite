@@ -111,8 +111,11 @@ private struct AddHostCard: View {
 private struct AppSection: View {
     @Environment(AppModel.self) private var model
 
+    // Adaptive, not a fixed column count: six fixed-width columns plus their gaps and padding
+    // (1740pt) exceed the width left after the page's own horizontal padding and the tvOS safe
+    // area (about 1580pt), which pushed the whole page's content wider than the screen.
     private var columns: [GridItem] {
-        Array(repeating: GridItem(.fixed(AppTile.size.width), spacing: 48), count: 6)
+        [GridItem(.adaptive(minimum: AppTile.size.width, maximum: AppTile.size.width), spacing: 48)]
     }
 
     var body: some View {
