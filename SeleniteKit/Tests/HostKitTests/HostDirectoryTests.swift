@@ -187,3 +187,14 @@ private func info(id: String, currentGame: Int = 0, mac: String? = nil) throws -
     #expect(codecs == 259)
     #expect(directory.hosts.map(\.id) == ["A", "B"])
 }
+
+@MainActor @Test func recordingAMACKeepsANewerStoredCertificate() async throws {
+    let (directory, probe, store) = makeDirectory(["A"])
+    var repaired = try #require(store.all().first)
+    repaired.serverCertificateDER = Data([9])
+    store.update(repaired)
+    probe.set("A", try info(id: "A", mac: "00:11:22:33:44:55"))
+    await directory.refresh()
+    #expect(store.all().first?.serverCertificateDER == Data([9]))
+    #expect(store.all().first?.macAddress == "00:11:22:33:44:55")
+}

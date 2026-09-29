@@ -128,7 +128,11 @@ public final class HostDirectory {
             if let info = answer, info.uniqueID == hosts[index].id,
                let mac = info.macAddress?.description, mac != hosts[index].host.macAddress {
                 hosts[index].host.macAddress = mac
-                store.update(hosts[index].host)
+                // Only the MAC: the stored entry may be newer than this snapshot (a Pair again meanwhile).
+                if var stored = store.all().first(where: { $0.id == hosts[index].id }) {
+                    stored.macAddress = mac
+                    store.update(stored)
+                }
             }
         }
     }
