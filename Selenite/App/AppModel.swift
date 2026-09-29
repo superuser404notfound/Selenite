@@ -101,7 +101,10 @@ final class AppModel {
                                        probe: LivePlainServerInfoProbe(uniqueID: identity.uniqueID, clients: clients),
                                        pinnedProbe: LiveServerInfoProbe(uniqueID: identity.uniqueID, clients: clients),
                                        store: hostStore,
-                                       onKnownHostMoved: { directory.reload() })
+                                       onKnownHostMoved: {
+                                           directory.reload()
+                                           Task { await directory.refresh() }
+                                       })
         self.catalog = AppCatalog(source: LiveAppCatalogSource(uniqueID: identity.uniqueID, clients: clients),
                                   cacheDirectory: AppCatalog.defaultCacheDirectory())
         self.settings = SettingsStore()
