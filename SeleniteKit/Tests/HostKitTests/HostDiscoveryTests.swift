@@ -11,6 +11,8 @@ private final class FakeBrowser: ServiceBrowsing, @unchecked Sendable {
     }
 
     func emit(_ event: BrowseEvent) { _ = lock.withLock { continuation }?.yield(event) }
+
+    func finish() { lock.withLock { continuation }?.finish() }
 }
 
 private final class FakePlainProbe: PlainServerInfoProbe, @unchecked Sendable {
@@ -72,12 +74,16 @@ private func paired(_ id: String, at address: String) -> PairedHost {
 @MainActor @Test func aKnownHostSavedByNameKeepsItsName() async throws {
     let (discovery, browser, probe, store, moves) = makeDiscovery(saved: [paired("A", at: "gaming-pc.local")])
     try probe.set("192.168.1.33", id: "A", name: "PC A")
+    try probe.set("192.168.1.40", id: "SENTINEL", name: "SENTINEL")
     discovery.start()
     browser.emit(.found(service: "PC A", address: "192.168.1.33"))
-    try await Task.sleep(for: .milliseconds(100))
+    browser.emit(.found(service: "SENTINEL", address: "192.168.1.40"))
+    // Events are handled in order, so by the time the sentinel shows up the known host's event
+    // has already been handled, without a fixed sleep.
+    let sentinelSeen = await eventually { discovery.discovered == [DiscoveredHost(id: "SENTINEL", name: "SENTINEL", address: "192.168.1.40")] }
+    #expect(sentinelSeen)
     #expect(store.all().first?.address == "gaming-pc.local")
     #expect(moves.count == 0)
-    #expect(discovery.discovered.isEmpty)
 }
 
 @MainActor @Test func aServiceThatDoesNotAnswerIsNotShown() async throws {
@@ -95,7 +101,8 @@ private func paired(_ id: String, at address: String) -> PairedHost {
     try probe.set("192.168.1.20", id: "NEW", name: "GAMING-PC")
     discovery.start()
     browser.emit(.found(service: "GAMING-PC", address: "192.168.1.20"))
-    _ = await eventually { !discovery.discovered.isEmpty }
+    let found = await eventually { !discovery.discovered.isEmpty }
+    #expect(found)
     store.save(paired("NEW", at: "192.168.1.20"))
     discovery.storeChanged()
     #expect(discovery.discovered.isEmpty)
@@ -106,10 +113,26 @@ private func paired(_ id: String, at address: String) -> PairedHost {
     try probe.set("192.168.1.20", id: "NEW", name: "GAMING-PC")
     discovery.start()
     browser.emit(.found(service: "GAMING-PC", address: "192.168.1.20"))
-    _ = await eventually { !discovery.discovered.isEmpty }
+    let found = await eventually { !discovery.discovered.isEmpty }
+    #expect(found)
     discovery.stop()
     #expect(discovery.discovered.isEmpty)
     #expect(!discovery.isRunning)
+}
+
+@MainActor @Test func aBrowserThatEndsOnItsOwnLetsANewStartTryAgain() async throws {
+    let (discovery, browser, probe, _, _) = makeDiscovery()
+    discovery.start()
+    #expect(discovery.isRunning)
+    browser.finish()
+    let stopped = await eventually { !discovery.isRunning }
+    #expect(stopped)
+    try probe.set("192.168.1.20", id: "NEW", name: "GAMING-PC")
+    discovery.start()
+    #expect(discovery.isRunning)
+    browser.emit(.found(service: "GAMING-PC", address: "192.168.1.20"))
+    let found = await eventually { discovery.discovered == [DiscoveredHost(id: "NEW", name: "GAMING-PC", address: "192.168.1.20")] }
+    #expect(found)
 }
 
 /// Polls `condition` every 5 ms for up to 2 s; true as soon as it holds.

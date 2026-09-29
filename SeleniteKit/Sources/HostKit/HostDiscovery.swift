@@ -59,6 +59,7 @@ public final class HostDiscovery {
     private let onKnownHostMoved: @MainActor () -> Void
     @ObservationIgnored private var byService: [String: DiscoveredHost] = [:]
     @ObservationIgnored private var task: Task<Void, Never>?
+    @ObservationIgnored private var browseGeneration = 0
 
     public init(browser: any ServiceBrowsing, probe: any PlainServerInfoProbe, store: HostStore,
                 onKnownHostMoved: @escaping @MainActor () -> Void) {
@@ -72,12 +73,15 @@ public final class HostDiscovery {
 
     public func start() {
         guard task == nil else { return }
+        browseGeneration += 1
+        let generation = browseGeneration
         let events = browser.events()
         task = Task { [weak self] in
             for await event in events {
                 guard let self, !Task.isCancelled else { return }
                 await self.handle(event)
             }
+            self?.browseEnded(generation: generation)
         }
     }
 
@@ -87,6 +91,14 @@ public final class HostDiscovery {
         task = nil
         byService = [:]
         publish()
+    }
+
+    /// The browser's stream ended on its own (a failed browse, missing entitlement, ...), not
+    /// through `stop()`: clear `task` so a later `start()` tries again. A loop from an older
+    /// generation ending after a `stop()`/`start()` cycle must never clear the new task.
+    private func browseEnded(generation: Int) {
+        guard generation == browseGeneration, task != nil else { return }
+        task = nil
     }
 
     /// A host was paired or removed: a paired one leaves the list.

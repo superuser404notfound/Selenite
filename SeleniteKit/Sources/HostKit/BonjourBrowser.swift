@@ -27,6 +27,14 @@ public struct BonjourBrowser: ServiceBrowsing {
                     }
                 }
             }
+            browser.stateUpdateHandler = { state in
+                switch state {
+                case .failed, .cancelled:
+                    continuation.finish()
+                default:
+                    break
+                }
+            }
             continuation.onTermination = { _ in browser.cancel() }
             browser.start(queue: queue)
         }
