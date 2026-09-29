@@ -13,13 +13,15 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: 40) {
                 header
                     .focusSection()
-                if model.directory.hosts.isEmpty {
+                if model.directory.hosts.isEmpty && model.discovery.discovered.isEmpty {
                     EmptyHostsView()
                 } else {
                     HostRow(focusScope: focusScope)
                         .focusSection()
-                    AppSection()
-                        .focusSection()
+                    if !model.directory.hosts.isEmpty {
+                        AppSection()
+                            .focusSection()
+                    }
                 }
             }
             .padding(.horizontal, 80)
@@ -65,6 +67,9 @@ private struct HostRow: View {
                              onRemove: { model.pendingRemoval = snapshot.host },
                              onPairAgain: { model.addHostRequest = .pairAgain(snapshot.host) })
                         .prefersDefaultFocus(isSelected, in: focusScope)
+                }
+                ForEach(model.discovery.discovered) { host in
+                    DiscoveredHostCard(host: host) { model.addHostRequest = .discovered(host) }
                 }
                 AddHostCard { model.addHostRequest = .new }
             }

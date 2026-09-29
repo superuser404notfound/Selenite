@@ -25,6 +25,10 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_nvstream._tcp</string>
+	</array>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Selenite connects to Sunshine hosts on your local network.</string>
 	<key>UILaunchScreen</key>

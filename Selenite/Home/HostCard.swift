@@ -61,3 +61,33 @@ struct HostCard: View {
         }
     }
 }
+
+/// A Sunshine PC found on the network that is not paired yet; selecting it pairs.
+struct DiscoveredHostCard: View {
+    let host: DiscoveredHost
+    let action: () -> Void
+
+    var body: some View {
+        FocusableCard(action: action) { focused in
+            VStack(alignment: .leading, spacing: 12) {
+                Image(systemName: "desktopcomputer")
+                    .font(.system(size: 40))
+                Text(verbatim: host.name)
+                    .font(.headline)
+                    .lineLimit(1)
+                HStack(spacing: 10) {
+                    Circle()
+                        .fill(.tint)
+                        .frame(width: 14, height: 14)
+                    Text("New")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(24)
+            .frame(width: 320, height: 170, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 20).fill(focused ? Color.Theme.surfaceElevated : Color.Theme.surface))
+            .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Color.Theme.panelEdge, lineWidth: 1))
+        }
+    }
+}

@@ -8,11 +8,13 @@ import SwiftUI
 enum AddHostRequest: Identifiable {
     case new
     case pairAgain(PairedHost)
+    case discovered(DiscoveredHost)
 
     var id: String {
         switch self {
         case .new: "new"
         case .pairAgain(let host): "pair-again-\(host.id)"
+        case .discovered(let host): "discovered-\(host.id)"
         }
     }
 }
@@ -41,6 +43,7 @@ struct AppSwitchPrompt: Identifiable {
 final class AppModel {
     let identity: ClientIdentity
     let directory: HostDirectory
+    let discovery: HostDiscovery
     let catalog: AppCatalog
     let settings: SettingsStore
     var activeStream: StreamController?
@@ -80,8 +83,13 @@ final class AppModel {
         self.secIdentity = secIdentity
         self.clients = clients
         self.hostStore = hostStore
-        self.directory = HostDirectory(store: hostStore,
-                                       probe: LiveServerInfoProbe(uniqueID: identity.uniqueID, clients: clients))
+        let directory = HostDirectory(store: hostStore,
+                                      probe: LiveServerInfoProbe(uniqueID: identity.uniqueID, clients: clients))
+        self.directory = directory
+        self.discovery = HostDiscovery(browser: BonjourBrowser(),
+                                       probe: LivePlainServerInfoProbe(uniqueID: identity.uniqueID, clients: clients),
+                                       store: hostStore,
+                                       onKnownHostMoved: { directory.reload() })
         self.catalog = AppCatalog(source: LiveAppCatalogSource(uniqueID: identity.uniqueID, clients: clients),
                                   cacheDirectory: AppCatalog.defaultCacheDirectory())
         self.settings = SettingsStore()
@@ -105,15 +113,22 @@ final class AppModel {
         await catalog.loadApps(for: snapshot.host)
     }
 
-    /// Home polls serverinfo every 5 s while visible and no stream runs (spec 4.1).
+    /// Home polls serverinfo every 5 s while visible and no stream runs (spec 4.1), and browses for
+    /// unpaired Sunshine hosts over Bonjour at the same time.
     func homeAppeared() {
         homeVisible = true
-        if activeStream == nil, !isStarting { directory.startPolling() }
+        if activeStream == nil, !isStarting { startWatchingHosts() }
     }
 
     func homeDisappeared() {
         homeVisible = false
         directory.stopPolling()
+        discovery.stop()
+    }
+
+    private func startWatchingHosts() {
+        directory.startPolling()
+        discovery.start()
     }
 
     func makeAddHostModel(for request: AddHostRequest) -> AddHostModel {
@@ -123,12 +138,14 @@ final class AppModel {
         switch request {
         case .new: return AddHostModel(flow: flow)
         case .pairAgain(let host): return AddHostModel(flow: flow, pairAgainAddress: host.address)
+        case .discovered(let host): return AddHostModel(flow: flow, discoveredAddress: host.address)
         }
     }
 
     /// The add-host panel closes itself; the host appears in the row, selected.
     func hostAdded(_ host: PairedHost) {
         directory.reload()
+        discovery.storeChanged()
         settings.setSelectedHostID(host.id)
         addHostRequest = nil
         Task { await directory.refresh() }
@@ -137,6 +154,7 @@ final class AppModel {
     func removeHost(_ host: PairedHost) {
         pendingRemoval = nil
         directory.remove(id: host.id)
+        discovery.storeChanged()
         catalog.forget(hostID: host.id)
         if settings.selectedHostID == host.id {
             settings.setSelectedHostID(directory.hosts.first?.id)
@@ -195,6 +213,7 @@ final class AppModel {
         isStarting = true
         lastLaunch = (host, app)
         directory.stopPolling()
+        discovery.stop()
         let codecs = directory.snapshot(id: host.id)?.codecModeSupport ?? 0
         let preferences = settings.preferences
         let display = DisplayModeReader.current()
@@ -244,7 +263,7 @@ final class AppModel {
         activeStream = nil
         endBackgroundTeardown()
         if homeVisible, !isBackgrounded {
-            directory.startPolling()
+            startWatchingHosts()
         } else {
             Task { await directory.refresh() }
         }
@@ -260,7 +279,7 @@ final class AppModel {
     private func showFailure(_ failure: StreamFailure) {
         DiagnosticLog.note("stream start failed: \(String(describing: failure))")
         errorPanel = ErrorPanelModel(failure: failure, canRetry: lastLaunch != nil && failure.offersRetry)
-        if homeVisible, !isBackgrounded { directory.startPolling() }
+        if homeVisible, !isBackgrounded { startWatchingHosts() }
     }
 
     /// Backgrounding or sleep disconnects cleanly; the game keeps running on the host and shows as
@@ -270,13 +289,14 @@ final class AppModel {
         case .background:
             isBackgrounded = true
             directory.stopPolling()
+            discovery.stop()
             if let stream = activeStream {
                 beginBackgroundTeardown()
                 stream.disconnect()
             }
         case .active:
             isBackgrounded = false
-            if homeVisible, activeStream == nil, !isStarting { directory.startPolling() }
+            if homeVisible, activeStream == nil, !isStarting { startWatchingHosts() }
         default:
             break
         }
