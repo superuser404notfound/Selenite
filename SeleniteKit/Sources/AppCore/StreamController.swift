@@ -71,6 +71,7 @@ public final class StreamController: Identifiable {
     private let commands: any HostCommands
     private let onEnded: @MainActor (StreamFailure?) -> Void
     private let firstFrameTimeout: Duration
+    private let onRunning: @MainActor () -> Void
     @ObservationIgnored private var loops: [Task<Void, Never>] = []
     @ObservationIgnored private var lastMenuPress = -Double.infinity
     @ObservationIgnored private var previousStats: StreamStats?
@@ -82,6 +83,7 @@ public final class StreamController: Identifiable {
     public init(host: PairedHost, app: AppEntry, settings: StreamSettings, session: any StreamSessionHandle,
                 input: any StreamInput, commands: any HostCommands,
                 firstFrameTimeout: Duration = StreamController.defaultFirstFrameTimeout,
+                onRunning: @escaping @MainActor () -> Void = {},
                 onEnded: @escaping @MainActor (StreamFailure?) -> Void) {
         self.host = host
         self.app = app
@@ -91,6 +93,7 @@ public final class StreamController: Identifiable {
         self.commands = commands
         self.onEnded = onEnded
         self.firstFrameTimeout = firstFrameTimeout
+        self.onRunning = onRunning
     }
 
     public func start() {
@@ -210,6 +213,7 @@ public final class StreamController: Identifiable {
     func checkFirstFrame() {
         guard phase == .waitingForPicture, ending == nil, session.stats().pacer.presented > 0 else { return }
         phase = .running
+        onRunning()
         sampleStats()
         loops.append(Task { [weak self] in
             while !Task.isCancelled {
