@@ -113,9 +113,10 @@ private struct AppSection: View {
 
     // Adaptive, not a fixed column count: six fixed-width columns plus their gaps and padding
     // (1740pt) exceed the width left after the page's own horizontal padding and the tvOS safe
-    // area (about 1580pt), which pushed the whole page's content wider than the screen.
+    // area (about 1580pt), which pushed the whole page's content wider than the screen. The
+    // columns take as many as fit and share the rest; each tile sits centered in its column.
     private var columns: [GridItem] {
-        [GridItem(.adaptive(minimum: AppTile.size.width, maximum: AppTile.size.width), spacing: 48)]
+        [GridItem(.adaptive(minimum: AppTile.size.width), spacing: 48, alignment: .center)]
     }
 
     var body: some View {
@@ -131,7 +132,7 @@ private struct AppSection: View {
     private func content(for snapshot: HostSnapshot) -> some View {
         let apps = model.catalog.apps[snapshot.id] ?? []
         if snapshot.status == .offline && HostWaker.canWake(snapshot.host) && !apps.isEmpty {
-            LazyVGrid(columns: columns, alignment: .leading, spacing: 56) {
+            LazyVGrid(columns: columns, alignment: .center, spacing: 56) {
                 ForEach(apps) { app in
                     AppTile(host: snapshot.host, app: app, isRunning: false, isDimmed: true) {
                         model.appSelected(app)
@@ -147,7 +148,7 @@ private struct AppSection: View {
             ProgressView()
                 .frame(maxWidth: .infinity, minHeight: 400)
         } else {
-            LazyVGrid(columns: columns, alignment: .leading, spacing: 56) {
+            LazyVGrid(columns: columns, alignment: .center, spacing: 56) {
                 ForEach(apps) { app in
                     let isRunning = app.id == snapshot.currentGame
                     AppTile(host: snapshot.host, app: app, isRunning: isRunning,
