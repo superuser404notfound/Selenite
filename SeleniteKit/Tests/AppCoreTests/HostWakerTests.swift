@@ -25,6 +25,46 @@ private final class WakeProbe: ServerInfoProbe, @unchecked Sendable {
     }
 }
 
+/// Holds the first serverinfo until `release()`, then answers it: the answer arrives after a cancel.
+private final class GateProbe: ServerInfoProbe, @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Void, Never>?
+    private var released = false
+    private var _answered = false
+    private let reply: ServerInfo
+
+    init(id: String) throws {
+        let xml = "<root status_code=\"200\"><appversion>7.1.431.-1</appversion><uniqueid>\(id)</uniqueid>"
+            + "<PairStatus>1</PairStatus><currentgame>0</currentgame><state>SUNSHINE_SERVER_FREE</state></root>"
+        self.reply = try ServerInfo(NvResponse.parse(Data(xml.utf8)).requireOK())
+    }
+
+    var isWaiting: Bool { lock.withLock { continuation != nil } }
+    var hasAnswered: Bool { lock.withLock { _answered } }
+
+    func release() {
+        let waiting = lock.withLock { () -> CheckedContinuation<Void, Never>? in
+            released = true
+            defer { continuation = nil }
+            return continuation
+        }
+        waiting?.resume()
+    }
+
+    func serverInfo(for host: PairedHost) async throws -> ServerInfo {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            let resumeNow = lock.withLock { () -> Bool in
+                if released { return true }
+                self.continuation = continuation
+                return false
+            }
+            if resumeNow { continuation.resume() }
+        }
+        lock.withLock { _answered = true }
+        return reply
+    }
+}
+
 private final class SendLog: @unchecked Sendable {
     private let lock = NSLock()
     private var _hosts: [String] = []
@@ -66,14 +106,19 @@ private let sleeper = PairedHost(id: "H", name: "PC", address: "10.0.0.2", https
 }
 
 @MainActor @Test func cancelEndsOnceAndALateAnswerIsIgnored() async throws {
-    let probe = try WakeProbe(answerFrom: 5, id: "H")
-    let waker = makeWaker(probe, SendLog())
+    let probe = try GateProbe(id: "H")
+    let waker = HostWaker(send: { _ in }, probe: probe, interval: .milliseconds(10), timeout: .seconds(2))
     var outcomes: [WakeOutcome] = []
     waker.wake(sleeper) { outcomes.append($0) }
+    let asking = await eventually { probe.isWaiting }
+    #expect(asking)
     waker.cancel()
     #expect(outcomes == [.cancelled])
     #expect(waker.wakingHostID == nil)
-    try await Task.sleep(for: .milliseconds(150))
+    probe.release()
+    let answered = await eventually { probe.hasAnswered }
+    #expect(answered)
+    try await Task.sleep(for: .milliseconds(50))
     #expect(outcomes == [.cancelled])
 }
 
