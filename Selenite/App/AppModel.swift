@@ -211,11 +211,14 @@ final class AppModel {
         launchOrAskToSwitch(snapshot: snapshot, app: app)
     }
 
-    /// A recent entry: the game on its own host, woken first when it sleeps.
+    /// A recent entry: the game on its own host, woken first when it sleeps. An offline host that
+    /// cannot be woken is only selected, so Home shows why nothing starts.
     func recentSelected(_ entry: RecentEntry) {
         guard let snapshot = directory.snapshot(id: entry.hostID) else { return }
         if Self.shouldWake(snapshot) {
             wakeAndLaunch(host: snapshot.host, app: entry.app)
+        } else if snapshot.status == .offline {
+            select(snapshot.id)
         } else {
             launchOrAskToSwitch(snapshot: snapshot, app: entry.app)
         }
