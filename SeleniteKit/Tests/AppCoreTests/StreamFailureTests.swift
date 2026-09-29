@@ -79,3 +79,7 @@ import Testing
     #expect(!quit)
     #expect(lost)
 }
+
+@Test func aHostThatDidNotWakeOffersRetry() {
+    #expect(StreamFailure.hostDidNotWake("PC").offersRetry)
+}

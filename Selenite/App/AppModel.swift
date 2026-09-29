@@ -46,12 +46,16 @@ final class AppModel {
     let discovery: HostDiscovery
     let catalog: AppCatalog
     let settings: SettingsStore
+    let waker: HostWaker
     var activeStream: StreamController?
     var errorPanel: ErrorPanelModel?
     var addHostRequest: AddHostRequest?
     var pendingRemoval: PairedHost?
     var pendingSwitch: AppSwitchPrompt?
     var isShowingSettings = false
+    var isShowingWake = false
+    /// Kept after the wake ends, so the panel does not lose its title while it animates out.
+    private(set) var wakingHostName = ""
 
     private let hostStore: HostStore
     private let clients: NvHTTPClientFactory
@@ -65,6 +69,9 @@ final class AppModel {
     @ObservationIgnored private var queuedRetry: (host: PairedHost, app: AppEntry)?
     @ObservationIgnored private var backgroundTeardown: UIBackgroundTaskIdentifier = .invalid
     @ObservationIgnored private var failureAfterCover: StreamFailure?
+    private var wakeTarget: (host: PairedHost, app: AppEntry?)?
+    @ObservationIgnored private var queuedWakeLaunch: (host: PairedHost, app: AppEntry)?
+    @ObservationIgnored private var queuedWakeFailure: StreamFailure?
 
     init() {
         let identity: ClientIdentity
@@ -93,6 +100,15 @@ final class AppModel {
         self.catalog = AppCatalog(source: LiveAppCatalogSource(uniqueID: identity.uniqueID, clients: clients),
                                   cacheDirectory: AppCatalog.defaultCacheDirectory())
         self.settings = SettingsStore()
+        self.waker = HostWaker(send: { host in
+            _ = await Task.detached {
+                let results = WakeOnLAN.wake(host)
+                let lines = results.map { result in
+                    result.errorCode.map { "\(result.destination) errno \(Int($0))" } ?? "\(result.destination) sent"
+                }
+                DiagnosticLog.note("wake \(host.name): \(lines.joined(separator: ", "))")
+            }.value
+        }, probe: LiveServerInfoProbe(uniqueID: identity.uniqueID, clients: clients))
         if let problem { DiagnosticLog.note("keychain unavailable, pairings will not persist: \(problem)") }
     }
 
@@ -107,10 +123,22 @@ final class AppModel {
         settings.setSelectedHostID(hostID)
     }
 
-    /// Only for a host that answered: an offline one shows its notice instead of a grid.
+    /// Only for a host that answered; an offline one gets the list saved at its last load.
     func loadApps(for snapshot: HostSnapshot) async {
+        if snapshot.status == .offline {
+            catalog.restoreApps(for: snapshot.id)
+            return
+        }
         guard snapshot.status == .online || snapshot.status == .busy else { return }
         await catalog.loadApps(for: snapshot.host)
+    }
+
+    /// A click on a host card; focus alone only selects. A sleeping host that can be woken is.
+    func hostCardClicked(_ snapshot: HostSnapshot) {
+        select(snapshot.id)
+        if snapshot.status == .offline && HostWaker.canWake(snapshot.host) {
+            wakeAndLaunch(host: snapshot.host, app: nil)
+        }
     }
 
     /// Home polls serverinfo every 5 s while visible and no stream runs (spec 4.1), and browses for
@@ -167,6 +195,10 @@ final class AppModel {
     /// quit by the launch (LaunchPlan.quitThenLaunch), so that asks first.
     func appSelected(_ app: AppEntry) {
         guard let snapshot = selectedHost else { return }
+        if snapshot.status == .offline && HostWaker.canWake(snapshot.host) {
+            wakeAndLaunch(host: snapshot.host, app: app)
+            return
+        }
         launchOrAskToSwitch(snapshot: snapshot, app: app)
     }
 
@@ -197,6 +229,10 @@ final class AppModel {
         if let retry = queuedRetry {
             queuedRetry = nil
             if let snapshot = directory.snapshot(id: retry.host.id) {
+                if snapshot.status == .offline && HostWaker.canWake(snapshot.host) {
+                    wakeAndLaunch(host: snapshot.host, app: retry.app)
+                    return
+                }
                 launchOrAskToSwitch(snapshot: snapshot, app: retry.app)
             } else {
                 startStream(host: retry.host, app: retry.app)
@@ -206,6 +242,61 @@ final class AppModel {
         guard let launch = queuedLaunch else { return }
         queuedLaunch = nil
         startStream(host: launch.host, app: launch.app)
+    }
+
+    // MARK: Waking
+
+    /// A sleeping host with a known MAC is woken first; the launch (or just the refresh, for a
+    /// host card) continues once it answers (M1-C spec, section 4).
+    func wakeAndLaunch(host: PairedHost, app: AppEntry?) {
+        guard HostWaker.canWake(host), activeStream == nil, !isStarting else { return }
+        wakeTarget = (host, app)
+        wakingHostName = host.name
+        lastLaunch = app.map { (host, $0) }
+        isShowingWake = true
+        waker.wake(host) { [weak self] outcome in self?.wakeEnded(outcome) }
+    }
+
+    func cancelWake() {
+        waker.cancel()
+    }
+
+    private func wakeEnded(_ outcome: WakeOutcome) {
+        guard let target = wakeTarget else { return }
+        wakeTarget = nil
+        DiagnosticLog.note("wake \(target.host.name): \(outcome)")
+        // Menu already closed the panel: a late answer starts nothing.
+        guard isShowingWake else { return }
+        switch outcome {
+        case .awake:
+            if let app = target.app { queuedWakeLaunch = (target.host, app) }
+            Task { await directory.refresh() }
+        case .timedOut:
+            queuedWakeFailure = .hostDidNotWake(target.host.name)
+        case .cancelled:
+            break
+        }
+        isShowingWake = false
+    }
+
+    /// `onDismiss` of the wake panel: presentations never replace each other directly.
+    func wakePanelDismissed() {
+        waker.cancel()
+        if let failure = queuedWakeFailure {
+            queuedWakeFailure = nil
+            errorPanel = ErrorPanelModel(failure: failure, canRetry: lastLaunch != nil)
+            return
+        }
+        guard let launch = queuedWakeLaunch else { return }
+        queuedWakeLaunch = nil
+        Task {
+            await directory.refresh()
+            if let snapshot = directory.snapshot(id: launch.host.id) {
+                launchOrAskToSwitch(snapshot: snapshot, app: launch.app)
+            } else {
+                startStream(host: launch.host, app: launch.app)
+            }
+        }
     }
 
     func startStream(host: PairedHost, app: AppEntry) {

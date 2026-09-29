@@ -1,16 +1,19 @@
+import AppCore
 import HostKit
 import SwiftUI
 
-/// One saved host: name and live status. Focus selects it; a long press offers Pair again and Remove.
+/// One saved host: name and live status. Focus selects it, a click wakes it when it sleeps; a long
+/// press offers Pair again and Remove.
 struct HostCard: View {
     let snapshot: HostSnapshot
     let isSelected: Bool
     let onSelect: () -> Void
+    let onClick: () -> Void
     let onRemove: () -> Void
     let onPairAgain: () -> Void
 
     var body: some View {
-        FocusableCard(action: onSelect, longPressOpensMenu: true, onFocusChange: { focused in
+        FocusableCard(action: onClick, longPressOpensMenu: true, onFocusChange: { focused in
             if focused { onSelect() }
         }) { focused in
             VStack(alignment: .leading, spacing: 12) {
@@ -46,7 +49,7 @@ struct HostCard: View {
     private var statusText: LocalizedStringKey {
         switch snapshot.status {
         case .unknown: "Checking…"
-        case .offline: "Offline"
+        case .offline: HostWaker.canWake(snapshot.host) ? "Asleep" : "Offline"
         case .online: "Online"
         case .busy: "Busy"
         }

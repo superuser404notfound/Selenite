@@ -19,6 +19,9 @@
     "1440p" : {
 
     },
+    "%@ did not wake up. Check that Wake-on-LAN is enabled on the PC." : {
+
+    },
     "%@ is offline." : {
 
     },
@@ -56,6 +59,9 @@
 
     },
     "Another stream is still running in Selenite." : {
+
+    },
+    "Asleep" : {
 
     },
     "Audio" : {
@@ -146,6 +152,9 @@
 
     },
     "HEVC" : {
+
+    },
+    "Host did not wake up" : {
 
     },
     "IP address" : {
@@ -313,6 +322,9 @@
     "The game could not be quit on the host." : {
 
     },
+    "The game starts as soon as the PC answers." : {
+
+    },
     "The game was closed on the host." : {
 
     },
@@ -347,6 +359,9 @@
 
     },
     "Waiting for picture…" : {
+
+    },
+    "Waking %@…" : {
 
     }
   },

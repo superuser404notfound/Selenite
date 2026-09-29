@@ -19,6 +19,7 @@ public enum StreamFailure: Equatable, Sendable {
     case frameConversion
     case connectionEnded(Int32)
     case quitFailed
+    case hostDidNotWake(String)
     case unknown(String)
 
     public static func from(error: any Error) -> StreamFailure {

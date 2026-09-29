@@ -55,6 +55,8 @@ extension StreamFailure {
             String(localized: "Connection ended (code \(Int(code)))")
         case .quitFailed:
             String(localized: "The game could not be quit on the host.")
+        case .hostDidNotWake(let name):
+            String(localized: "\(name) did not wake up. Check that Wake-on-LAN is enabled on the PC.")
         case .unknown(let reason):
             String(localized: "Something went wrong: \(reason)")
         }

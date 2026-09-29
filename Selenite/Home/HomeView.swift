@@ -64,6 +64,7 @@ private struct HostRow: View {
                     let isSelected = snapshot.id == model.selectedHost?.id
                     HostCard(snapshot: snapshot, isSelected: isSelected,
                              onSelect: { model.select(snapshot.id) },
+                             onClick: { model.hostCardClicked(snapshot) },
                              onRemove: { model.pendingRemoval = snapshot.host },
                              onPairAgain: { model.addHostRequest = .pairAgain(snapshot.host) })
                         .prefersDefaultFocus(isSelected, in: focusScope)
@@ -119,7 +120,16 @@ private struct AppSection: View {
     @ViewBuilder
     private func content(for snapshot: HostSnapshot) -> some View {
         let apps = model.catalog.apps[snapshot.id] ?? []
-        if snapshot.status == .offline {
+        if snapshot.status == .offline && HostWaker.canWake(snapshot.host) && !apps.isEmpty {
+            LazyVGrid(columns: columns, alignment: .leading, spacing: 56) {
+                ForEach(apps) { app in
+                    AppTile(host: snapshot.host, app: app, isRunning: false, isDimmed: true) {
+                        model.appSelected(app)
+                    }
+                }
+            }
+            .padding(30)
+        } else if snapshot.status == .offline {
             notice(systemImage: "wifi.slash", text: Text("\(snapshot.host.name) is offline."))
         } else if apps.isEmpty && model.catalog.failedHosts.contains(snapshot.id) {
             notice(systemImage: "exclamationmark.triangle", text: Text("The app list could not be loaded."))

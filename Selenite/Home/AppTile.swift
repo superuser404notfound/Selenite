@@ -10,6 +10,7 @@ struct AppTile: View {
     let host: PairedHost
     let app: AppEntry
     let isRunning: Bool
+    var isDimmed = false
     let action: () -> Void
 
     @Environment(AppModel.self) private var model
@@ -42,6 +43,7 @@ struct AppTile: View {
                     }
                 }
                 .frame(width: Self.size.width, height: Self.size.height)
+                .opacity(isDimmed ? 0.5 : 1)
                 .clipShape(RoundedRectangle(cornerRadius: ArtworkCorner.radius))
                 .contentShape(RoundedRectangle(cornerRadius: ArtworkCorner.radius))
                 .overlay(RoundedRectangle(cornerRadius: ArtworkCorner.radius).strokeBorder(Color.Theme.hairline, lineWidth: 1))
