@@ -30,9 +30,14 @@ import Testing
     #expect(hosts.first?.id == "A")
 }
 
-@Test func isVirtualDetectsLocallyAdministeredAndTheIncusPrefix() {
+@Test func isVirtualDetectsLocallyAdministeredAndTheLXDPrefix() {
     #expect(MACAddress("00:16:3e:12:34:56")!.isVirtual)
     #expect(MACAddress("02:42:ac:11:00:02")!.isVirtual)
     #expect(!MACAddress("00:11:22:33:44:55")!.isVirtual)
     #expect(!MACAddress("A4:BB:6D:01:02:03")!.isVirtual)
+}
+
+@Test func isVirtualDetectsTheIncusPrefix() {
+    #expect(MACAddress("10:66:6a:76:63:ea")!.isVirtual)
+    #expect(MACAddress("10:66:6A:96:C5:73")!.isVirtual)
 }

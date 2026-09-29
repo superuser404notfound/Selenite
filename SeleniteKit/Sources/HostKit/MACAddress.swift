@@ -23,8 +23,14 @@ public struct MACAddress: Sendable, Hashable, CustomStringConvertible {
     }
 
     /// A container's virtual NIC, not the host's real one: the locally administered bit
-    /// (`02:42:...` for Docker) or Incus/LXD's default `00:16:3E` prefix. Wakes nothing.
+    /// (`02:42:...` for Docker) or a container runtime's default OUI prefix
+    /// (`00:16:3E` LXD, `10:66:6A` Incus). Wakes nothing.
+    private static let virtualPrefixes: [[UInt8]] = [
+        [0x00, 0x16, 0x3E],
+        [0x10, 0x66, 0x6A],
+    ]
+
     public var isVirtual: Bool {
-        bytes[0] & 0x02 != 0 || bytes[0] == 0x00 && bytes[1] == 0x16 && bytes[2] == 0x3E
+        bytes[0] & 0x02 != 0 || Self.virtualPrefixes.contains(Array(bytes.prefix(3)))
     }
 }
