@@ -106,7 +106,6 @@ struct StableTapModifier: ViewModifier {
 struct FocusableCard<Content: View>: View {
     let action: () -> Void
     var longPressOpensMenu = false
-    var onFocusChange: ((Bool) -> Void)? = nil
     @ViewBuilder let content: (_ isFocused: Bool) -> Content
 
     @FocusState private var isFocused: Bool
@@ -117,6 +116,5 @@ struct FocusableCard<Content: View>: View {
             .focused($isFocused)
             .stableTap(isFocused: isFocused, longPressOpensMenu: longPressOpensMenu) { action() }
             .focusResponse(.card, isFocused: isFocused)
-            .onChange(of: isFocused) { _, focused in onFocusChange?(focused) }
     }
 }

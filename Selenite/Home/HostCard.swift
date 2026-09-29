@@ -2,21 +2,18 @@ import AppCore
 import HostKit
 import SwiftUI
 
-/// One saved host: name and live status. Focus selects it, a click wakes it when it sleeps; a long
-/// press offers Pair again and Remove.
+/// One saved host: name and live status. Focus only highlights it; a click selects it and wakes it
+/// when it sleeps; a long press offers Pair again and Remove. The selected host carries a check.
 struct HostCard: View {
     let snapshot: HostSnapshot
     let isSelected: Bool
-    let onSelect: () -> Void
     let onClick: () -> Void
     let onRemove: () -> Void
     let onPairAgain: () -> Void
     let onToggleWakeOnLAN: () -> Void
 
     var body: some View {
-        FocusableCard(action: onClick, longPressOpensMenu: true, onFocusChange: { focused in
-            if focused { onSelect() }
-        }) { focused in
+        FocusableCard(action: onClick, longPressOpensMenu: true) { focused in
             VStack(alignment: .leading, spacing: 12) {
                 Image(systemName: "desktopcomputer")
                     .font(.system(size: 40))
@@ -35,11 +32,15 @@ struct HostCard: View {
             .padding(24)
             .frame(width: 320, height: 170, alignment: .leading)
             .background(RoundedRectangle(cornerRadius: 20).fill(focused ? Color.Theme.surfaceElevated : Color.Theme.surface))
-            .overlay(
-                RoundedRectangle(cornerRadius: 20)
-                    .strokeBorder(isSelected ? AnyShapeStyle(.tint) : AnyShapeStyle(Color.Theme.panelEdge),
-                                  lineWidth: isSelected ? 3 : 1)
-            )
+            .overlay(HostRowCardEdge(isFocused: focused))
+            .overlay(alignment: .topTrailing) {
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 28))
+                        .foregroundStyle(.tint)
+                        .padding(16)
+                }
+            }
         }
         .contextMenu {
             Button("Pair again", systemImage: "key") { onPairAgain() }
@@ -96,7 +97,18 @@ struct DiscoveredHostCard: View {
             .padding(24)
             .frame(width: 320, height: 170, alignment: .leading)
             .background(RoundedRectangle(cornerRadius: 20).fill(focused ? Color.Theme.surfaceElevated : Color.Theme.surface))
-            .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Color.Theme.panelEdge, lineWidth: 1))
+            .overlay(HostRowCardEdge(isFocused: focused))
         }
+    }
+}
+
+/// The edge of every card in the host row: the tint border marks focus, not selection.
+struct HostRowCardEdge: View {
+    let isFocused: Bool
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 20)
+            .strokeBorder(isFocused ? AnyShapeStyle(.tint) : AnyShapeStyle(Color.Theme.panelEdge),
+                          lineWidth: isFocused ? 3 : 1)
     }
 }

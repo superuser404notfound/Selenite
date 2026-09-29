@@ -54,10 +54,12 @@ struct HomeView: View {
     }
 }
 
-/// The saved hosts, then the "Add host" card. Focus selects a host.
+/// The saved hosts, then the "Add host" card. Focus only highlights; a click selects a host. Focus
+/// entering the row lands on the selected host.
 private struct HostRow: View {
     @Environment(AppModel.self) private var model
     let focusScope: Namespace.ID
+    @FocusState private var focusedHostID: String?
 
     var body: some View {
         ScrollView(.horizontal) {
@@ -65,11 +67,11 @@ private struct HostRow: View {
                 ForEach(model.directory.hosts) { snapshot in
                     let isSelected = snapshot.id == model.selectedHost?.id
                     HostCard(snapshot: snapshot, isSelected: isSelected,
-                             onSelect: { model.select(snapshot.id) },
                              onClick: { model.hostCardClicked(snapshot) },
                              onRemove: { model.pendingRemoval = snapshot.host },
                              onPairAgain: { model.addHostRequest = .pairAgain(snapshot.host) },
                              onToggleWakeOnLAN: { model.setWakeOnLAN(snapshot.host, enabled: !snapshot.host.wakesOnLAN) })
+                        .focused($focusedHostID, equals: snapshot.id)
                         .prefersDefaultFocus(isSelected, in: focusScope)
                 }
                 ForEach(model.discovery.discovered) { host in
@@ -81,6 +83,7 @@ private struct HostRow: View {
             .padding(.horizontal, 12)
         }
         .scrollClipDisabled()
+        .defaultFocus($focusedHostID, model.selectedHost?.id, priority: .userInitiated)
         .frame(height: 250)
     }
 }
@@ -98,7 +101,7 @@ private struct AddHostCard: View {
             }
             .frame(width: 240, height: 170)
             .background(RoundedRectangle(cornerRadius: 20).fill(focused ? Color.Theme.surfaceElevated : Color.Theme.surface))
-            .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Color.Theme.panelEdge, lineWidth: 1))
+            .overlay(HostRowCardEdge(isFocused: focused))
         }
     }
 }

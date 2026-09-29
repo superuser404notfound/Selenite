@@ -152,7 +152,8 @@ final class AppModel {
         await catalog.loadApps(for: snapshot.host)
     }
 
-    /// A click on a host card; focus alone only selects. A sleeping host that can be woken is.
+    /// A click on a host card selects it; focus alone only highlights. A sleeping host that can be
+    /// woken is.
     func hostCardClicked(_ snapshot: HostSnapshot) {
         select(snapshot.id)
         if Self.shouldWake(snapshot) {
