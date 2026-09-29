@@ -21,4 +21,10 @@ public struct MACAddress: Sendable, Hashable, CustomStringConvertible {
     public var description: String {
         bytes.map { String(format: "%02X", $0) }.joined(separator: ":")
     }
+
+    /// A container's virtual NIC, not the host's real one: the locally administered bit
+    /// (`02:42:...` for Docker) or Incus/LXD's default `00:16:3E` prefix. Wakes nothing.
+    public var isVirtual: Bool {
+        bytes[0] & 0x02 != 0 || bytes[0] == 0x00 && bytes[1] == 0x16 && bytes[2] == 0x3E
+    }
 }

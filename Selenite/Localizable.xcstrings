@@ -370,6 +370,12 @@
     "Waiting for picture…" : {
 
     },
+    "Wake-on-LAN: Off" : {
+
+    },
+    "Wake-on-LAN: On" : {
+
+    },
     "Waking %@…" : {
 
     }

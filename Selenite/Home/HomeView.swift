@@ -68,7 +68,8 @@ private struct HostRow: View {
                              onSelect: { model.select(snapshot.id) },
                              onClick: { model.hostCardClicked(snapshot) },
                              onRemove: { model.pendingRemoval = snapshot.host },
-                             onPairAgain: { model.addHostRequest = .pairAgain(snapshot.host) })
+                             onPairAgain: { model.addHostRequest = .pairAgain(snapshot.host) },
+                             onToggleWakeOnLAN: { model.setWakeOnLAN(snapshot.host, enabled: !snapshot.host.wakesOnLAN) })
                         .prefersDefaultFocus(isSelected, in: focusScope)
                 }
                 ForEach(model.discovery.discovered) { host in

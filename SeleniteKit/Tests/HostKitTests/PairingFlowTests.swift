@@ -231,6 +231,19 @@ private func makeFlow(_ sunshine: ScriptedSunshine, store: HostStore, pin: Strin
     #expect(secureChecks.isEmpty)
 }
 
+@MainActor @Test func pairAgainCarriesOverTheMACAndWakeOnLANSwitch() async throws {
+    let sunshine = try ScriptedSunshine(pin: "4711")
+    let store = freshStore()
+    store.save(PairedHost(id: fixtureHostID, name: "GAMING-PC", address: "192.168.1.20", httpsPort: 47984,
+                          serverCertificateDER: Data([1]), macAddress: "AA:BB:CC:DD:EE:FF", wakeOnLAN: false))
+    let outcome = try await makeFlow(sunshine, store: store, pin: "4711")
+        .run(address: "192.168.1.20", forcePairing: true) { _ in }
+    let saved = store.all()
+    #expect(saved.first?.macAddress == "AA:BB:CC:DD:EE:FF")
+    #expect(saved.first?.wakeOnLAN == false)
+    #expect(outcome == .paired(saved[0]))
+}
+
 @Test func failuresMapFromTheirSources() {
     let timedOut: PairingFailure = PairingFailure.from(URLError(.timedOut))
     let refused: PairingFailure = PairingFailure.from(URLError(.cannotConnectToHost))

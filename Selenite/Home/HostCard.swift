@@ -11,6 +11,7 @@ struct HostCard: View {
     let onClick: () -> Void
     let onRemove: () -> Void
     let onPairAgain: () -> Void
+    let onToggleWakeOnLAN: () -> Void
 
     var body: some View {
         FocusableCard(action: onClick, longPressOpensMenu: true, onFocusChange: { focused in
@@ -42,6 +43,11 @@ struct HostCard: View {
         }
         .contextMenu {
             Button("Pair again", systemImage: "key") { onPairAgain() }
+            if snapshot.host.macAddress.flatMap(MACAddress.init) != nil {
+                Button(snapshot.host.wakesOnLAN ? "Wake-on-LAN: On" : "Wake-on-LAN: Off", systemImage: "power") {
+                    onToggleWakeOnLAN()
+                }
+            }
             Button("Remove", systemImage: "trash", role: .destructive) { onRemove() }
         }
     }

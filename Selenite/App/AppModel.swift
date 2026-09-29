@@ -187,6 +187,13 @@ final class AppModel {
         Task { await directory.refresh() }
     }
 
+    func setWakeOnLAN(_ host: PairedHost, enabled: Bool) {
+        var updated = host
+        updated.wakeOnLAN = enabled
+        hostStore.update(updated)
+        directory.reload()
+    }
+
     func removeHost(_ host: PairedHost) {
         pendingRemoval = nil
         directory.remove(id: host.id)

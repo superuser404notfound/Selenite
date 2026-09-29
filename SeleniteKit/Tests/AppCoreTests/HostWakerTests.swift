@@ -140,3 +140,17 @@ private let sleeper = PairedHost(id: "H", name: "PC", address: "10.0.0.2", https
     noMAC.macAddress = "00:00:00:00:00:00"
     #expect(!HostWaker.canWake(noMAC))
 }
+
+@Test func aVirtualMACCannotWakeUnlessTheSwitchIsOn() {
+    var virtual = sleeper
+    virtual.macAddress = "00:16:3e:12:34:56"
+    #expect(!HostWaker.canWake(virtual))
+    virtual.wakeOnLAN = true
+    #expect(HostWaker.canWake(virtual))
+}
+
+@Test func theSwitchCanTurnOffAHostWithARealMAC() {
+    var real = sleeper
+    real.wakeOnLAN = false
+    #expect(!HostWaker.canWake(real))
+}

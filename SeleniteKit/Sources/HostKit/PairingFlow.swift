@@ -82,8 +82,11 @@ public struct PairingFlow: Sendable {
             await onPIN(pin)
             let certificate = try await Pairing(transport: transport, endpoints: endpoints, identity: identity)
                 .run(pin: pin, serverMajorVersion: info.majorVersion)
+            // A re-pair of a host already stored under this uniqueID must not reset its switch.
+            let existing = store.all().first { $0.id == info.uniqueID }
             let host = PairedHost(id: info.uniqueID, name: info.hostname, address: address,
-                                  httpsPort: info.httpsPort, serverCertificateDER: certificate)
+                                  httpsPort: info.httpsPort, serverCertificateDER: certificate,
+                                  macAddress: existing?.macAddress, wakeOnLAN: existing?.wakeOnLAN)
             store.save(host)
             return .paired(host)
         } catch {

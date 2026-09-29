@@ -28,7 +28,7 @@ public final class HostWaker {
     }
 
     nonisolated public static func canWake(_ host: PairedHost) -> Bool {
-        host.macAddress.flatMap(MACAddress.init) != nil
+        host.wakesOnLAN
     }
 
     public func wake(_ host: PairedHost, onEnd: @escaping @MainActor (WakeOutcome) -> Void) {

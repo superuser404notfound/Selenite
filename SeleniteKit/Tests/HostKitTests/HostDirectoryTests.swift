@@ -188,6 +188,17 @@ private func info(id: String, currentGame: Int = 0, mac: String? = nil) throws -
     #expect(directory.hosts.map(\.id) == ["A", "B"])
 }
 
+@MainActor @Test func aPollKeepsTheWakeOnLANSwitch() async throws {
+    let (directory, probe, store) = makeDirectory(["A"])
+    var stored = try #require(store.all().first)
+    stored.wakeOnLAN = false
+    store.update(stored)
+    probe.set("A", try info(id: "A", mac: "00:11:22:33:44:55"))
+    await directory.refresh()
+    #expect(store.all().first?.wakeOnLAN == false)
+    #expect(store.all().first?.macAddress == "00:11:22:33:44:55")
+}
+
 @MainActor @Test func recordingAMACKeepsANewerStoredCertificate() async throws {
     let (directory, probe, store) = makeDirectory(["A"])
     var repaired = try #require(store.all().first)
