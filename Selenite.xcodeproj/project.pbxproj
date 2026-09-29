@@ -19,6 +19,7 @@
 		37E4DAF36DD2A84FC1F1BFD5 /* StreamLoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA2DB4429BE59BAC3854583B /* StreamLoadingView.swift */; };
 		42F2F727BE695487B17FC82D /* ColorTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29084BD577B639C217599362 /* ColorTheme.swift */; };
 		4722FE1A787E162F5C3448F6 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB1D9C38AA34B31FFCA5FA32 /* RootView.swift */; };
+		48190944DC9CF5EB8BCC5D17 /* RecentsRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDC88DAC646888CD387DFA80 /* RecentsRow.swift */; };
 		52AC0336E4A7777DB30D201F /* MoonlightCore in Frameworks */ = {isa = PBXBuildFile; productRef = 9FE785F1EF1DE3002B7959FE /* MoonlightCore */; };
 		66808BE2A8E9D404085E10AA /* StreamStageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E70B26630A9DC9D63AA3FF5 /* StreamStageView.swift */; };
 		6DF9D32C15A12D0C2955FE33 /* FailureText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68830DDB57D3AA87AD8A38C6 /* FailureText.swift */; };
@@ -78,6 +79,7 @@
 		ED727DA465B015CE790EDF05 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 		F00EAE024DF3884F582048B1 /* FocusKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusKit.swift; sourceTree = "<group>"; };
 		FB1D9C38AA34B31FFCA5FA32 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		FDC88DAC646888CD387DFA80 /* RecentsRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentsRow.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -104,6 +106,7 @@
 				273A08E874EAF5433651BECB /* HomeView.swift */,
 				536760E4329F49D368B1B8BD /* HostCard.swift */,
 				1AFF32ECFE4F5B57C7D3376D /* Prompts.swift */,
+				FDC88DAC646888CD387DFA80 /* RecentsRow.swift */,
 				37C8DEC225845017D34A9385 /* WakePanel.swift */,
 			);
 			path = Home;
@@ -305,6 +308,7 @@
 				C44E78C4EDFB53E5C70B370F /* MenuPresentation.swift in Sources */,
 				25C43362B5FA13ECE711080A /* PromptPanel.swift in Sources */,
 				A08C4B6DDBD4B39B48DCAF35 /* Prompts.swift in Sources */,
+				48190944DC9CF5EB8BCC5D17 /* RecentsRow.swift in Sources */,
 				4722FE1A787E162F5C3448F6 /* RootView.swift in Sources */,
 				1EF96EFD252F0C8C6146CD9D /* SeleniteApp.swift in Sources */,
 				254805DE344BBFCC597A314F /* SettingsView.swift in Sources */,

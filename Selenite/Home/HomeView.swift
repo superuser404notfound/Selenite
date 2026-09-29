@@ -18,6 +18,8 @@ struct HomeView: View {
                 } else {
                     HostRow(focusScope: focusScope)
                         .focusSection()
+                    RecentsRow()
+                        .focusSection()
                     if !model.directory.hosts.isEmpty {
                         AppSection()
                             .focusSection()

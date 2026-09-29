@@ -238,10 +238,16 @@
     "Quitting game…" : {
 
     },
+    "Recently played" : {
+
+    },
     "Remove" : {
 
     },
     "Remove %@?" : {
+
+    },
+    "Remove from list" : {
 
     },
     "Resolution" : {

@@ -3,7 +3,8 @@ import HostKit
 import SwiftUI
 
 /// An app of the selected host: box art, or its title on the neutral ground when the host has
-/// none. The app the host is running carries a "Running" badge; choosing it resumes.
+/// none. The app the host is running carries a "Running" badge; choosing it resumes. A tile with
+/// `onRemove` set (a recent) offers "Remove from list" on a long press.
 struct AppTile: View {
     static let size = CGSize(width: 240, height: 320)
 
@@ -11,12 +12,24 @@ struct AppTile: View {
     let app: AppEntry
     let isRunning: Bool
     var isDimmed = false
+    var subtitle: String? = nil
+    var onRemove: (() -> Void)? = nil
     let action: () -> Void
 
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        FocusableCard(action: action) { focused in
+        if let onRemove {
+            card.contextMenu {
+                Button("Remove from list", systemImage: "minus.circle", role: .destructive) { onRemove() }
+            }
+        } else {
+            card
+        }
+    }
+
+    private var card: some View {
+        FocusableCard(action: action, longPressOpensMenu: onRemove != nil) { focused in
             VStack(alignment: .leading, spacing: 14) {
                 ZStack(alignment: .topTrailing) {
                     AsyncCachedImage(key: "\(host.id)/\(app.id)",
@@ -53,6 +66,13 @@ struct AppTile: View {
                     .lineLimit(1)
                     .frame(width: Self.size.width, alignment: .leading)
                     .foregroundStyle(focused ? .primary : .secondary)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.caption2)
+                        .lineLimit(1)
+                        .frame(width: Self.size.width, alignment: .leading)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
     }

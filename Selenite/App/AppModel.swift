@@ -47,6 +47,7 @@ final class AppModel {
     let catalog: AppCatalog
     let settings: SettingsStore
     let waker: HostWaker
+    let recents = RecentsStore()
     var activeStream: StreamController?
     var errorPanel: ErrorPanelModel?
     var addHostRequest: AddHostRequest?
@@ -187,6 +188,7 @@ final class AppModel {
         directory.remove(id: host.id)
         discovery.storeChanged()
         catalog.forget(hostID: host.id)
+        recents.removeAll(hostID: host.id)
         if settings.selectedHostID == host.id {
             settings.setSelectedHostID(directory.hosts.first?.id)
         }
@@ -203,6 +205,16 @@ final class AppModel {
             return
         }
         launchOrAskToSwitch(snapshot: snapshot, app: app)
+    }
+
+    /// A recent entry: the game on its own host, woken first when it sleeps.
+    func recentSelected(_ entry: RecentEntry) {
+        guard let snapshot = directory.snapshot(id: entry.hostID) else { return }
+        if snapshot.status == .offline, HostWaker.canWake(snapshot.host) {
+            wakeAndLaunch(host: snapshot.host, app: entry.app)
+        } else {
+            launchOrAskToSwitch(snapshot: snapshot, app: entry.app)
+        }
     }
 
     private func launchOrAskToSwitch(snapshot: HostSnapshot, app: AppEntry) {
@@ -346,6 +358,7 @@ final class AppModel {
                     host: host, app: app, settings: streamSettings, session: session,
                     input: ControllerInput(),
                     commands: LiveHostCommands(uniqueID: identity.uniqueID, clients: clients),
+                    onRunning: { self.recents.record(hostID: host.id, app: app) },
                     // Strong: AppModel lives as long as the app, and streamEnded clears activeStream,
                     // which drops the controller and this closure with it.
                     onEnded: { failure in self.streamEnded(failure) })
