@@ -140,6 +140,42 @@ private func temporaryDirectory() -> URL {
     #expect(art == nil)
 }
 
+@MainActor @Test func appListsPersistAcrossLaunches() async {
+    let source = FakeCatalogSource()
+    source.setApps([desktop])
+    let directory = temporaryDirectory()
+    await AppCatalog(source: source, cacheDirectory: directory).loadApps(for: host)
+    let relaunched = AppCatalog(source: FakeCatalogSource(), cacheDirectory: directory)
+    relaunched.restoreApps(for: host.id)
+    #expect(relaunched.apps[host.id] == [desktop])
+}
+
+@MainActor @Test func aRestoredListNeverReplacesALoadedOne() async {
+    let directory = temporaryDirectory()
+    let old = FakeCatalogSource()
+    old.setApps([desktop])
+    await AppCatalog(source: old, cacheDirectory: directory).loadApps(for: host)
+    let fresh = FakeCatalogSource()
+    let steam = AppEntry(id: 2, title: "Steam Big Picture", supportsHDR: false)
+    fresh.setApps([steam])
+    let catalog = AppCatalog(source: fresh, cacheDirectory: directory)
+    await catalog.loadApps(for: host)
+    catalog.restoreApps(for: host.id)
+    #expect(catalog.apps[host.id] == [steam])
+}
+
+@MainActor @Test func forgettingAHostDropsItsSavedList() async {
+    let source = FakeCatalogSource()
+    source.setApps([desktop])
+    let directory = temporaryDirectory()
+    let catalog = AppCatalog(source: source, cacheDirectory: directory)
+    await catalog.loadApps(for: host)
+    catalog.forget(hostID: host.id)
+    let relaunched = AppCatalog(source: source, cacheDirectory: directory)
+    relaunched.restoreApps(for: host.id)
+    #expect(relaunched.apps[host.id] == nil)
+}
+
 @Test func imageSignatures() {
     let jpeg = Data([0xFF, 0xD8, 0xFF, 0xE0])
     #expect(AppCatalog.looksLikeImage(png))
