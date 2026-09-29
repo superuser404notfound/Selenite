@@ -145,6 +145,9 @@
     "Free software under the GNU GPLv3. Streaming is built on moonlight-common-c by the Moonlight Game Streaming Project, also GPLv3." : {
 
     },
+    "Game did not quit" : {
+
+    },
     "H.264" : {
 
     },
@@ -224,6 +227,9 @@
 
     },
     "Quit %@ on %@? Unsaved progress may be lost." : {
+
+    },
+    "Quit %@?" : {
 
     },
     "Quit and start %@" : {

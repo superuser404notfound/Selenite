@@ -31,6 +31,9 @@ struct RootView: View {
             .menuPresentation(item: $model.pendingSwitch, onDismiss: { model.presentationDismissed() }) { prompt in
                 SwitchAppPrompt(prompt: prompt).environment(model)
             }
+            .menuPresentation(item: $model.pendingQuit, onDismiss: { model.quitPromptDismissed() }) { prompt in
+                QuitGamePrompt(prompt: prompt).environment(model)
+            }
             .menuPresentation(item: $model.errorPanel, onDismiss: { model.presentationDismissed() }) { panel in
                 ErrorPanel(panel: panel).environment(model)
             }

@@ -17,10 +17,12 @@ struct RecentsRow: View {
                     LazyHStack(spacing: 48) {
                         ForEach(entries) { entry in
                             if let snapshot = model.directory.snapshot(id: entry.hostID) {
+                                let isRunning = snapshot.currentGame == entry.app.id
                                 AppTile(host: snapshot.host, app: entry.app,
-                                        isRunning: snapshot.currentGame == entry.app.id,
+                                        isRunning: isRunning,
                                         isDimmed: snapshot.status == .offline,
                                         subtitle: snapshot.host.name,
+                                        onQuit: isRunning ? { model.requestQuit(host: snapshot.host, app: entry.app) } : nil,
                                         onRemove: { model.recents.remove(entry) },
                                         action: { model.recentSelected(entry) })
                             }

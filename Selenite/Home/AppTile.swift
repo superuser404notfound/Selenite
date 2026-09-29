@@ -3,8 +3,9 @@ import HostKit
 import SwiftUI
 
 /// An app of the selected host: box art, or its title on the neutral ground when the host has
-/// none. The app the host is running carries a "Running" badge; choosing it resumes. A tile with
-/// `onRemove` set (a recent) offers "Remove from list" on a long press.
+/// none. The app the host is running carries a "Running" badge; choosing it resumes. A long press
+/// offers "Quit game" when `onQuit` is set (the running game) and "Remove from list" when
+/// `onRemove` is set (a recent).
 struct AppTile: View {
     static let size = CGSize(width: 240, height: 320)
 
@@ -13,15 +14,21 @@ struct AppTile: View {
     let isRunning: Bool
     var isDimmed = false
     var subtitle: String? = nil
+    var onQuit: (() -> Void)? = nil
     var onRemove: (() -> Void)? = nil
     let action: () -> Void
 
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        if let onRemove {
+        if onQuit != nil || onRemove != nil {
             card.contextMenu {
-                Button("Remove from list", systemImage: "minus.circle", role: .destructive) { onRemove() }
+                if let onQuit {
+                    Button("Quit game", systemImage: "xmark.circle", role: .destructive) { onQuit() }
+                }
+                if let onRemove {
+                    Button("Remove from list", systemImage: "minus.circle", role: .destructive) { onRemove() }
+                }
             }
         } else {
             card
@@ -29,7 +36,7 @@ struct AppTile: View {
     }
 
     private var card: some View {
-        FocusableCard(action: action, longPressOpensMenu: onRemove != nil) { focused in
+        FocusableCard(action: action, longPressOpensMenu: onQuit != nil || onRemove != nil) { focused in
             VStack(alignment: .leading, spacing: 14) {
                 ZStack(alignment: .topTrailing) {
                     AsyncCachedImage(key: "\(host.id)/\(app.id)",

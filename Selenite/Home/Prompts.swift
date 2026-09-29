@@ -33,3 +33,17 @@ struct SwitchAppPrompt: View {
         return Text("Another game is running on \(prompt.host.name). Starting \(prompt.app.title) quits it.")
     }
 }
+
+/// A long press on the running game's tile: quit it on the host.
+struct QuitGamePrompt: View {
+    @Environment(AppModel.self) private var model
+    let prompt: QuitPrompt
+
+    var body: some View {
+        PromptPanel(title: Text("Quit \(prompt.app.title)?"),
+                    message: Text("Quit \(prompt.app.title) on \(prompt.host.name)? Unsaved progress may be lost.")) {
+            Button("Quit game", role: .destructive) { model.confirmQuit(prompt) }
+            Button("Cancel") { model.pendingQuit = nil }
+        }
+    }
+}

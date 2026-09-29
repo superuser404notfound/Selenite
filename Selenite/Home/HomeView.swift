@@ -142,7 +142,9 @@ private struct AppSection: View {
         } else {
             LazyVGrid(columns: columns, alignment: .leading, spacing: 56) {
                 ForEach(apps) { app in
-                    AppTile(host: snapshot.host, app: app, isRunning: app.id == snapshot.currentGame) {
+                    let isRunning = app.id == snapshot.currentGame
+                    AppTile(host: snapshot.host, app: app, isRunning: isRunning,
+                            onQuit: isRunning ? { model.requestQuit(host: snapshot.host, app: app) } : nil) {
                         model.appSelected(app)
                     }
                 }

@@ -32,6 +32,12 @@ struct AppSwitchPrompt: Identifiable {
     let runningTitle: String?
 }
 
+struct QuitPrompt: Identifiable {
+    let id = UUID()
+    let host: PairedHost
+    let app: AppEntry
+}
+
 /// The app's one model (M1-B spec, section 3): hosts, the selected host, app lists, settings, the
 /// active stream, and which panel is up. The live dependencies are built here.
 ///
@@ -47,12 +53,14 @@ final class AppModel {
     let catalog: AppCatalog
     let settings: SettingsStore
     let waker: HostWaker
+    let commands: any HostCommands
     let recents = RecentsStore()
     var activeStream: StreamController?
     var errorPanel: ErrorPanelModel?
     var addHostRequest: AddHostRequest?
     var pendingRemoval: PairedHost?
     var pendingSwitch: AppSwitchPrompt?
+    var pendingQuit: QuitPrompt?
     var isShowingSettings = false
     var isShowingWake = false
     /// Kept after the wake ends, so the panel does not lose its title while it animates out.
@@ -69,6 +77,8 @@ final class AppModel {
     @ObservationIgnored private var lastLaunch: (host: PairedHost, app: AppEntry)?
     @ObservationIgnored private var queuedLaunch: (host: PairedHost, app: AppEntry)?
     @ObservationIgnored private var queuedRetry: (host: PairedHost, app: AppEntry)?
+    @ObservationIgnored private var queuedQuit: QuitPrompt?
+    @ObservationIgnored private var isQuitting = false
     @ObservationIgnored private var backgroundTeardown: UIBackgroundTaskIdentifier = .invalid
     @ObservationIgnored private var failureAfterCover: StreamFailure?
     private var wakeTarget: (host: PairedHost, app: AppEntry?)?
@@ -108,6 +118,7 @@ final class AppModel {
         self.catalog = AppCatalog(source: LiveAppCatalogSource(uniqueID: identity.uniqueID, clients: clients),
                                   cacheDirectory: AppCatalog.defaultCacheDirectory())
         self.settings = SettingsStore()
+        self.commands = LiveHostCommands(uniqueID: identity.uniqueID, clients: clients)
         self.waker = HostWaker(send: { host in
             _ = await Task.detached {
                 let results = WakeOnLAN.wake(host)
@@ -282,6 +293,38 @@ final class AppModel {
         startStream(host: launch.host, app: launch.app)
     }
 
+    // MARK: Quitting
+
+    /// A long press on the running game's tile quits it on the host, after a prompt.
+    func requestQuit(host: PairedHost, app: AppEntry) {
+        pendingQuit = QuitPrompt(host: host, app: app)
+    }
+
+    func confirmQuit(_ prompt: QuitPrompt) {
+        queuedQuit = prompt
+        pendingQuit = nil
+    }
+
+    /// `onDismiss` of the quit prompt: a failure shows the error panel, which may not replace the
+    /// prompt while it is still leaving.
+    func quitPromptDismissed() {
+        guard let prompt = queuedQuit else { return }
+        queuedQuit = nil
+        guard !isQuitting else { return }
+        isQuitting = true
+        Task {
+            defer { isQuitting = false }
+            do {
+                try await commands.quitApp(on: prompt.host)
+                DiagnosticLog.note("quit \(prompt.app.id) on \(prompt.host.name)")
+            } catch {
+                DiagnosticLog.note("quit \(prompt.app.id) on \(prompt.host.name) failed: \(String(describing: error))")
+                errorPanel = ErrorPanelModel(failure: .quitFailed, canRetry: false)
+            }
+            await directory.refresh()
+        }
+    }
+
     // MARK: Waking
 
     /// Unknown counts as asleep: on a cold launch or a resume nothing has answered yet, and an
@@ -377,7 +420,7 @@ final class AppModel {
                 let controller = StreamController(
                     host: host, app: app, settings: streamSettings, session: session,
                     input: ControllerInput(),
-                    commands: LiveHostCommands(uniqueID: identity.uniqueID, clients: clients),
+                    commands: commands,
                     onRunning: { self.recents.record(hostID: host.id, app: app) },
                     // Strong: AppModel lives as long as the app, and streamEnded clears activeStream,
                     // which drops the controller and this closure with it.
