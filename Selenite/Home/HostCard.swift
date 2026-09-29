@@ -42,6 +42,7 @@ struct HostCard: View {
                 }
             }
         }
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
         .contextMenu {
             Button("Pair again", systemImage: "key") { onPairAgain() }
             if snapshot.host.macAddress.flatMap(MACAddress.init) != nil {

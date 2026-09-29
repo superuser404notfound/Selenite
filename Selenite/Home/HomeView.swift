@@ -72,6 +72,7 @@ private struct HostRow: View {
                              onPairAgain: { model.addHostRequest = .pairAgain(snapshot.host) },
                              onToggleWakeOnLAN: { model.setWakeOnLAN(snapshot.host, enabled: !snapshot.host.wakesOnLAN) })
                         .focused($focusedHostID, equals: snapshot.id)
+                        // Initial focus of the scope; the row's defaultFocus covers a move into the row.
                         .prefersDefaultFocus(isSelected, in: focusScope)
                 }
                 ForEach(model.discovery.discovered) { host in

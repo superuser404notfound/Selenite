@@ -311,7 +311,10 @@ final class AppModel {
     func quitPromptDismissed() {
         guard let prompt = queuedQuit else { return }
         queuedQuit = nil
-        guard !isQuitting else { return }
+        guard !isQuitting else {
+            DiagnosticLog.note("quit \(prompt.app.id) on \(prompt.host.name) ignored: a quit is in flight")
+            return
+        }
         isQuitting = true
         Task {
             defer { isQuitting = false }
@@ -320,10 +323,18 @@ final class AppModel {
                 DiagnosticLog.note("quit \(prompt.app.id) on \(prompt.host.name)")
             } catch {
                 DiagnosticLog.note("quit \(prompt.app.id) on \(prompt.host.name) failed: \(String(describing: error))")
-                errorPanel = ErrorPanelModel(failure: .quitFailed, canRetry: false)
+                if canPresentPanel {
+                    errorPanel = ErrorPanelModel(failure: .quitFailed, canRetry: false)
+                }
             }
             await directory.refresh()
         }
+    }
+
+    /// Nothing is presented or on its way: a late result may show a panel without replacing one.
+    private var canPresentPanel: Bool {
+        activeStream == nil && !isStarting && !isShowingWake && errorPanel == nil && pendingSwitch == nil
+            && pendingQuit == nil && pendingRemoval == nil && addHostRequest == nil && !isShowingSettings
     }
 
     // MARK: Waking
@@ -337,6 +348,10 @@ final class AppModel {
     /// A sleeping host with a known MAC is woken first; the launch (or just the refresh, for a
     /// host card) continues once it answers (M1-C spec, section 4).
     func wakeAndLaunch(host: PairedHost, app: AppEntry?) {
+        guard !isQuitting else {
+            DiagnosticLog.note("wake \(host.name) ignored: a quit is in flight")
+            return
+        }
         guard HostWaker.canWake(host), activeStream == nil, !isStarting else { return }
         wakeTarget = (host, app)
         wakingHostName = host.name
@@ -390,6 +405,10 @@ final class AppModel {
     }
 
     func startStream(host: PairedHost, app: AppEntry) {
+        guard !isQuitting else {
+            DiagnosticLog.note("stream start \(host.name) app \(app.id) ignored: a quit is in flight")
+            return
+        }
         guard activeStream == nil, !isStarting else { return }
         isStarting = true
         lastLaunch = (host, app)
