@@ -117,6 +117,11 @@ public final class HostDirectory {
         for index in hosts.indices {
             guard let answer = answers[hosts[index].id] else { continue }
             hosts[index].apply(answer)
+            if let info = answer, info.uniqueID == hosts[index].id,
+               let mac = info.macAddress?.description, mac != hosts[index].host.macAddress {
+                hosts[index].host.macAddress = mac
+                store.update(hosts[index].host)
+            }
         }
     }
 
