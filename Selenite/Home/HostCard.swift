@@ -58,7 +58,7 @@ struct HostCard: View {
     private var statusColor: Color {
         switch snapshot.status {
         case .unknown: .gray
-        case .offline: Color.Theme.destructive
+        case .offline: HostWaker.canWake(snapshot.host) ? .gray : Color.Theme.destructive
         case .online: Color.Theme.success
         case .busy: Color.Theme.warning
         }
