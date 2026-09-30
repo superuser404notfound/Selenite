@@ -84,8 +84,12 @@ private final class FakeSession: StreamSessionHandle, @unchecked Sendable {
     func stop() { stopped += 1 }
 }
 
-private final class NoCommands: HostCommands, @unchecked Sendable {
-    func quitApp(on host: PairedHost) async throws {}
+private final class FakeCommands: HostCommands, @unchecked Sendable {
+    let error: (any Error)?
+    init(error: (any Error)?) { self.error = error }
+    func quitApp(on host: PairedHost) async throws {
+        if let error { throw error }
+    }
 }
 
 private final class Pad {
@@ -120,7 +124,7 @@ private func host(_ id: String) -> PairedHost {
     /// Pads stay alive for the whole test, so a new pad never reuses a released one's identity.
     var pads: [Pad] = []
 
-    init(volumes: [SplitSide: Float] = [:]) {
+    init(volumes: [SplitSide: Float] = [:], quitError: (any Error)? = nil) {
         for (side, volume) in volumes { store.setVolume(volume, for: side) }
         let deps = SplitDependencies(
             host: { [unowned self] id in hosts[id] },
@@ -136,7 +140,7 @@ private func host(_ id: String) -> PairedHost {
                 made[host.id, default: []].append(session)
                 return (session, StreamSettings(width: 1920, height: 2160, fps: 60, bitrateKbps: 10_000, hdr: false))
             },
-            input: input, commands: NoCommands(), store: store,
+            input: input, commands: FakeCommands(error: quitError), store: store,
             recordRecent: { [unowned self] id, app in recents.append("\(id):\(app.id)") },
             onStreamsIdle: { [unowned self] in idle += 1 },
             chooseGame: { [unowned self] side, plan in chosen.append((side, plan)) })
@@ -277,6 +281,7 @@ private func host(_ id: String) -> PairedHost {
     rig.session("A")?.send(.terminated(-101))
     _ = await eventually { rig.state(.first) == .ended(.failed(.unstableConnection)) }
     rig.send(one, .a(.center))
+    #expect(rig.state(.first) == .idle)
     let again = await eventually { rig.made["A"]?.count == 2 && rig.state(.first) == .streaming }
     #expect(again)
     #expect(rig.controller.seats.side(of: one.id) == .first)
@@ -352,6 +357,7 @@ private func host(_ id: String) -> PairedHost {
     let (rig, _, _) = await runningRig()
     rig.controller.menuPressed(now: 10)
     rig.controller.endSplit()
+    #expect(rig.finished.isEmpty)
     #expect(!rig.controller.isOverlayOpen)
     let done = await eventually { !rig.finished.isEmpty }
     #expect(done)
@@ -480,4 +486,68 @@ private func host(_ id: String) -> PairedHost {
     #expect(started)
     #expect(rig.made["A"]?.count == 1)
     #expect(rig.state(.first) == .streaming)
+}
+
+@MainActor private func startedRig(quitError: (any Error)? = nil) async -> Rig {
+    let rig = Rig(quitError: quitError)
+    _ = rig.startBoth()
+    _ = await rig.bothStreaming()
+    rig.session("A")?.send(.started)
+    _ = await eventually { rig.controller.streams[.first]?.phase == .waitingForPicture }
+    return rig
+}
+
+@MainActor @Test func aFailedHostQuitEndsAsFailed() async {
+    let rig = await startedRig(quitError: URLError(.timedOut))
+    rig.controller.secondaryAction(.first)
+    rig.controller.secondaryAction(.first)
+    let failed = await eventually { rig.state(.first) == .ended(.failed(.quitFailed)) }
+    #expect(failed)
+    #expect(rig.state(.second) == .streaming)
+}
+
+@MainActor @Test func aFailureRacingADisconnectKeepsTheFailure() async {
+    let rig = await startedRig()
+    rig.controller.streams[.first]?.handle(.terminated(-101))
+    #expect(rig.state(.first) == .streaming)
+    rig.controller.primaryAction(.first)
+    let failed = await eventually { rig.state(.first) == .ended(.failed(.unstableConnection)) }
+    #expect(failed)
+}
+
+@MainActor @Test func quitBeforeThePictureLeavesNoPendingQuit() async {
+    let (rig, _, _) = await runningRig()
+    #expect(rig.controller.streams[.first]?.phase == .connecting)
+    rig.controller.secondaryAction(.first)
+    rig.controller.secondaryAction(.first)
+    #expect(rig.controller.streams[.first]?.ending == nil)
+    #expect(rig.state(.first) == .streaming)
+    rig.controller.primaryAction(.first)
+    let ended = await eventually { rig.state(.first) == .ended(.disconnected) }
+    #expect(ended)
+}
+
+@MainActor @Test func suspendWithNoLiveSideStillReportsIdle() async {
+    let joining = Rig()
+    joining.controller.suspend()
+    #expect(joining.idle == 1)
+    #expect(joining.finished.isEmpty)
+
+    let (rig, _, _) = await runningRig()
+    rig.controller.primaryAction(.first)
+    rig.controller.primaryAction(.second)
+    _ = await eventually { rig.state(.first) == .ended(.disconnected) && rig.state(.second) == .ended(.disconnected) }
+    #expect(rig.idle == 1)
+    rig.controller.suspend()
+    #expect(rig.idle == 2)
+    #expect(rig.state(.first) == .ended(.disconnected))
+}
+
+@MainActor @Test func menuWhileEndingDoesNotOpenTheOverlay() async {
+    let (rig, _, _) = await runningRig()
+    rig.controller.endSplit()
+    rig.controller.menuPressed(now: 10)
+    #expect(!rig.controller.isOverlayOpen)
+    let done = await eventually { rig.finished == [.ended] }
+    #expect(done)
 }

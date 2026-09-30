@@ -125,7 +125,7 @@ public final class SplitController: Identifiable {
             seatPrompt = nil
         } else if isOverlayOpen {
             closeOverlay()
-        } else {
+        } else if !isEnding {
             cursor = OverlayCursor()
             quitArmed = nil
             isOverlayOpen = true
@@ -184,9 +184,8 @@ public final class SplitController: Identifiable {
             }
             quitArmed = nil
             guard let stream = streams[side] else { return }
-            pendingEnd[side] = .quit
             stream.quitGame()
-            if stream.ending == nil { pendingEnd[side] = nil }
+            if stream.ending == .quittingGame { pendingEnd[side] = .quit }
         case .ended, .waking:
             isChoosingGame = true
             closeOverlay()
@@ -239,9 +238,14 @@ public final class SplitController: Identifiable {
         finishIfDone()
     }
 
-    /// App backgrounded: both sides stop cleanly and wait for "Resume".
+    /// App backgrounded: both sides stop cleanly and wait for "Resume". `onStreamsIdle` follows
+    /// exactly once, at once when nothing was live.
     public func suspend() {
-        guard stage == .running, !finished else { return }
+        guard !finished else { return }
+        guard !streams.isEmpty || !startTasks.isEmpty else {
+            dependencies.onStreamsIdle()
+            return
+        }
         stopAll(as: .suspended)
     }
 
@@ -339,7 +343,7 @@ public final class SplitController: Identifiable {
             return
         }
         let wakes = dependencies.needsWake(choice.hostID)
-        if wakes { states[side] = .waking }
+        states[side] = wakes ? .waking : .idle
         let token = UUID()
         let task = Task { [weak self] () -> Void in
             await self?.runStart(side: side, host: host, app: choice.app, wakes: wakes, token: token)
@@ -396,7 +400,7 @@ public final class SplitController: Identifiable {
     private func sideEnded(_ side: SplitSide, controllerID: UUID, failure: StreamFailure?) {
         guard streams[side]?.id == controllerID else { return }
         streams[side] = nil
-        settle(side, pendingEnd[side] ?? failure.map(SideEnd.failed) ?? .disconnected)
+        settle(side, failure.map(SideEnd.failed) ?? pendingEnd[side] ?? .disconnected)
     }
 
     /// A wake or a connect in flight stops now; its result, whenever it comes, is ignored.
