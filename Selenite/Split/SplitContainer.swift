@@ -24,7 +24,7 @@ struct SplitContainer: UIViewControllerRepresentable {
 
 /// Which half a side shows in: `first` left or top, swapped when `isSwapped`.
 enum SplitGeometry {
-    static func frame(of side: SplitSide, in bounds: CGRect, layout: StreamKit.SplitLayout, swapped: Bool) -> CGRect {
+    static func frame(of side: SplitSide, in bounds: CGRect, layout: SplitLayout, swapped: Bool) -> CGRect {
         let leading = (side == .first) != swapped
         switch layout {
         case .sideBySide:

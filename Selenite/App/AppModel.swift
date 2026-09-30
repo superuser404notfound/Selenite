@@ -612,7 +612,7 @@ final class AppModel {
             })
     }
 
-    private func makeSplitSession(host: PairedHost, app: AppEntry, layout: StreamKit.SplitLayout,
+    private func makeSplitSession(host: PairedHost, app: AppEntry, layout: SplitLayout,
                                   format: SplitFormat) throws -> (any StreamSessionHandle, StreamSettings) {
         guard let secIdentity else {
             throw StreamSessionError.launchFailed(identityProblem ?? "no client identity")

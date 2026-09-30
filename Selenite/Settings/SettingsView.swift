@@ -37,7 +37,7 @@ struct SettingsView: View {
                                options: StatsPreference.allCases, selection: preferences.stats,
                                label: \.label) { model.settings.set(\.stats, $0) }
                 about
-                // Visually quiet, at the very bottom: the M0/M1-A harness, which still runs split.
+                // Visually quiet, at the very bottom: experimental switches for the real streams.
                 Button("Developer") { showsDeveloper = true }
                     .buttonStyle(.plain)
                     .font(.caption)

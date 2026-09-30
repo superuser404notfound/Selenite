@@ -82,9 +82,6 @@
     "Audio underruns" : {
 
     },
-    "Audio: %@" : {
-
-    },
     "Automatic" : {
 
     },
@@ -92,12 +89,6 @@
 
     },
     "Bitrate" : {
-
-    },
-    "Bitrate %lld Mbps: +10" : {
-
-    },
-    "Bitrate %lld Mbps: -10" : {
 
     },
     "Bottom" : {
@@ -181,16 +172,10 @@
     "H.264" : {
 
     },
-    "HDR (solo only)" : {
-
-    },
     "HEVC" : {
 
     },
     "Host did not wake up" : {
-
-    },
-    "IP address" : {
 
     },
     "Layout" : {
@@ -235,9 +220,6 @@
     "Online" : {
 
     },
-    "Pair" : {
-
-    },
     "Pair again" : {
 
     },
@@ -260,9 +242,6 @@
 
     },
     "Picture format" : {
-
-    },
-    "PIN %@" : {
 
     },
     "Player 1: choose a game" : {
@@ -382,9 +361,6 @@
     "Selenite forgets this host. Pair it again to stream from it." : {
 
     },
-    "Selenite M0 harness" : {
-
-    },
     "Send Wake-on-LAN to saved hosts" : {
 
     },
@@ -404,9 +380,6 @@
 
     },
     "Stalls" : {
-
-    },
-    "Start" : {
 
     },
     "Starting game…" : {
