@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		0BF9A5FEDDE308F69811C949 /* AppCore in Frameworks */ = {isa = PBXBuildFile; productRef = 09C91847BF3CE63FF4B9A88E /* AppCore */; };
+		1A5037371D94DD06B9D0A982 /* SplitInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21121228E6AA78CBC1743FF3 /* SplitInput.swift */; };
 		1EF96EFD252F0C8C6146CD9D /* SeleniteApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C17D93938F3EF35FC7048224 /* SeleniteApp.swift */; };
 		20E632824AA1A93A96DE60E2 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED727DA465B015CE790EDF05 /* AppModel.swift */; };
 		233F6F38F4D6327243A997A1 /* HarnessView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A6A866C8C288C7F96C4E477 /* HarnessView.swift */; };
@@ -51,6 +52,7 @@
 		12D1C745A4359BA90A9D9162 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		152E3C6DC9B0F1A43ECDF02F /* Selenite-tvOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "Selenite-tvOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		1AFF32ECFE4F5B57C7D3376D /* Prompts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Prompts.swift; sourceTree = "<group>"; };
+		21121228E6AA78CBC1743FF3 /* SplitInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitInput.swift; sourceTree = "<group>"; };
 		273A08E874EAF5433651BECB /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		29084BD577B639C217599362 /* ColorTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorTheme.swift; sourceTree = "<group>"; };
 		2A6A866C8C288C7F96C4E477 /* HarnessView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessView.swift; sourceTree = "<group>"; };
@@ -175,6 +177,7 @@
 				68830DDB57D3AA87AD8A38C6 /* FailureText.swift */,
 				B991729B15A5D4B5BC2C7A7A /* LiveDependencies.swift */,
 				FB1D9C38AA34B31FFCA5FA32 /* RootView.swift */,
+				21121228E6AA78CBC1743FF3 /* SplitInput.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -312,6 +315,7 @@
 				4722FE1A787E162F5C3448F6 /* RootView.swift in Sources */,
 				1EF96EFD252F0C8C6146CD9D /* SeleniteApp.swift in Sources */,
 				254805DE344BBFCC597A314F /* SettingsView.swift in Sources */,
+				1A5037371D94DD06B9D0A982 /* SplitInput.swift in Sources */,
 				C9D3D7D4294509AB483C9F86 /* StreamContainer.swift in Sources */,
 				3444C9834442D162D4AFDEE1 /* StreamCoverView.swift in Sources */,
 				37E4DAF36DD2A84FC1F1BFD5 /* StreamLoadingView.swift in Sources */,

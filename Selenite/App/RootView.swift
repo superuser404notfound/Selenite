@@ -8,7 +8,7 @@ struct RootView: View {
 
     var body: some View {
         @Bindable var model = model
-        let streaming = model.activeStream != nil
+        let streaming = model.activeStream != nil || model.activeSplit != nil
         ZStack {
             HomeView()
                 // Out of focus reach while a stream runs, so focus can only be on the stream.
@@ -21,9 +21,17 @@ struct RootView: View {
                     .ignoresSafeArea()
                     .id(ObjectIdentifier(stream))
             }
+            if let split = model.activeSplit {
+                Color.black
+                    .ignoresSafeArea()
+                    .id(ObjectIdentifier(split))
+            }
         }
         .onChange(of: streaming) { _, isStreaming in
             if !isStreaming { model.streamCoverDismissed() }
+        }
+        .onChange(of: model.activeSplit == nil) { _, isGone in
+            if isGone { model.splitCoverDismissed() }
         }
             .menuPresentation(item: $model.pendingRemoval) { host in
                 RemoveHostPrompt(host: host).environment(model)
@@ -42,6 +50,9 @@ struct RootView: View {
             }
             .menuPresentation(isPresented: $model.isShowingWake, onDismiss: { model.wakePanelDismissed() }) {
                 WakePanel(hostName: model.wakingHostName, forGame: model.isWakingForGame).environment(model)
+            }
+            .menuPresentation(item: $model.splitWizard, onDismiss: { model.splitWizardDismissed() }) { _ in
+                Text(verbatim: "Split wizard")
             }
             .menuPresentation(isPresented: $model.isShowingSettings) {
                 SettingsView().environment(model)

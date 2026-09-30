@@ -1,5 +1,6 @@
 import AppCore
 import HostKit
+import InputKit
 import Observation
 import Security
 import StreamKit
@@ -55,7 +56,10 @@ final class AppModel {
     let waker: HostWaker
     let commands: any HostCommands
     let recents = RecentsStore()
+    let splitStore = SplitStore()
     var activeStream: StreamController?
+    var activeSplit: SplitController?
+    var splitWizard: SplitWizardModel?
     var errorPanel: ErrorPanelModel?
     var addHostRequest: AddHostRequest?
     var pendingRemoval: PairedHost?
@@ -86,6 +90,9 @@ final class AppModel {
     @ObservationIgnored private var queuedWakeFailure: StreamFailure?
     @ObservationIgnored private var lastWakeTarget: (host: PairedHost, app: AppEntry?)?
     @ObservationIgnored private var queuedWakeRetry: (host: PairedHost, app: AppEntry?)?
+    @ObservationIgnored private var queuedSplitPlan: SplitPlan?
+    @ObservationIgnored private var reopenWizardWith: SplitPlan?
+    @ObservationIgnored private var splitSideRequest: (side: SplitSide, controller: SplitController)?
 
     init() {
         let identity: ClientIdentity
@@ -119,16 +126,19 @@ final class AppModel {
                                   cacheDirectory: AppCatalog.defaultCacheDirectory())
         self.settings = SettingsStore()
         self.commands = LiveHostCommands(uniqueID: identity.uniqueID, clients: clients)
-        self.waker = HostWaker(send: { host in
-            _ = await Task.detached {
-                let results = WakeOnLAN.wake(host)
-                let lines = results.map { result in
-                    result.errorCode.map { "\(result.destination) errno \(Int($0))" } ?? "\(result.destination) sent"
-                }
-                DiagnosticLog.note("wake \(host.name): \(lines.joined(separator: ", "))")
-            }.value
-        }, probe: LiveServerInfoProbe(uniqueID: identity.uniqueID, clients: clients))
+        self.waker = HostWaker(send: Self.wakeSender,
+                               probe: LiveServerInfoProbe(uniqueID: identity.uniqueID, clients: clients))
         if let problem { DiagnosticLog.note("keychain unavailable, pairings will not persist: \(problem)") }
+    }
+
+    private static let wakeSender: @Sendable (PairedHost) async -> Void = { host in
+        _ = await Task.detached {
+            let results = WakeOnLAN.wake(host)
+            let lines = results.map { result in
+                result.errorCode.map { "\(result.destination) errno \(Int($0))" } ?? "\(result.destination) sent"
+            }
+            DiagnosticLog.note("wake \(host.name): \(lines.joined(separator: ", "))")
+        }.value
     }
 
     // MARK: Hosts
@@ -165,7 +175,7 @@ final class AppModel {
     /// unpaired Sunshine hosts over Bonjour at the same time.
     func homeAppeared() {
         homeVisible = true
-        if activeStream == nil, !isStarting { startWatchingHosts() }
+        if activeStream == nil, activeSplit == nil, !isStarting { startWatchingHosts() }
     }
 
     func homeDisappeared() {
@@ -212,6 +222,7 @@ final class AppModel {
         discovery.storeChanged()
         catalog.forget(hostID: host.id)
         recents.removeAll(hostID: host.id)
+        splitStore.removeHost(id: host.id)
         if settings.selectedHostID == host.id {
             settings.setSelectedHostID(directory.hosts.first?.id)
         }
@@ -333,7 +344,7 @@ final class AppModel {
 
     /// Nothing is presented or on its way: a late result may show a panel without replacing one.
     private var canPresentPanel: Bool {
-        activeStream == nil && !isStarting && !isShowingWake && errorPanel == nil && pendingSwitch == nil
+        activeStream == nil && activeSplit == nil && !isStarting && !isShowingWake && errorPanel == nil && pendingSwitch == nil
             && pendingQuit == nil && pendingRemoval == nil && addHostRequest == nil && !isShowingSettings
     }
 
@@ -352,7 +363,7 @@ final class AppModel {
             DiagnosticLog.note("wake \(host.name) ignored: a quit is in flight")
             return
         }
-        guard HostWaker.canWake(host), activeStream == nil, !isStarting else { return }
+        guard HostWaker.canWake(host), activeStream == nil, activeSplit == nil, !isStarting else { return }
         wakeTarget = (host, app)
         wakingHostName = host.name
         isWakingForGame = app != nil
@@ -409,7 +420,7 @@ final class AppModel {
             DiagnosticLog.note("stream start \(host.name) app \(app.id) ignored: a quit is in flight")
             return
         }
-        guard activeStream == nil, !isStarting else { return }
+        guard activeStream == nil, activeSplit == nil, !isStarting else { return }
         isStarting = true
         lastLaunch = (host, app)
         directory.stopPolling()
@@ -497,11 +508,134 @@ final class AppModel {
                 beginBackgroundTeardown()
                 stream.disconnect()
             }
+            if let split = activeSplit {
+                // suspend() always ends in onStreamsIdle, which ends the teardown.
+                beginBackgroundTeardown()
+                split.suspend()
+            }
         case .active:
             isBackgrounded = false
-            if homeVisible, activeStream == nil, !isStarting { startWatchingHosts() }
+            if homeVisible, activeStream == nil, activeSplit == nil, !isStarting { startWatchingHosts() }
         default:
             break
+        }
+    }
+
+    // MARK: Split
+
+    func openSplitWizard() {
+        splitWizard = SplitWizardModel(startingFrom: splitStore.plan)
+    }
+
+    /// The quick-start tile: the last split again.
+    func startQuickSplit() {
+        guard let plan = splitStore.plan else { return }
+        startSplit(plan)
+    }
+
+    /// The wizard closes first; what it chose starts from its `onDismiss`.
+    func splitWizardFinished(_ wizard: SplitWizardModel) {
+        queuedSplitPlan = wizard.finish()
+        splitWizard = nil
+    }
+
+    /// `onDismiss` of the wizard: a one-side wizard replaces its side or gives up, a full one starts
+    /// the split it queued.
+    func splitWizardDismissed() {
+        let plan = queuedSplitPlan
+        queuedSplitPlan = nil
+        if let request = splitSideRequest {
+            splitSideRequest = nil
+            if let plan, activeSplit === request.controller {
+                request.controller.replaceSide(request.side, with: plan[request.side])
+            } else {
+                request.controller.chooseGameCancelled()
+            }
+            return
+        }
+        if let plan { startSplit(plan) }
+    }
+
+    /// The split has left the screen: a cancelled join opens the wizard again.
+    func splitCoverDismissed() {
+        guard let plan = reopenWizardWith else { return }
+        reopenWizardWith = nil
+        splitWizard = SplitWizardModel(startingFrom: plan)
+    }
+
+    private func startSplit(_ plan: SplitPlan) {
+        guard activeStream == nil, activeSplit == nil, !isStarting, !isQuitting else { return }
+        directory.stopPolling()
+        discovery.stop()
+        let controller = SplitController(plan: plan, dependencies: makeSplitDependencies(),
+                                         onFinished: { [weak self] finish in self?.splitFinished(finish, plan: plan) })
+        activeSplit = controller
+        controller.begin()
+    }
+
+    private func makeSplitDependencies() -> SplitDependencies {
+        let directory = self.directory
+        let recents = self.recents
+        let probe = LiveServerInfoProbe(uniqueID: identity.uniqueID, clients: clients)
+        return SplitDependencies(
+            host: { id in directory.snapshot(id: id)?.host },
+            needsWake: { id in directory.snapshot(id: id).map(Self.shouldWake) ?? false },
+            wake: { host in
+                // A waker per call: HostWaker.wake cancels the wake already running on it.
+                let waker = HostWaker(send: Self.wakeSender, probe: probe)
+                return await withTaskCancellationHandler {
+                    await withCheckedContinuation { continuation in
+                        waker.wake(host) { outcome in
+                            DiagnosticLog.note("split wake \(host.name): \(outcome)")
+                            continuation.resume(returning: outcome)
+                        }
+                    }
+                } onCancel: {
+                    Task { @MainActor in waker.cancel() }
+                }
+            },
+            makeSession: { [weak self] host, app, layout, format in
+                guard let self else { throw StreamSessionError.cancelled }
+                return try self.makeSplitSession(host: host, app: app, layout: layout, format: format)
+            },
+            input: SplitInput(),
+            commands: commands,
+            store: splitStore,
+            recordRecent: { hostID, app in recents.record(hostID: hostID, app: app) },
+            onStreamsIdle: { [weak self] in self?.endBackgroundTeardown() },
+            chooseGame: { [weak self] side, plan in
+                guard let self, let controller = self.activeSplit else { return }
+                self.splitSideRequest = (side, controller)
+                self.splitWizard = SplitWizardModel(replacing: side, in: plan)
+            })
+    }
+
+    private func makeSplitSession(host: PairedHost, app: AppEntry, layout: StreamKit.SplitLayout,
+                                  format: SplitFormat) throws -> (any StreamSessionHandle, StreamSettings) {
+        guard let secIdentity else {
+            throw StreamSessionError.launchFailed(identityProblem ?? "no client identity")
+        }
+        let display = DisplayModeReader.current()
+        let codecs = directory.snapshot(id: host.id)?.codecModeSupport ?? 0
+        let streamSettings = StreamSettingsResolver.resolveSplit(settings.preferences, layout: layout, format: format,
+                                                                 display: display, hostCodecModeSupport: codecs)
+        DiagnosticLog.note("split start: \(host.name) app \(app.id) \(streamSettings.width)x\(streamSettings.height)"
+            + " at \(streamSettings.fps) fps, \(streamSettings.bitrateKbps) kbps, \(streamSettings.codec),"
+            + " layout \(layout), format \(format), pacing \(streamSettings.pacing.rawValue),"
+            + " direct present \(streamSettings.directPresent ? "on" : "off"), display \(display.width)x\(display.height) at \(display.refreshRate) Hz")
+        let session = try StreamSession(host: host, appID: app.id, settings: streamSettings,
+                                        identity: identity, clientIdentity: secIdentity)
+        return (session, streamSettings)
+    }
+
+    private func splitFinished(_ finish: SplitFinish, plan: SplitPlan) {
+        DiagnosticLog.note("split end: \(finish)")
+        if finish == .cancelledJoin { reopenWizardWith = plan }
+        activeSplit = nil
+        if homeVisible, !isBackgrounded {
+            startWatchingHosts()
+        } else {
+            Task { await directory.refresh() }
         }
     }
 
