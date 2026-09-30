@@ -158,10 +158,16 @@ public final class ControllerManager {
         controller.playerIndex = lightIndex ?? GCControllerPlayerIndex(rawValue: Int(number)) ?? .indexUnset
         forwarder.arrived(number: number, mask: roster.mask, kind: Self.kind(of: controller))
         let id = ObjectIdentifier(controller)
-        gamepad.valueChangedHandler = { [weak self] pad, _ in
+        // valueChangedHandler is one slot shared by whoever currently owns the physical controller.
+        // A not-admitted release (disconnect(markGhost: false)) leaves a prior handler in place
+        // instead of racing to nil it, so this closure re-checks ownership on every report: once
+        // `controllers[number]` no longer points at this same controller, it goes quiet by itself
+        // instead of sending under a number this manager no longer has.
+        gamepad.valueChangedHandler = { [weak self, weak controller] pad, _ in
             MainActor.assumeIsolated {
-                self?.onInput?(id, pad)
-                self?.send(pad, number: number)
+                guard let self, let controller, self.controllers[number] === controller else { return }
+                self.onInput?(id, pad)
+                self.send(pad, number: number)
             }
         }
         send(gamepad, number: number)
@@ -170,12 +176,18 @@ public final class ControllerManager {
     /// Releases the controller on `number`. `markGhost` should be false only when the controller
     /// stays connected but is no longer admitted here (a split seat change): the physical device is
     /// not going anywhere, so latching it in the ledger would block a real reconnect notification
-    /// that will never come.
+    /// that will never come. For the same reason `valueChangedHandler` is left alone on that path:
+    /// the pad's next owner (another manager's `connect`, or the lobby) overwrites it once it picks
+    /// the controller up, and until then the outgoing `connect` closure's own ownership check keeps
+    /// it quiet. Clearing it here would risk wiping a handler a faster-refreshing new owner already
+    /// installed.
     private func disconnect(id: ObjectIdentifier, markGhost: Bool = true) {
         guard let number = roster.disconnect(id: id) else { return }
-        if markGhost { ledger.markReleased(id) }
-        // A departed controller object can outlive this call; its handler must not keep sending.
-        controllers[number]?.extendedGamepad?.valueChangedHandler = nil
+        if markGhost {
+            ledger.markReleased(id)
+            // A departed controller object can outlive this call; its handler must not keep sending.
+            controllers[number]?.extendedGamepad?.valueChangedHandler = nil
+        }
         controllers[number] = nil
         touching[number] = nil
         forwarder.released(number: number, remainingMask: roster.mask)

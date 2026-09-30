@@ -11,7 +11,24 @@ public final class ControllerLobby {
     public var onEvent: (@MainActor (PadID, LobbyEvent) -> Void)?
     public var onPadsChanged: (@MainActor (Set<PadID>) -> Void)?
     public var isClaimed: @MainActor (PadID) -> Bool = { _ in false }
-    public var includesClaimed = false
+    /// Off between seat changes: a claimed pad's presses reach `ingest` only through the reassign
+    /// flow, not on every report. On the rising edge, every connected pad the lobby has not adopted
+    /// (the claimed ones) gets a fresh baseline, so a button already held in game is not read back
+    /// as a new press the moment reassigning starts; the falling edge forgets those baselines again.
+    public var includesClaimed = false {
+        didSet {
+            guard includesClaimed != oldValue else { return }
+            for controller in GCController.controllers() {
+                let id = ObjectIdentifier(controller)
+                guard adopted[id] == nil, let pad = controller.extendedGamepad else { continue }
+                if includesClaimed {
+                    detector.baseline(pad: id, snapshot: ControllerManager.snapshot(of: pad))
+                } else {
+                    detector.forget(id)
+                }
+            }
+        }
+    }
     private var detector = LobbyEdgeDetector()
     private var adopted: [PadID: GCController] = [:]
     private var observers: [NSObjectProtocol] = []
