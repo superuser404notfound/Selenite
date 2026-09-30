@@ -22,7 +22,7 @@ struct RootView: View {
                     .id(ObjectIdentifier(stream))
             }
             if let split = model.activeSplit {
-                Color.black
+                SplitContainer(split: split, model: model)
                     .ignoresSafeArea()
                     .id(ObjectIdentifier(split))
             }

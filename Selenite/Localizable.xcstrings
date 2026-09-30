@@ -136,6 +136,9 @@
     "Disconnect" : {
 
     },
+    "Disconnected. Press A to reconnect." : {
+
+    },
     "Disconnecting…" : {
 
     },
@@ -161,6 +164,9 @@
 
     },
     "Game did not quit" : {
+
+    },
+    "Game quit. Press A to restart." : {
 
     },
     "H.264" : {
@@ -191,6 +197,12 @@
 
     },
     "New" : {
+
+    },
+    "New controller: point left or right and press A" : {
+
+    },
+    "New controller: point up or down and press A" : {
 
     },
     "No video arrived from the host. A firewall may be blocking UDP port 47998." : {
@@ -232,6 +244,9 @@
     "Pairing was cancelled." : {
 
     },
+    "Paused. Press A to resume." : {
+
+    },
     "Picture format" : {
 
     },
@@ -250,10 +265,31 @@
     "Player 2: choose a host" : {
 
     },
+    "Point left or right and press A. Start begins." : {
+
+    },
+    "Point up or down and press A. Start begins." : {
+
+    },
     "Present on arrival (experimental)" : {
 
     },
+    "Press A to join" : {
+
+    },
+    "Press A to reconnect" : {
+
+    },
+    "Press A to restart" : {
+
+    },
+    "Press B to cancel" : {
+
+    },
     "Press Menu again to leave the stream." : {
+
+    },
+    "Press Start to play" : {
 
     },
     "Quit %@ on %@? Unsaved progress may be lost." : {

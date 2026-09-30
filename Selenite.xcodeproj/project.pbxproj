@@ -22,11 +22,13 @@
 		4722FE1A787E162F5C3448F6 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB1D9C38AA34B31FFCA5FA32 /* RootView.swift */; };
 		48190944DC9CF5EB8BCC5D17 /* RecentsRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDC88DAC646888CD387DFA80 /* RecentsRow.swift */; };
 		52AC0336E4A7777DB30D201F /* MoonlightCore in Frameworks */ = {isa = PBXBuildFile; productRef = 9FE785F1EF1DE3002B7959FE /* MoonlightCore */; };
+		53FA1B28082BB906B32F81FC /* SplitScreenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20FE94F627DB05CFAF9A536D /* SplitScreenView.swift */; };
 		66808BE2A8E9D404085E10AA /* StreamStageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E70B26630A9DC9D63AA3FF5 /* StreamStageView.swift */; };
 		6DF9D32C15A12D0C2955FE33 /* FailureText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68830DDB57D3AA87AD8A38C6 /* FailureText.swift */; };
 		6E89F70DE09BD4F802273DA2 /* AppTile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BE0886C65B71808D997F30A /* AppTile.swift */; };
 		71A30642922B8F8B29A65265 /* AddHostFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31D65A510D94364F3B5D7626 /* AddHostFlowView.swift */; };
 		81B8795B97796488DA74FFC8 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 12D1C745A4359BA90A9D9162 /* Localizable.xcstrings */; };
+		8EA122957D8DABD53DCA34B7 /* SplitContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14D5D5B06C94898B89C00BD1 /* SplitContainer.swift */; };
 		9546C00191F51DA116A05798 /* SplitWizardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54F6C2BE12159B857CCF910D /* SplitWizardView.swift */; };
 		993D6AFA841889D22673347E /* StreamOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56AEAF6F7A60D4EE01BA1587 /* StreamOverlayView.swift */; };
 		9A5E740E012CFCADE2B10078 /* HarnessModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 617BEEA33243BBB500BFE892 /* HarnessModel.swift */; };
@@ -51,8 +53,10 @@
 		00F01E3CDDCB412C415DCCB0 /* ValuePickerRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ValuePickerRow.swift; sourceTree = "<group>"; };
 		10D449D417CA0BAC6F70C675 /* StreamCoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamCoverView.swift; sourceTree = "<group>"; };
 		12D1C745A4359BA90A9D9162 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
+		14D5D5B06C94898B89C00BD1 /* SplitContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitContainer.swift; sourceTree = "<group>"; };
 		152E3C6DC9B0F1A43ECDF02F /* Selenite-tvOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "Selenite-tvOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		1AFF32ECFE4F5B57C7D3376D /* Prompts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Prompts.swift; sourceTree = "<group>"; };
+		20FE94F627DB05CFAF9A536D /* SplitScreenView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitScreenView.swift; sourceTree = "<group>"; };
 		21121228E6AA78CBC1743FF3 /* SplitInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitInput.swift; sourceTree = "<group>"; };
 		273A08E874EAF5433651BECB /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		29084BD577B639C217599362 /* ColorTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorTheme.swift; sourceTree = "<group>"; };
@@ -205,6 +209,8 @@
 		FA8D0F0469F01E8213EA25B0 /* Split */ = {
 			isa = PBXGroup;
 			children = (
+				14D5D5B06C94898B89C00BD1 /* SplitContainer.swift */,
+				20FE94F627DB05CFAF9A536D /* SplitScreenView.swift */,
 				54F6C2BE12159B857CCF910D /* SplitWizardView.swift */,
 			);
 			path = Split;
@@ -326,7 +332,9 @@
 				4722FE1A787E162F5C3448F6 /* RootView.swift in Sources */,
 				1EF96EFD252F0C8C6146CD9D /* SeleniteApp.swift in Sources */,
 				254805DE344BBFCC597A314F /* SettingsView.swift in Sources */,
+				8EA122957D8DABD53DCA34B7 /* SplitContainer.swift in Sources */,
 				1A5037371D94DD06B9D0A982 /* SplitInput.swift in Sources */,
+				53FA1B28082BB906B32F81FC /* SplitScreenView.swift in Sources */,
 				9546C00191F51DA116A05798 /* SplitWizardView.swift in Sources */,
 				C9D3D7D4294509AB483C9F86 /* StreamContainer.swift in Sources */,
 				3444C9834442D162D4AFDEE1 /* StreamCoverView.swift in Sources */,

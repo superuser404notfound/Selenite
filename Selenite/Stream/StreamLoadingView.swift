@@ -27,20 +27,23 @@ struct StreamLoadingView: View {
                 Text(controller.app.title)
                     .font(.title)
                     .fontWeight(.bold)
-                Text(statusLine)
+                Text(controller.loadingLine)
                     .foregroundStyle(.secondary)
             }
         }
         .ignoresSafeArea()
     }
+}
 
-    private var statusLine: LocalizedStringKey {
-        switch controller.ending {
+extension StreamController {
+    /// The step a stream is at until its first frame, and what its stop waits for.
+    var loadingLine: LocalizedStringKey {
+        switch ending {
         case .quittingGame: return "Quitting game…"
         case .disconnecting: return "Disconnecting…"
         case nil: break
         }
-        return switch controller.phase {
+        return switch phase {
         case .connecting: "Connecting…"
         case .startingGame: "Starting game…"
         case .waitingForPicture, .running, .ended: "Waiting for picture…"
