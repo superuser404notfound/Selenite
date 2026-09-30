@@ -41,6 +41,7 @@
 		C9D3D7D4294509AB483C9F86 /* StreamContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31071BC9355E89A5E5CA7339 /* StreamContainer.swift */; };
 		D2F2FB6D3F9FB933330C3A2F /* ErrorPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A94CE08B4C9A3E680A947E22 /* ErrorPanel.swift */; };
 		D994CAFD234138F65277521A /* StreamSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF77301DC333661362D4FEB7 /* StreamSurface.swift */; };
+		DFCC100449E4B9582F992142 /* SplitOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AED27E2044FDE82ADEDF6C6 /* SplitOverlayView.swift */; };
 		E4CBC4B4BCE309F4E1F5AE83 /* AsyncCachedImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45E145C40671B3024384F31F /* AsyncCachedImage.swift */; };
 		EBD2EC4B6DED50553E7C4F9E /* ArtworkTile.swift in Sources */ = {isa = PBXBuildFile; fileRef = B660E02E5ABAFD106CB03193 /* ArtworkTile.swift */; };
 		ED786636E3672852C14D4D5B /* HostKit in Frameworks */ = {isa = PBXBuildFile; productRef = CCD3F26D86A723963A2FB2BA /* HostKit */; };
@@ -55,6 +56,7 @@
 		12D1C745A4359BA90A9D9162 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		14D5D5B06C94898B89C00BD1 /* SplitContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitContainer.swift; sourceTree = "<group>"; };
 		152E3C6DC9B0F1A43ECDF02F /* Selenite-tvOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "Selenite-tvOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		1AED27E2044FDE82ADEDF6C6 /* SplitOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitOverlayView.swift; sourceTree = "<group>"; };
 		1AFF32ECFE4F5B57C7D3376D /* Prompts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Prompts.swift; sourceTree = "<group>"; };
 		20FE94F627DB05CFAF9A536D /* SplitScreenView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitScreenView.swift; sourceTree = "<group>"; };
 		21121228E6AA78CBC1743FF3 /* SplitInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitInput.swift; sourceTree = "<group>"; };
@@ -210,6 +212,7 @@
 			isa = PBXGroup;
 			children = (
 				14D5D5B06C94898B89C00BD1 /* SplitContainer.swift */,
+				1AED27E2044FDE82ADEDF6C6 /* SplitOverlayView.swift */,
 				20FE94F627DB05CFAF9A536D /* SplitScreenView.swift */,
 				54F6C2BE12159B857CCF910D /* SplitWizardView.swift */,
 			);
@@ -334,6 +337,7 @@
 				254805DE344BBFCC597A314F /* SettingsView.swift in Sources */,
 				8EA122957D8DABD53DCA34B7 /* SplitContainer.swift in Sources */,
 				1A5037371D94DD06B9D0A982 /* SplitInput.swift in Sources */,
+				DFCC100449E4B9582F992142 /* SplitOverlayView.swift in Sources */,
 				53FA1B28082BB906B32F81FC /* SplitScreenView.swift in Sources */,
 				9546C00191F51DA116A05798 /* SplitWizardView.swift in Sources */,
 				C9D3D7D4294509AB483C9F86 /* StreamContainer.swift in Sources */,

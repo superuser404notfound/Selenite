@@ -141,15 +141,25 @@ public final class SplitController: Identifiable {
     public func overlaySelect() {
         guard isOverlayOpen else { return }
         switch cursor.item {
-        case .volumeDown(let side): setVolume((volumes[side] ?? 1) - 0.1, for: side)
-        case .volumeUp(let side): setVolume((volumes[side] ?? 1) + 0.1, for: side)
-        case .primary(let side): primaryAction(side)
-        case .secondary(let side): secondaryAction(side)
+        case .volumeDown(let position):
+            let side = realSide(position)
+            setVolume((volumes[side] ?? 1) - 0.1, for: side)
+        case .volumeUp(let position):
+            let side = realSide(position)
+            setVolume((volumes[side] ?? 1) + 0.1, for: side)
+        case .primary(let position): primaryAction(realSide(position))
+        case .secondary(let position): secondaryAction(realSide(position))
         case .swap: swapSides()
         case .reassign: reassignControllers()
         case .endSplit: endSplit()
         case .resume: closeOverlay()
         }
+    }
+
+    /// `OverlayCursor` items name a screen position (left/top vs right/bottom); after a swap that
+    /// position is the other side's stream.
+    public func realSide(_ position: SplitSide) -> SplitSide {
+        isSwapped ? position.other : position
     }
 
     public func closeOverlay() {

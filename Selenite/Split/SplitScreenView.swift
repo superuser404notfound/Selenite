@@ -29,8 +29,8 @@ struct SplitScreenView: View {
                         .transition(.opacity)
                 }
                 if split.isOverlayOpen {
-                    // Task 10: SplitOverlayView(split: split)
-                    Color.clear
+                    SplitOverlayView(split: split, hostName: hostName)
+                        .transition(.opacity)
                 }
             }
         }

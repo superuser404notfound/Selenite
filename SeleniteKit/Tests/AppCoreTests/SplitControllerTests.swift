@@ -370,6 +370,54 @@ private func host(_ id: String) -> PairedHost {
     #expect(!rig.controller.isOverlayOpen)
 }
 
+@MainActor @Test func overlaySelectVolumeDownFollowsTheSwappedScreenPosition() async {
+    let (rig, _, _) = await runningRig()
+    rig.controller.menuPressed(now: 10)
+    for _ in 0..<3 { rig.controller.overlayMove(.up) }
+    for _ in 0..<3 { rig.controller.overlayMove(.left) }
+    #expect(rig.controller.cursor.item == .volumeDown(.first))
+    rig.controller.overlaySelect()
+    #expect(abs((rig.controller.volumes[.first] ?? -1) - 0.9) < 1e-5)
+    #expect(abs((rig.controller.volumes[.second] ?? -1) - 1) < 1e-5)
+
+    rig.controller.menuPressed(now: 10.4)
+    rig.controller.menuPressed(now: 10.8)
+    rig.controller.swapSides()
+    for _ in 0..<3 { rig.controller.overlayMove(.up) }
+    for _ in 0..<3 { rig.controller.overlayMove(.left) }
+    #expect(rig.controller.cursor.item == .volumeDown(.first))
+    rig.controller.overlaySelect()
+    #expect(abs((rig.controller.volumes[.second] ?? -1) - 0.9) < 1e-5)
+    #expect(abs((rig.controller.volumes[.first] ?? -1) - 0.9) < 1e-5)
+}
+
+@MainActor @Test func overlaySelectPrimaryDisconnectsTheRealSide() async {
+    let (rig, _, _) = await runningRig()
+    rig.controller.menuPressed(now: 10)
+    rig.controller.overlayMove(.up)
+    rig.controller.overlayMove(.up)
+    rig.controller.overlayMove(.left)
+    #expect(rig.controller.cursor.item == .primary(.first))
+    rig.controller.overlaySelect()
+    let ended = await eventually { rig.state(.first) == .ended(.disconnected) }
+    #expect(ended)
+    #expect(rig.state(.second) == .streaming)
+}
+
+@MainActor @Test func overlaySelectPrimaryFollowsTheSwappedScreenPosition() async {
+    let (rig, _, _) = await runningRig()
+    rig.controller.swapSides()
+    rig.controller.menuPressed(now: 10)
+    rig.controller.overlayMove(.up)
+    rig.controller.overlayMove(.up)
+    rig.controller.overlayMove(.left)
+    #expect(rig.controller.cursor.item == .primary(.first))
+    rig.controller.overlaySelect()
+    let ended = await eventually { rig.state(.second) == .ended(.disconnected) }
+    #expect(ended)
+    #expect(rig.state(.first) == .streaming)
+}
+
 @MainActor @Test func quitNeedsTwoPressesAndMovingDisarms() async {
     let (rig, _, _) = await runningRig()
     rig.session("A")?.send(.started)

@@ -100,6 +100,9 @@
     "Bitrate %lld Mbps: -10" : {
 
     },
+    "Bottom" : {
+
+    },
     "Busy" : {
 
     },
@@ -107,6 +110,9 @@
 
     },
     "Checking…" : {
+
+    },
+    "Choose game" : {
 
     },
     "Codec" : {
@@ -143,6 +149,9 @@
 
     },
     "Dropped frames" : {
+
+    },
+    "End split" : {
 
     },
     "Enter the IP address or hostname of the PC running Sunshine." : {
@@ -185,6 +194,9 @@
 
     },
     "Layout" : {
+
+    },
+    "Left" : {
 
     },
     "Lowest latency" : {
@@ -283,6 +295,9 @@
     "Press A to restart" : {
 
     },
+    "Press again to quit" : {
+
+    },
     "Press B to cancel" : {
 
     },
@@ -310,7 +325,13 @@
     "Quitting game…" : {
 
     },
+    "Reassign controllers" : {
+
+    },
     "Recently played" : {
+
+    },
+    "Reconnect" : {
 
     },
     "Remove" : {
@@ -325,7 +346,13 @@
     "Resolution" : {
 
     },
+    "Restart" : {
+
+    },
     "Resume" : {
+
+    },
+    "Right" : {
 
     },
     "Round trip" : {
@@ -397,6 +424,12 @@
     "Sunshine is already pairing with another device. Finish or cancel that first." : {
 
     },
+    "Swap sides" : {
+
+    },
+    "Swipe to move, click to choose. Menu closes." : {
+
+    },
     "The app list could not be loaded." : {
 
     },
@@ -443,6 +476,9 @@
 
     },
     "The PIN did not match. Try again with the new PIN." : {
+
+    },
+    "Top" : {
 
     },
     "Top and bottom" : {
