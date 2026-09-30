@@ -4,6 +4,9 @@
     "4K" : {
 
     },
+    "16:9" : {
+
+    },
     "30 fps" : {
 
     },
@@ -17,6 +20,9 @@
 
     },
     "1440p" : {
+
+    },
+    "%@ + %@" : {
 
     },
     "%@ did not wake up. Check that Wake-on-LAN is enabled on the PC." : {
@@ -53,6 +59,12 @@
 
     },
     "Address" : {
+
+    },
+    "Already used by Player 1" : {
+
+    },
+    "Already used by Player 2" : {
 
     },
     "Another game is running on %@. Starting %@ quits it." : {
@@ -136,6 +148,9 @@
     "Enter this PIN in Sunshine's web UI (PIN tab)" : {
 
     },
+    "Fill half" : {
+
+    },
     "Frame pacing" : {
 
     },
@@ -217,7 +232,22 @@
     "Pairing was cancelled." : {
 
     },
+    "Picture format" : {
+
+    },
     "PIN %@" : {
+
+    },
+    "Player 1: choose a game" : {
+
+    },
+    "Player 1: choose a host" : {
+
+    },
+    "Player 2: choose a game" : {
+
+    },
+    "Player 2: choose a host" : {
 
     },
     "Present on arrival (experimental)" : {
@@ -274,6 +304,9 @@
     "Running" : {
 
     },
+    "Screen split" : {
+
+    },
     "Selenite" : {
 
     },
@@ -295,10 +328,16 @@
     "Settings" : {
 
     },
+    "Side by side" : {
+
+    },
     "Smooth" : {
 
     },
     "Something went wrong: %@" : {
+
+    },
+    "Split screen" : {
 
     },
     "Stalls" : {
@@ -368,6 +407,9 @@
 
     },
     "The PIN did not match. Try again with the new PIN." : {
+
+    },
+    "Top and bottom" : {
 
     },
     "Try again" : {

@@ -51,8 +51,8 @@ struct RootView: View {
             .menuPresentation(isPresented: $model.isShowingWake, onDismiss: { model.wakePanelDismissed() }) {
                 WakePanel(hostName: model.wakingHostName, forGame: model.isWakingForGame).environment(model)
             }
-            .menuPresentation(item: $model.splitWizard, onDismiss: { model.splitWizardDismissed() }) { _ in
-                Text(verbatim: "Split wizard")
+            .menuPresentation(item: $model.splitWizard, panel: .plain, onDismiss: { model.splitWizardDismissed() }) { wizard in
+                SplitWizardView(wizard: wizard).environment(model)
             }
             .menuPresentation(isPresented: $model.isShowingSettings) {
                 SettingsView().environment(model)

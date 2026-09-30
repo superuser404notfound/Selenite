@@ -27,6 +27,7 @@
 		6E89F70DE09BD4F802273DA2 /* AppTile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BE0886C65B71808D997F30A /* AppTile.swift */; };
 		71A30642922B8F8B29A65265 /* AddHostFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31D65A510D94364F3B5D7626 /* AddHostFlowView.swift */; };
 		81B8795B97796488DA74FFC8 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 12D1C745A4359BA90A9D9162 /* Localizable.xcstrings */; };
+		9546C00191F51DA116A05798 /* SplitWizardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54F6C2BE12159B857CCF910D /* SplitWizardView.swift */; };
 		993D6AFA841889D22673347E /* StreamOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56AEAF6F7A60D4EE01BA1587 /* StreamOverlayView.swift */; };
 		9A5E740E012CFCADE2B10078 /* HarnessModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 617BEEA33243BBB500BFE892 /* HarnessModel.swift */; };
 		9E014C89E72ACA197D89FC43 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 273A08E874EAF5433651BECB /* HomeView.swift */; };
@@ -62,6 +63,7 @@
 		45E145C40671B3024384F31F /* AsyncCachedImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AsyncCachedImage.swift; sourceTree = "<group>"; };
 		45EAB5CCA5EF274867374D67 /* DeveloperView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperView.swift; sourceTree = "<group>"; };
 		536760E4329F49D368B1B8BD /* HostCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostCard.swift; sourceTree = "<group>"; };
+		54F6C2BE12159B857CCF910D /* SplitWizardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitWizardView.swift; sourceTree = "<group>"; };
 		56AEAF6F7A60D4EE01BA1587 /* StreamOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamOverlayView.swift; sourceTree = "<group>"; };
 		587861A0A29BF0BAD44514E0 /* PromptPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromptPanel.swift; sourceTree = "<group>"; };
 		617BEEA33243BBB500BFE892 /* HarnessModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessModel.swift; sourceTree = "<group>"; };
@@ -124,6 +126,7 @@
 				B96A0335EA2C3F46F2F4083A /* Developer */,
 				018A681675718F1D2FE36CF2 /* Home */,
 				A8E61A105AB35A3AC53D0A50 /* Settings */,
+				FA8D0F0469F01E8213EA25B0 /* Split */,
 				67A762DAC7B039EF1268E1A6 /* Stream */,
 				FF192B3F71CF0B5F9815F3F0 /* UI */,
 			);
@@ -197,6 +200,14 @@
 				E06B05EB5A9C79E42910DCC6 /* SeleniteKit */,
 			);
 			name = Packages;
+			sourceTree = "<group>";
+		};
+		FA8D0F0469F01E8213EA25B0 /* Split */ = {
+			isa = PBXGroup;
+			children = (
+				54F6C2BE12159B857CCF910D /* SplitWizardView.swift */,
+			);
+			path = Split;
 			sourceTree = "<group>";
 		};
 		FF192B3F71CF0B5F9815F3F0 /* UI */ = {
@@ -316,6 +327,7 @@
 				1EF96EFD252F0C8C6146CD9D /* SeleniteApp.swift in Sources */,
 				254805DE344BBFCC597A314F /* SettingsView.swift in Sources */,
 				1A5037371D94DD06B9D0A982 /* SplitInput.swift in Sources */,
+				9546C00191F51DA116A05798 /* SplitWizardView.swift in Sources */,
 				C9D3D7D4294509AB483C9F86 /* StreamContainer.swift in Sources */,
 				3444C9834442D162D4AFDEE1 /* StreamCoverView.swift in Sources */,
 				37E4DAF36DD2A84FC1F1BFD5 /* StreamLoadingView.swift in Sources */,

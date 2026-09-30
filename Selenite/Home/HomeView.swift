@@ -79,6 +79,16 @@ private struct HostRow: View {
                     DiscoveredHostCard(host: host) { model.addHostRequest = .discovered(host) }
                 }
                 AddHostCard { model.addHostRequest = .new }
+                if model.directory.hosts.count >= 2 {
+                    SplitCard { model.openSplitWizard() }
+                }
+                if let plan = quickSplitPlan {
+                    QuickSplitCard(plan: plan,
+                                   firstHostName: hostName(plan.first.hostID),
+                                   secondHostName: hostName(plan.second.hostID)) {
+                        model.startQuickSplit()
+                    }
+                }
             }
             .padding(.vertical, 30)
             .padding(.horizontal, 12)
@@ -86,6 +96,64 @@ private struct HostRow: View {
         .scrollClipDisabled()
         .defaultFocus($focusedHostID, model.selectedHost?.id, priority: .userInitiated)
         .frame(height: 250)
+    }
+
+    /// The last split, only while both of its hosts are still paired.
+    private var quickSplitPlan: SplitPlan? {
+        guard let plan = model.splitStore.plan,
+              model.directory.hosts.contains(where: { $0.id == plan.first.hostID }),
+              model.directory.hosts.contains(where: { $0.id == plan.second.hostID }) else { return nil }
+        return plan
+    }
+
+    private func hostName(_ hostID: String) -> String {
+        model.directory.snapshot(id: hostID)?.host.name ?? ""
+    }
+}
+
+private struct SplitCard: View {
+    let action: () -> Void
+
+    var body: some View {
+        FocusableCard(action: action) { focused in
+            VStack(spacing: 16) {
+                Image(systemName: "rectangle.split.2x1")
+                    .font(.system(size: 44, weight: .semibold))
+                Text("Split screen")
+                    .font(.headline)
+            }
+            .frame(width: 240, height: 170)
+            .background(RoundedRectangle(cornerRadius: 20).fill(focused ? Color.Theme.surfaceElevated : Color.Theme.surface))
+            .overlay(HostRowCardEdge(isFocused: focused))
+        }
+    }
+}
+
+/// Starts the last split again: the two games on their two hosts.
+private struct QuickSplitCard: View {
+    let plan: SplitPlan
+    let firstHostName: String
+    let secondHostName: String
+    let action: () -> Void
+
+    var body: some View {
+        FocusableCard(action: action) { focused in
+            VStack(alignment: .leading, spacing: 12) {
+                Image(systemName: "play.rectangle.on.rectangle")
+                    .font(.system(size: 40))
+                Text("\(plan.first.app.title) + \(plan.second.app.title)")
+                    .font(.headline)
+                    .lineLimit(1)
+                Text("\(firstHostName) + \(secondHostName)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            .padding(24)
+            .frame(width: 320, height: 170, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 20).fill(focused ? Color.Theme.surfaceElevated : Color.Theme.surface))
+            .overlay(HostRowCardEdge(isFocused: focused))
+        }
     }
 }
 
