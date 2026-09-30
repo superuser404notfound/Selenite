@@ -188,6 +188,12 @@ public final class StreamController: Identifiable {
         finish(failure: nil, quitGame: true)
     }
 
+    /// Split: the overlay confirms, then the side stops and the game quits on the host.
+    public func quitGame() {
+        guard phase == .running || phase == .waitingForPicture else { return }
+        finish(failure: nil, quitGame: true)
+    }
+
     func handle(_ event: StreamEvent) {
         guard ending == nil else { return }
         switch event {

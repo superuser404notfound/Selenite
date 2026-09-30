@@ -428,3 +428,16 @@ private final class FakeCommands: HostCommands, @unchecked Sendable {
     rig.controller.checkFirstFrame()
     #expect(running == 0)
 }
+
+@MainActor @Test func quitGameStopsThenQuitsWithoutTheOverlay() async {
+    let rig = await runningRig()
+    #expect(!rig.controller.isOverlayOpen)
+    rig.controller.quitGame()
+    let during: StreamEnding? = rig.controller.ending
+    #expect(during == .quittingGame)
+    await rig.controller.endTask?.value
+    let quits: [Int] = rig.commands.stopsAtQuit
+    let calls: [StreamFailure?] = rig.ended.calls
+    #expect(quits == [1])
+    #expect(calls == [nil])
+}
