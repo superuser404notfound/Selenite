@@ -217,9 +217,9 @@ private struct WizardHostCard: View {
                 if isSelectable {
                     HStack(spacing: 10) {
                         Circle()
-                            .fill(statusColor)
+                            .fill(snapshot.statusColor)
                             .frame(width: 14, height: 14)
-                        Text(statusText)
+                        Text(snapshot.statusText)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -234,24 +234,6 @@ private struct WizardHostCard: View {
             .background(RoundedRectangle(cornerRadius: 20).fill(focused ? Color.Theme.surfaceElevated : Color.Theme.surface))
             .overlay(HostRowCardEdge(isFocused: focused))
             .opacity(isSelectable ? 1 : 0.45)
-        }
-    }
-
-    private var statusText: LocalizedStringKey {
-        switch snapshot.status {
-        case .unknown: "Checking…"
-        case .offline: HostWaker.canWake(snapshot.host) ? "Asleep" : "Offline"
-        case .online: "Online"
-        case .busy: "Busy"
-        }
-    }
-
-    private var statusColor: Color {
-        switch snapshot.status {
-        case .unknown: .gray
-        case .offline: HostWaker.canWake(snapshot.host) ? .gray : Color.Theme.destructive
-        case .online: Color.Theme.success
-        case .busy: Color.Theme.warning
         }
     }
 }
