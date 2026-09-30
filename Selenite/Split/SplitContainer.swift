@@ -20,6 +20,12 @@ struct SplitContainer: UIViewControllerRepresentable {
     }
 
     func updateUIViewController(_ container: SplitContainerController, context: Context) {}
+
+    /// The split ends here and only here: a disappear also comes with a presentation over the split
+    /// (the one-side game wizard), which must not stop the remotes, the pacer or the display mode.
+    static func dismantleUIViewController(_ container: SplitContainerController, coordinator: ()) {
+        container.teardown()
+    }
 }
 
 /// Which half a side shows in: `first` left or top, swapped when `isSwapped`.
@@ -82,11 +88,6 @@ final class SplitContainerController: GCEventViewController {
         host.view.backgroundColor = .clear
         observeChoosingGame()
         startObservingRemotes()
-    }
-
-    override func viewDidDisappear(_ animated: Bool) {
-        super.viewDidDisappear(animated)
-        teardown()
     }
 
     /// The one-side game wizard is a focus panel: controllers navigate it through UIKit while it is up.
@@ -221,11 +222,12 @@ final class SplitContainerController: GCEventViewController {
         split.menuPressed(now: released)
     }
 
-    private func teardown() {
+    func teardown() {
         guard !tornDown else { return }
         tornDown = true
         stopObservingRemotes()
         controllerUserInteractionEnabled = true
+        surface.teardown()
     }
 }
 
@@ -274,17 +276,13 @@ final class SplitSurfaceController: UIViewController {
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        guard !tornDown else { return }
         UIApplication.shared.isIdleTimerDisabled = true
         if let window = view.window {
             displayWindow = window
             DisplayModeController.apply(hdr: false, refreshRate: 60, window: window)
         }
         pacer.start()
-    }
-
-    override func viewDidDisappear(_ animated: Bool) {
-        super.viewDidDisappear(animated)
-        teardown()
     }
 
     func setAcceptsFocus(_ accepts: Bool) {
@@ -312,7 +310,8 @@ final class SplitSurfaceController: UIViewController {
         view.setNeedsLayout()
     }
 
-    private func teardown() {
+    /// Called by `SplitContainerController.teardown` only, never on a disappear.
+    func teardown() {
         guard !tornDown else { return }
         tornDown = true
         UIApplication.shared.isIdleTimerDisabled = false
