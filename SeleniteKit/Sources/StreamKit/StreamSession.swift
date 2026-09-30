@@ -309,10 +309,14 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
     }
 
     /// This session's level in the shared mixer, 0...1; kept for an audio stream that starts later.
+    /// Stored and applied under the lock, as `audioInit` attaches and applies, so whichever runs
+    /// second sees the other's write and the mixer always ends on the last level set.
     public func setVolume(_ volume: Float) {
         let clamped = min(max(volume, 0), 1)
-        lock.lock(); self.volume = clamped; let stream = audio; lock.unlock()
-        stream?.setVolume(clamped)
+        lock.withLock {
+            self.volume = clamped
+            audio?.setVolume(clamped)
+        }
     }
 
     private func keep(_ string: String) -> UnsafeMutablePointer<CChar> {
@@ -359,8 +363,10 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
     public func audioInit(_ config: OPUS_MULTISTREAM_CONFIGURATION) -> Int32 {
         do {
             let stream = try AudioStream(config: config)
-            lock.lock(); audio = stream; let volume = self.volume; lock.unlock()
-            stream.setVolume(volume)
+            lock.withLock {
+                audio = stream
+                stream.setVolume(volume)
+            }
             return 0
         } catch {
             NSLog("StreamSession: audio init failed on slot %@: %@", String(describing: slot), String(describing: error))
