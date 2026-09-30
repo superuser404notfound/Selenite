@@ -439,7 +439,8 @@ public final class SplitController: Identifiable {
     private func stopAll(as end: SideEnd) {
         for side in SplitSide.allCases {
             if let stream = streams[side] {
-                pendingEnd[side] = end
+                // A quit racing the background still ends as quit, so A never relaunches it.
+                if pendingEnd[side] != .quit { pendingEnd[side] = end }
                 stream.disconnect()
             } else if startTasks[side] != nil {
                 cancelStart(side, end: end)

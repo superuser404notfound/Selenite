@@ -496,6 +496,19 @@ private func host(_ id: String) -> PairedHost {
     #expect(rig.input.stopped == 0)
 }
 
+@MainActor @Test func backgroundKeepsAPendingQuit() async {
+    let rig = await startedRig()
+    rig.controller.secondaryAction(.first)
+    rig.controller.secondaryAction(.first)
+    #expect(rig.controller.streams[.first]?.ending == .quittingGame)
+    rig.controller.suspend()
+    let settled = await eventually {
+        rig.state(.first) != .streaming && rig.state(.second) == .ended(.suspended)
+    }
+    #expect(settled)
+    #expect(rig.state(.first) == .ended(.quit))
+}
+
 @MainActor @Test func menuWhileJoiningCancelsBackToTheWizard() {
     let rig = Rig()
     rig.send(Pad(), .a(.center))
