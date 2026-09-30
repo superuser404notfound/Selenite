@@ -14,6 +14,7 @@ public protocol StreamSessionHandle: AnyObject, Sendable {
     func sendMouseMove(dx: Int16, dy: Int16)
     func sendMouseButton(_ button: MouseButton, pressed: Bool)
     func sendScroll(amount: Int16)
+    func setVolume(_ volume: Float)
 }
 
 extension StreamSession: StreamSessionHandle {}

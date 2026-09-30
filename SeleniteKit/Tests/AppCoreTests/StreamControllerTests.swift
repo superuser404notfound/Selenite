@@ -38,6 +38,7 @@ private final class FakeSession: StreamSessionHandle, @unchecked Sendable {
     func sendMouseButton(_ button: MouseButton, pressed: Bool) {
         lock.withLock { _mouse.append("\(button) \(pressed ? "down" : "up")") }
     }
+    func setVolume(_ volume: Float) {}
     func presentFirstFrame() { lock.withLock { _presented = 1 } }
 
     func completeStart() {

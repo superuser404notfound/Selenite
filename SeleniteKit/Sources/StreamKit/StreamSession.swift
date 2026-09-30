@@ -91,6 +91,8 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
     private let lock = NSLock()
     private var pipeline: VideoPipeline?
     private var audio: AudioStream?
+    /// This session's level in the shared mixer, 0...1; kept for an audio stream that starts later.
+    private var volume: Float = 1
     /// Set right before the /launch or /resume request is sent, so a stop knows the host may
     /// already be running the app even if that request never returned.
     private var launchIssued = false
@@ -306,6 +308,13 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
                            audio: audio?.stats)
     }
 
+    /// This session's level in the shared mixer, 0...1; kept for an audio stream that starts later.
+    public func setVolume(_ volume: Float) {
+        let clamped = min(max(volume, 0), 1)
+        lock.lock(); self.volume = clamped; let stream = audio; lock.unlock()
+        stream?.setVolume(clamped)
+    }
+
     private func keep(_ string: String) -> UnsafeMutablePointer<CChar> {
         let pointer = strdup(string)!
         lock.lock(); cStrings.append(pointer); lock.unlock()
@@ -350,7 +359,8 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
     public func audioInit(_ config: OPUS_MULTISTREAM_CONFIGURATION) -> Int32 {
         do {
             let stream = try AudioStream(config: config)
-            lock.lock(); audio = stream; lock.unlock()
+            lock.lock(); audio = stream; let volume = self.volume; lock.unlock()
+            stream.setVolume(volume)
             return 0
         } catch {
             NSLog("StreamSession: audio init failed on slot %@: %@", String(describing: slot), String(describing: error))

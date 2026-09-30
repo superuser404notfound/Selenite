@@ -104,4 +104,28 @@ public enum StreamSettingsResolver {
             return hostCodecModeSupport & Int32(SCM_HEVC) != 0 ? .hevc : .h264
         }
     }
+
+    /// One side of a split (M2 spec, section 3): 60 fps, SDR and stereo whatever the preferences
+    /// say, half the global bitrate, codec and pacing as chosen.
+    public static func resolveSplit(_ preferences: StreamPreferences, layout: SplitLayout, format: SplitFormat,
+                                    display: DisplayMode, hostCodecModeSupport: Int32) -> StreamSettings {
+        let display = display.width > 0 && display.height > 0 && display.refreshRate > 0 ? display : fallbackDisplay
+        let (width, height) = splitSize(layout: layout, format: format, display: display)
+        return StreamSettings(
+            width: width, height: height,
+            fps: 60,
+            bitrateKbps: preferences.bitrateMbps * 1000 / 2,
+            hdr: false,
+            audio: .stereo,
+            codec: codec(for: preferences.codec, hostCodecModeSupport: hostCodecModeSupport),
+            pacing: preferences.pacing,
+            directPresent: preferences.directPresent)
+    }
+
+    static func splitSize(layout: SplitLayout, format: SplitFormat, display: DisplayMode) -> (Int, Int) {
+        let half = layout == .sideBySide ? (display.width / 2, display.height) : (display.width, display.height / 2)
+        guard format == .sixteenByNine else { return (half.0 & ~1, half.1 & ~1) }
+        let width = min(half.0, half.1 * 16 / 9)
+        return (width & ~1, (width * 9 / 16) & ~1)
+    }
 }

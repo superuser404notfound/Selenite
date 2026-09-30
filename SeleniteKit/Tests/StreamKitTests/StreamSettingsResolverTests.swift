@@ -148,3 +148,68 @@ private func resolve(_ preferences: StreamPreferences, display: DisplayMode = di
         #expect(directPresent == value)
     }
 }
+
+private let panel4K = DisplayMode(width: 3840, height: 2160, refreshRate: 60)
+
+@Test func splitFillHalfSideBySideOn4K() {
+    let s = StreamSettingsResolver.resolveSplit(StreamPreferences(), layout: .sideBySide, format: .fillHalf,
+                                                display: panel4K, hostCodecModeSupport: 0)
+    #expect(s.width == 1920)
+    #expect(s.height == 2160)
+}
+
+@Test func splitFillHalfTopBottomOn4K() {
+    let s = StreamSettingsResolver.resolveSplit(StreamPreferences(), layout: .topBottom, format: .fillHalf,
+                                                display: panel4K, hostCodecModeSupport: 0)
+    #expect(s.width == 3840)
+    #expect(s.height == 1080)
+}
+
+@Test func splitSixteenByNineIs1080pInBothLayoutsOn4K() {
+    for layout in SplitLayout.allCases {
+        let s = StreamSettingsResolver.resolveSplit(StreamPreferences(), layout: layout, format: .sixteenByNine,
+                                                    display: panel4K, hostCodecModeSupport: 0)
+        #expect(s.width == 1920)
+        #expect(s.height == 1080)
+    }
+}
+
+@Test func splitOn1080pPanelHalvesTheSmallerScreen() {
+    let panel = DisplayMode(width: 1920, height: 1080, refreshRate: 60)
+    let fill = StreamSettingsResolver.resolveSplit(StreamPreferences(), layout: .sideBySide, format: .fillHalf,
+                                                   display: panel, hostCodecModeSupport: 0)
+    let wide = StreamSettingsResolver.resolveSplit(StreamPreferences(), layout: .sideBySide, format: .sixteenByNine,
+                                                   display: panel, hostCodecModeSupport: 0)
+    #expect(fill.width == 960 && fill.height == 1080)
+    #expect(wide.width == 960 && wide.height == 540)
+}
+
+@Test func splitIsSixtyFpsSdrStereoAtHalfTheBitrate() {
+    var preferences = StreamPreferences()
+    preferences.bitrateMbps = 150
+    preferences.frameRate = .fps30
+    preferences.audio = .automatic
+    let s = StreamSettingsResolver.resolveSplit(preferences, layout: .sideBySide, format: .fillHalf,
+                                                display: panel4K, hostCodecModeSupport: 0)
+    #expect(s.fps == 60)
+    #expect(s.hdr == false)
+    #expect(s.audio == .stereo)
+    #expect(s.bitrateKbps == 75_000)
+}
+
+@Test func splitKeepsCodecAndPacingChoices() {
+    var preferences = StreamPreferences()
+    preferences.codec = .h264
+    preferences.pacing = .smooth
+    let s = StreamSettingsResolver.resolveSplit(preferences, layout: .topBottom, format: .fillHalf,
+                                                display: panel4K, hostCodecModeSupport: 0)
+    #expect(s.codec == .h264)
+    #expect(s.pacing == .smooth)
+}
+
+@Test func splitFallsBackOnAnUnreadableDisplay() {
+    let s = StreamSettingsResolver.resolveSplit(StreamPreferences(), layout: .sideBySide, format: .fillHalf,
+                                                display: DisplayMode(width: 0, height: 0, refreshRate: 0),
+                                                hostCodecModeSupport: 0)
+    #expect(s.width == 960 && s.height == 1080)
+}
