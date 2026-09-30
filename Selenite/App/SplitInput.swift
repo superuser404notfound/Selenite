@@ -10,6 +10,7 @@ final class SplitInput: SplitInputHandle {
     private let lobby = ControllerLobby()
     private var sides: [SplitSide: SideInput] = [:]
     private(set) var seats = SeatMap()
+    private(set) var isReassigning = false
 
     var onEvent: (@MainActor (PadID, LobbyEvent) -> Void)? {
         get { lobby.onEvent }
@@ -46,6 +47,7 @@ final class SplitInput: SplitInputHandle {
     }
 
     func setReassigning(_ reassigning: Bool) {
+        isReassigning = reassigning
         lobby.includesClaimed = reassigning
         for side in sides.values { side.setForwarding(!reassigning) }
     }
@@ -98,7 +100,9 @@ private final class SideInput: StreamInput {
         let manager = ControllerManager(
             sink: session,
             admits: { [weak owner] controller in owner?.seats.side(of: ObjectIdentifier(controller)) == side },
-            lightIndex: side == .first ? .index1 : .index2)
+            lightIndex: side == .first ? .index1 : .index2, masksJoiningPress: true)
+        // A side that connects during Reassign stays quiet until the join screen closes.
+        manager.isForwarding = owner?.isReassigning != true
         manager.onInput = { [weak owner] id, pad in owner?.lobbyIngest(id, pad) }
         let feedback = ControllerFeedback(manager: manager)
         feedback.sink = session

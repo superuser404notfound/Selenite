@@ -40,15 +40,18 @@ public final class ControllerManager {
     private var observers: [NSObjectProtocol] = []
     private let admits: @MainActor (GCController) -> Bool
     private let lightIndex: GCControllerPlayerIndex?
+    /// Split only: the buttons a pad holds when it is taken stay off the host until released.
+    private let masksJoiningPress: Bool
     /// Every input report of a held controller, before it is forwarded; the split lobby listens
     /// here while controllers are reassigned.
     public var onInput: (@MainActor (PadID, GCExtendedGamepad) -> Void)?
 
     public init(sink: any ControllerEventSink, admits: @escaping @MainActor (GCController) -> Bool = { _ in true },
-                lightIndex: GCControllerPlayerIndex? = nil) {
+                lightIndex: GCControllerPlayerIndex? = nil, masksJoiningPress: Bool = false) {
         forwarder = ControllerForwarder(sink: sink)
         self.admits = admits
         self.lightIndex = lightIndex
+        self.masksJoiningPress = masksJoiningPress
     }
 
     /// False while the stream overlay owns the input. Pausing sends one neutral state per
@@ -166,9 +169,14 @@ public final class ControllerManager {
         gamepad.valueChangedHandler = { [weak self, weak controller] pad, _ in
             MainActor.assumeIsolated {
                 guard let self, let controller, self.controllers[number] === controller else { return }
-                self.onInput?(id, pad)
+                // Forward first: a Start that finishes reassigning resumes forwarding from inside
+                // onInput, and the resume must already see Start held to mask it.
                 self.send(pad, number: number)
+                self.onInput?(id, pad)
             }
+        }
+        if masksJoiningPress {
+            forwarder.maskUntilReleased(number: number, buttons: GamepadMapper.state(from: Self.snapshot(of: gamepad)).buttons)
         }
         send(gamepad, number: number)
     }
