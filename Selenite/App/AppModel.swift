@@ -524,6 +524,8 @@ final class AppModel {
     // MARK: Split
 
     func openSplitWizard() {
+        guard activeStream == nil, activeSplit == nil, !isStarting, !isQuitting, canPresentPanel,
+              splitWizard == nil else { return }
         splitWizard = SplitWizardModel(startingFrom: splitStore.plan)
     }
 
@@ -564,7 +566,7 @@ final class AppModel {
     }
 
     private func startSplit(_ plan: SplitPlan) {
-        guard activeStream == nil, activeSplit == nil, !isStarting, !isQuitting else { return }
+        guard activeStream == nil, activeSplit == nil, !isStarting, !isQuitting, !isBackgrounded else { return }
         directory.stopPolling()
         discovery.stop()
         let controller = SplitController(plan: plan, dependencies: makeSplitDependencies(),

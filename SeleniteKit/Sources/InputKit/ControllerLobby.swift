@@ -32,6 +32,9 @@ public final class ControllerLobby {
     private var detector = LobbyEdgeDetector()
     private var adopted: [PadID: GCController] = [:]
     private var observers: [NSObjectProtocol] = []
+    /// The connected set last reported: a refresh reports only a change, so a caller that
+    /// refreshes from inside `onPadsChanged` does not recurse.
+    private var reportedLive: Set<PadID>?
 
     public init() {}
 
@@ -52,6 +55,7 @@ public final class ControllerLobby {
         for controller in adopted.values { controller.extendedGamepad?.valueChangedHandler = nil }
         adopted.removeAll()
         detector = LobbyEdgeDetector()
+        reportedLive = nil
     }
 
     /// Adopts every connected gamepad no manager holds, lets go of the ones a manager took over,
@@ -75,6 +79,8 @@ public final class ControllerLobby {
                 MainActor.assumeIsolated { self?.ingest(id, pad) }
             }
         }
+        guard live != reportedLive else { return }
+        reportedLive = live
         onPadsChanged?(live)
     }
 
