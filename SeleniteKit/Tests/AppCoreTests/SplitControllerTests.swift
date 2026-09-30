@@ -106,9 +106,7 @@ private func host(_ id: String) -> PairedHost {
 
 @MainActor private final class Rig {
     let hosts = ["A": host("A"), "B": host("B"), "C": host("C")]
-    let plan = SplitPlan(first: SplitSideChoice(hostID: "A", app: appA),
-                         second: SplitSideChoice(hostID: "B", app: appB),
-                         layout: .sideBySide, format: .fillHalf)
+    let plan: SplitPlan
     let input = FakeSplitInput()
     let store = SplitStore(defaults: UserDefaults(suiteName: "split-controller-\(UUID().uuidString)")!)
     var failures: [String: any Error] = [:]
@@ -124,7 +122,10 @@ private func host(_ id: String) -> PairedHost {
     /// Pads stay alive for the whole test, so a new pad never reuses a released one's identity.
     var pads: [Pad] = []
 
-    init(volumes: [SplitSide: Float] = [:], quitError: (any Error)? = nil) {
+    init(volumes: [SplitSide: Float] = [:], quitError: (any Error)? = nil, layout: SplitLayout = .sideBySide) {
+        plan = SplitPlan(first: SplitSideChoice(hostID: "A", app: appA),
+                         second: SplitSideChoice(hostID: "B", app: appB),
+                         layout: layout, format: .fillHalf)
         for (side, volume) in volumes { store.setVolume(volume, for: side) }
         let deps = SplitDependencies(
             host: { [unowned self] id in hosts[id] },
@@ -203,6 +204,50 @@ private func host(_ id: String) -> PairedHost {
     #expect(rig.controller.seats.side(of: two.id) == nil)
     #expect(rig.input.applied.count == 4)
     #expect(rig.input.applied.last == rig.controller.seats)
+}
+
+@MainActor @Test func aDirectionPointsAtTheHalfOnScreenAfterASwap() {
+    let rig = Rig()
+    let one = Pad(), two = Pad()
+    rig.send(one, .a(.left))
+    #expect(rig.controller.seats.side(of: one.id) == .first)
+    rig.controller.swapSides()
+    rig.send(two, .a(.left))
+    #expect(rig.controller.seats.side(of: two.id) == .second)
+    rig.send(one, .a(.left))
+    #expect(rig.controller.seats.side(of: one.id) == .second)
+    rig.send(one, .a(.right))
+    #expect(rig.controller.seats.side(of: one.id) == .first)
+}
+
+@MainActor @Test func upPointsAtTheLowerHalfAfterASwapInTopAndBottom() {
+    let rig = Rig(layout: .topBottom)
+    let one = Pad(), two = Pad()
+    rig.send(one, .a(.up))
+    #expect(rig.controller.seats.side(of: one.id) == .first)
+    rig.controller.swapSides()
+    rig.send(two, .a(.up))
+    #expect(rig.controller.seats.side(of: two.id) == .second)
+}
+
+@MainActor @Test func theFewerPlayersFallbackIgnoresTheSwap() {
+    let rig = Rig()
+    rig.controller.swapSides()
+    let one = Pad()
+    rig.send(one, .a(.center))
+    #expect(rig.controller.seats.side(of: one.id) == .first)
+}
+
+@MainActor @Test func reassignAndNewControllerFollowTheSwap() async {
+    let (rig, one, _) = await runningRig()
+    rig.controller.swapSides()
+    let three = Pad()
+    rig.send(three, .a(.center))
+    rig.send(three, .a(.left))
+    #expect(rig.controller.seats.side(of: three.id) == .second)
+    rig.controller.reassignControllers()
+    rig.send(one, .a(.right))
+    #expect(rig.controller.seats.side(of: one.id) == .first)
 }
 
 @MainActor @Test func startNeedsBothSidesAndASeatedPad() async {

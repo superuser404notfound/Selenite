@@ -17,7 +17,7 @@ struct SplitScreenView: View {
                     let frame = SplitGeometry.frame(of: side, in: bounds, layout: split.plan.layout,
                                                     swapped: split.isSwapped)
                     SplitHalfView(split: split, side: side, hostName: hostName(side), isJoining: isJoining)
-                        .padding(.bottom, isJoining ? 140 : 0)
+                        .padding(.bottom, isJoining && frame.maxY >= bounds.maxY ? 140 : 0)
                         .frame(width: frame.width, height: frame.height)
                         .position(x: frame.midX, y: frame.midY)
                 }

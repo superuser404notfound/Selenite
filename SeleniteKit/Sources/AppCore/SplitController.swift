@@ -273,7 +273,7 @@ public final class SplitController: Identifiable {
                 guard let target = explicitSide(direction), target != current else { return }
                 seat(pad, on: target)
             } else {
-                seat(pad, on: seats.joinSide(for: direction, stacked: isStacked))
+                seat(pad, on: joinSide(for: direction))
             }
         case .b:
             guard seats.side(of: pad) != nil else { return }
@@ -300,7 +300,7 @@ public final class SplitController: Identifiable {
         case .a(let direction):
             if seatPrompt == pad {
                 seatPrompt = nil
-                seat(pad, on: seats.joinSide(for: direction, stacked: isStacked))
+                seat(pad, on: joinSide(for: direction))
             } else {
                 seatPrompt = pad
             }
@@ -313,13 +313,20 @@ public final class SplitController: Identifiable {
 
     private var isStacked: Bool { plan.layout == .topBottom }
 
-    /// A direction along the layout's axis names a side; anything else leaves a seated pad where it is.
+    /// A direction along the layout's axis names the half it points at on screen, so after a swap
+    /// the other side; anything else leaves a seated pad where it is.
     private func explicitSide(_ direction: StickDirection) -> SplitSide? {
-        switch (direction, isStacked) {
+        let side: SplitSide? = switch (direction, isStacked) {
         case (.left, false), (.up, true): .first
         case (.right, false), (.down, true): .second
         default: nil
         }
+        return isSwapped ? side?.other : side
+    }
+
+    /// The pointed-at half, otherwise the side with fewer players.
+    private func joinSide(for direction: StickDirection) -> SplitSide {
+        explicitSide(direction) ?? seats.joinSide(for: direction, stacked: isStacked)
     }
 
     private func seat(_ pad: PadID, on side: SplitSide) {
