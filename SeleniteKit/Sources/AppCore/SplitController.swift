@@ -124,7 +124,12 @@ public final class SplitController: Identifiable {
         } else if seatPrompt != nil {
             seatPrompt = nil
         } else if isOverlayOpen {
-            closeOverlay()
+            // Like solo: Menu with the overlay open leaves the stream, after backing out of a quit.
+            if quitArmed != nil {
+                quitArmed = nil
+            } else {
+                endSplit()
+            }
         } else if !isEnding {
             cursor = OverlayCursor()
             quitArmed = nil

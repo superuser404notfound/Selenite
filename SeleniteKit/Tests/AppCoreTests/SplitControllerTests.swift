@@ -366,8 +366,31 @@ private func host(_ id: String) -> PairedHost {
     rig.controller.overlaySelect()
     #expect(rig.controller.isSwapped)
     #expect(rig.controller.isOverlayOpen)
+    rig.controller.closeOverlay()
+    #expect(!rig.controller.isOverlayOpen)
+}
+
+@MainActor @Test func menuWithTheOverlayOpenEndsTheSplitLikeSolo() async {
+    let (rig, _, _) = await runningRig()
+    rig.controller.menuPressed(now: 10)
+    #expect(rig.controller.isOverlayOpen)
     rig.controller.menuPressed(now: 11)
     #expect(!rig.controller.isOverlayOpen)
+    let finished = await eventually { rig.finished == [.ended] }
+    #expect(finished)
+}
+
+@MainActor @Test func menuBacksOutOfAnArmedQuitBeforeEnding() async {
+    let (rig, _, _) = await runningRig()
+    rig.session("A")?.presentFirstFrame()
+    _ = await eventually { rig.controller.streams[.first]?.phase == .running }
+    rig.controller.menuPressed(now: 10)
+    rig.controller.secondaryAction(.first)
+    #expect(rig.controller.quitArmed == .first)
+    rig.controller.menuPressed(now: 11)
+    #expect(rig.controller.quitArmed == nil)
+    #expect(rig.controller.isOverlayOpen)
+    #expect(rig.finished.isEmpty)
 }
 
 @MainActor @Test func overlaySelectVolumeDownFollowsTheSwappedScreenPosition() async {
@@ -380,7 +403,7 @@ private func host(_ id: String) -> PairedHost {
     #expect(abs((rig.controller.volumes[.first] ?? -1) - 0.9) < 1e-5)
     #expect(abs((rig.controller.volumes[.second] ?? -1) - 1) < 1e-5)
 
-    rig.controller.menuPressed(now: 10.4)
+    rig.controller.closeOverlay()
     rig.controller.menuPressed(now: 10.8)
     rig.controller.swapSides()
     for _ in 0..<3 { rig.controller.overlayMove(.up) }

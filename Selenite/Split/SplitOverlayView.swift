@@ -25,9 +25,12 @@ struct SplitOverlayView: View {
                 column(.second)
             }
             bottomRow
-            Text("Press Menu again to close.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
+            // Menu backs out of an armed quit first, so the hint only shows without one, as in solo.
+            if split.quitArmed == nil {
+                Text("Press Menu again to leave the stream.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding(48)
         .frame(width: 1500)
