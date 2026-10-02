@@ -25,7 +25,7 @@ struct SplitOverlayView: View {
                 column(.second)
             }
             bottomRow
-            Text("Swipe to move, click to choose. Menu closes.")
+            Text("Press Menu again to close.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
         }

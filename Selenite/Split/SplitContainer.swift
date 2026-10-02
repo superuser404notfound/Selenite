@@ -52,7 +52,6 @@ enum SplitGeometry {
 @MainActor
 final class SplitContainerController: GCEventViewController {
     private static let pressSettleDelay: Duration = .milliseconds(150)
-    private static let dpadThreshold: Float = 0.5
 
     private let split: SplitController
     private let surface: SplitSurfaceController
@@ -60,8 +59,8 @@ final class SplitContainerController: GCEventViewController {
     private var tornDown = false
     private var remoteObservers: [NSObjectProtocol] = []
     private var remotes: [ObjectIdentifier: GCController] = [:]
-    /// The direction each Siri Remote's touch surface last pointed past the threshold.
-    private var dpadDirections: [ObjectIdentifier: OverlayDirection] = [:]
+    /// One per Siri Remote: swipes and edge clicks move the overlay cursor, a centre click selects.
+    private var navigators: [ObjectIdentifier: RemoteNavigator] = [:]
     private var lastRemoteMenu = -Double.infinity
 
     init(split: SplitController, content: AnyView) {
@@ -126,12 +125,13 @@ final class SplitContainerController: GCEventViewController {
         let live = Set(connected.map(ObjectIdentifier.init))
         for id in remotes.keys where !live.contains(id) {
             if let gone = remotes.removeValue(forKey: id) { Self.clearHandlers(gone) }
-            dpadDirections.removeValue(forKey: id)
+            navigators.removeValue(forKey: id)
         }
         for controller in connected where remotes[ObjectIdentifier(controller)] == nil {
             guard controller.extendedGamepad == nil, let pad = controller.microGamepad else { continue }
             let id = ObjectIdentifier(controller)
-            pad.reportsAbsoluteDpadValues = false
+            pad.reportsAbsoluteDpadValues = true
+            navigators[id] = RemoteNavigator()
             pad.buttonMenu.pressedChangedHandler = { [weak self] _, _, pressed in
                 MainActor.assumeIsolated { self?.remoteMenuChanged(pressed: pressed) }
             }
@@ -139,7 +139,7 @@ final class SplitContainerController: GCEventViewController {
                 MainActor.assumeIsolated { self?.remoteDpadChanged(id: id, x: x, y: y) }
             }
             pad.buttonA.pressedChangedHandler = { [weak self] _, _, pressed in
-                MainActor.assumeIsolated { self?.remoteSelectChanged(pressed: pressed) }
+                MainActor.assumeIsolated { self?.remoteClickChanged(id: id, pressed: pressed) }
             }
             remotes[id] = controller
         }
@@ -150,6 +150,7 @@ final class SplitContainerController: GCEventViewController {
         pad.buttonMenu.pressedChangedHandler = nil
         pad.dpad.valueChangedHandler = nil
         pad.buttonA.pressedChangedHandler = nil
+        pad.reportsAbsoluteDpadValues = false
     }
 
     private func stopObservingRemotes() {
@@ -157,7 +158,7 @@ final class SplitContainerController: GCEventViewController {
         remoteObservers.removeAll()
         for controller in remotes.values { Self.clearHandlers(controller) }
         remotes.removeAll()
-        dpadDirections.removeAll()
+        navigators.removeAll()
     }
 
     private func remoteMenuChanged(pressed: Bool) {
@@ -167,25 +168,32 @@ final class SplitContainerController: GCEventViewController {
         split.menuPressed(now: now)
     }
 
-    /// One move per swipe: a direction counts when the dominant axis first passes the threshold.
     private func remoteDpadChanged(id: ObjectIdentifier, x: Float, y: Float) {
-        guard !tornDown else { return }
-        let direction: OverlayDirection? = if max(abs(x), abs(y)) <= Self.dpadThreshold {
-            nil
-        } else if abs(x) >= abs(y) {
-            x > 0 ? .right : .left
-        } else {
-            y > 0 ? .up : .down
-        }
-        let previous = dpadDirections[id]
-        dpadDirections[id] = direction
-        guard let direction, direction != previous, split.isOverlayOpen else { return }
-        split.overlayMove(direction)
+        guard !tornDown, var navigator = navigators[id] else { return }
+        let events = navigator.touch(x: x, y: y)
+        navigators[id] = navigator
+        apply(events)
     }
 
-    private func remoteSelectChanged(pressed: Bool) {
-        guard !pressed, !tornDown, split.isOverlayOpen else { return }
-        split.overlaySelect()
+    private func remoteClickChanged(id: ObjectIdentifier, pressed: Bool) {
+        guard !tornDown, var navigator = navigators[id] else { return }
+        let events = navigator.click(pressed: pressed)
+        navigators[id] = navigator
+        apply(events)
+    }
+
+    private func apply(_ events: [RemoteNavigator.Event]) {
+        guard split.isOverlayOpen else { return }
+        for event in events {
+            switch event {
+            case .select: split.overlaySelect()
+            case .move(.left): split.overlayMove(.left)
+            case .move(.right): split.overlayMove(.right)
+            case .move(.up): split.overlayMove(.up)
+            case .move(.down): split.overlayMove(.down)
+            case .move(.center): break
+            }
+        }
     }
 
     // MARK: UIKit presses

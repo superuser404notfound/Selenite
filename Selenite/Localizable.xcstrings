@@ -280,6 +280,9 @@
     "Press B to cancel" : {
 
     },
+    "Press Menu again to close." : {
+
+    },
     "Press Menu again to leave the stream." : {
 
     },
@@ -398,9 +401,6 @@
 
     },
     "Swap sides" : {
-
-    },
-    "Swipe to move, click to choose. Menu closes." : {
 
     },
     "The app list could not be loaded." : {
