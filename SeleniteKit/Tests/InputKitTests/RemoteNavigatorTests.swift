@@ -42,13 +42,10 @@ import Testing
     #expect(nav.click(pressed: true) == [.select])
 }
 
-@Test func aClickOnTheEdgeMovesThatWay() {
+@Test func aClickSelectsWhereverTheFingerRests() {
     var nav = RemoteNavigator()
     _ = nav.touch(x: 0.85, y: 0.1)
-    #expect(nav.click(pressed: true) == [.move(.right)])
-    _ = nav.click(pressed: false)
-    _ = nav.touch(x: 0.1, y: -0.8)
-    #expect(nav.click(pressed: true) == [.move(.down)])
+    #expect(nav.click(pressed: true) == [.select])
 }
 
 @Test func movementWhileClickedIsNotASwipe() {

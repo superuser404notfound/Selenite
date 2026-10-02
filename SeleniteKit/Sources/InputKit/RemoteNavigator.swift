@@ -1,6 +1,7 @@
-/// The Siri Remote as a menu remote for a cursor that is not UIKit focus (the split overlay): a
-/// swipe moves one step per `swipeStep` of travel, a click on the edge of the surface moves one
-/// step that way, a click in the middle selects, as tvOS does for focus.
+/// The Siri Remote's touch surface as a menu remote for a cursor that is not UIKit focus (the split
+/// overlay): a swipe moves one step per `swipeStep` of travel, a click selects. A click on the
+/// surface's edge never comes through here: tvOS delivers it only as a UIKit arrow press
+/// (measured on device 2026-10-02), so the split container handles those.
 ///
 /// Samples are absolute positions (`reportsAbsoluteDpadValues`), -1...1 with y up. A sample with
 /// either axis exactly 0 is the edge of a touch, never a position (see `RemotePointer`).
@@ -12,8 +13,6 @@ public struct RemoteNavigator: Sendable {
 
     /// Surface units of travel per step; the surface is 2 units wide.
     public static let swipeStep: Float = 0.5
-    /// A click this far from the centre on the dominant axis is a directional click.
-    public static let edgeClick: Float = 0.5
 
     private var anchor: (x: Float, y: Float)?
     private var position: (x: Float, y: Float)?
@@ -44,8 +43,7 @@ public struct RemoteNavigator: Sendable {
             anchor = position.map { (x: $0.x, y: $0.y) }
             return []
         }
-        guard let position, max(abs(position.x), abs(position.y)) >= Self.edgeClick else { return [.select] }
-        return [.move(Self.direction(dx: position.x, dy: position.y))]
+        return [.select]
     }
 
     private static func direction(dx: Float, dy: Float) -> StickDirection {
