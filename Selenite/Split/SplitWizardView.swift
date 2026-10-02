@@ -17,16 +17,21 @@ struct SplitWizardView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 40) {
-            header
-            step
-                .focusSection()
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        // One vertical scroll for the whole page, as on Home, so the title scrolls away with a long
+        // game grid instead of staying behind it.
+        ScrollView(.vertical) {
+            VStack(alignment: .leading, spacing: 40) {
+                header
+                step
+                    .focusSection()
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+            }
+            .padding(.horizontal, 80)
+            .padding(.top, 60)
+            .padding(.bottom, 80)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
-        .padding(.horizontal, 80)
-        .padding(.top, 60)
-        .padding(.bottom, 80)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .scrollClipDisabled()
         .background(Color.Theme.page.ignoresSafeArea())
         .focusScope(focusScope)
         // One-side mode has no layout step: the plan is already complete once the game is chosen.
@@ -104,10 +109,7 @@ struct SplitWizardView: View {
     private func gameStep(side: SplitSide) -> some View {
         Group {
             if let hostID = wizard.hostIDs[side], let snapshot = model.directory.snapshot(id: hostID) {
-                ScrollView(.vertical) {
-                    gameGrid(for: snapshot)
-                }
-                .scrollClipDisabled()
+                gameGrid(for: snapshot)
                 .task(id: "\(snapshot.id)|\(String(describing: snapshot.status))") {
                     await model.loadApps(for: snapshot)
                 }
