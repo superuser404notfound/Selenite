@@ -139,8 +139,13 @@ public final class AudioOutput: @unchecked Sendable {
     /// `standardFormat(sampleRate:channels:)` initializer returns nil above 2 channels, so using
     /// it here silently kept every route at stereo; 5.1 needs an explicit channel layout to reach
     /// an eARC receiver. Returns the channel count the output was connected with.
+    ///
+    /// AVAudioEngine throws (and the app aborts) when the mixer's output is disconnected while the
+    /// engine renders, which is what a second split stream attaching or one of two detaching would
+    /// do. So an output already in the wanted format is left alone, and a real change stops the
+    /// engine around the rewire. `force` is for a configuration change, which needs the rewire.
     @discardableResult
-    private func connectOutput() -> AVAudioChannelCount {
+    private func connectOutput(force: Bool = false) -> AVAudioChannelCount {
         let hardware = engine.outputNode.outputFormat(forBus: 0)
         let sampleRate = hardware.sampleRate > 0 ? hardware.sampleRate : 48000
         let wanted = AudioRoutePolicy.outputChannels(streamChannels: nodes.values.map(\.channels),
@@ -161,10 +166,24 @@ public final class AudioOutput: @unchecked Sendable {
         }
         #endif
         let format = Self.outputFormat(sampleRate: sampleRate, channelCount: AVAudioChannelCount(wanted))
+        let current = engine.mainMixerNode.outputFormat(forBus: 0)
+        let isConnected = !engine.outputConnectionPoints(for: engine.mainMixerNode, outputBus: 0).isEmpty
+        if !force, isConnected, current.channelCount == format.channelCount, current.sampleRate == format.sampleRate {
+            return format.channelCount
+        }
+        let wasRunning = engine.isRunning
+        if wasRunning { engine.stop() }
         // AVAudioEngine refuses to connect a node that is still connected to the output node
         // ("!isSrcNodeConnectedToIONode"), which a rewire after a configuration change always is.
         engine.disconnectNodeOutput(engine.mainMixerNode)
         engine.connect(engine.mainMixerNode, to: engine.outputNode, format: format)
+        if wasRunning {
+            do {
+                try engine.start()
+            } catch {
+                NSLog("[Selenite] AudioOutput: engine restart after an output change failed: %@", String(describing: error))
+            }
+        }
         return format.channelCount
     }
 
@@ -194,7 +213,7 @@ public final class AudioOutput: @unchecked Sendable {
             // A configuration change has already stopped the engine; stop it explicitly anyway so
             // the graph is never edited while it renders.
             engine.stop()
-            let outputChannels = connectOutput()
+            let outputChannels = connectOutput(force: true)
             do {
                 try engine.start()
                 NSLog("[Selenite] AudioOutput: rewired after a configuration change, output runs %d channels",
