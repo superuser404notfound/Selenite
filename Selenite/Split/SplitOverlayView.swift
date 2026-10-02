@@ -19,8 +19,8 @@ struct SplitOverlayView: View {
     }
 
     private var panel: some View {
-        VStack(spacing: 28) {
-            HStack(alignment: .top, spacing: 48) {
+        VStack(spacing: 24) {
+            HStack(alignment: .top, spacing: 64) {
                 column(.first)
                 column(.second)
             }
@@ -30,7 +30,7 @@ struct SplitOverlayView: View {
                 .foregroundStyle(.secondary)
         }
         .padding(48)
-        .frame(width: 1400)
+        .frame(width: 1500)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 32))
         .overlay(RoundedRectangle(cornerRadius: 32).strokeBorder(Color.Theme.panelEdge, lineWidth: 1))
     }
@@ -48,22 +48,22 @@ struct SplitOverlayView: View {
 
     private func column(_ position: SplitSide) -> some View {
         let side = split.realSide(position)
-        return VStack(alignment: .leading, spacing: 14) {
-            Text(columnTitle(position))
-                .font(.caption)
-                .fontWeight(.semibold)
-                .foregroundStyle(.secondary)
-            VStack(alignment: .leading, spacing: 4) {
+        return VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(columnTitle(position))
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.secondary)
                 Text(split.plan[side].app.title)
-                    .font(.title3)
+                    .font(.title2)
                     .fontWeight(.bold)
                     .lineLimit(1)
                 Text(hostName(side))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
-            if let stats = split.streams[side]?.liveStats {
-                CompactStatsPill(stats: stats)
+            if let stream = split.streams[side], let stats = stream.liveStats {
+                OverlayStats(stats: stats, pacing: stream.settings.pacing)
             }
             volumeRow(position: position, side: side)
             labelCell(.primary(position), label: primaryLabel(side),
@@ -149,8 +149,11 @@ struct SplitOverlayView: View {
         OverlayCell(isHighlighted: split.cursor.item == target, isDestructive: isDestructive, isDimmed: isDimmed) {
             Text(label)
                 .font(.headline)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
+                .padding(.vertical, 18)
+                .padding(.horizontal, 20)
         }
     }
 
@@ -158,13 +161,14 @@ struct SplitOverlayView: View {
         OverlayCell(isHighlighted: split.cursor.item == target) {
             Image(systemName: systemImage)
                 .font(.headline)
-                .frame(width: 44, height: 44)
+                .frame(width: 64, height: 56)
         }
     }
 }
 
-/// One item in the overlay: highlighted with a tint fill and a 1.05 scale when the cursor sits on
-/// it. Never a `Button`, the cursor drives selection, not UIKit focus.
+/// One item in the overlay, drawn like the solo overlay's tvOS buttons: a capsule on a faint fill
+/// at rest, white and lifted under the cursor. Never a `Button`, the cursor drives selection, not
+/// UIKit focus.
 private struct OverlayCell<Content: View>: View {
     let isHighlighted: Bool
     var isDestructive = false
@@ -173,10 +177,17 @@ private struct OverlayCell<Content: View>: View {
 
     var body: some View {
         content()
-            .foregroundStyle(isDestructive ? Color.Theme.destructive : Color.primary)
+            .fontWeight(isHighlighted ? .semibold : .regular)
+            .foregroundStyle(foreground)
+            .background(isHighlighted ? Color.white : Color.Theme.restFill, in: Capsule())
             .opacity(isDimmed ? 0.4 : 1)
-            .background(isHighlighted ? AnyShapeStyle(.tint) : AnyShapeStyle(.clear),
-                       in: RoundedRectangle(cornerRadius: 14))
-            .scaleEffect(isHighlighted ? 1.05 : 1)
+            .scaleEffect(isHighlighted ? 1.06 : 1)
+            .shadow(color: .black.opacity(isHighlighted ? 0.35 : 0), radius: 14, y: 8)
+            .animation(.easeOut(duration: 0.15), value: isHighlighted)
+    }
+
+    private var foreground: Color {
+        if isDestructive { return Color.Theme.destructive }
+        return isHighlighted ? .black : .primary
     }
 }
