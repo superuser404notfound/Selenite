@@ -610,3 +610,28 @@ private final class ManualClock: @unchecked Sendable {
     #expect(pacer.stats.overflowDrops == 1)
     #expect(pacer.stats.displayWaitSamples == 1)
 }
+
+@Test func directPresentRecordsDisplayWait() {
+    let clock = ManualClock()
+    let pacer = FramePacer<Int>(mode: .lowLatency, frameRate: 60, directPresent: true, clock: { clock.now })
+    let sink = PresentSink()
+    pacer.setPresenter { sink.present($0) }
+    let d = 1.0 / 60
+    // The first vsync plus tick is the warmup every direct-present test starts from: it leaves
+    // intervalServed false and primes vsyncDuration so the next put presents directly.
+    pacer.vsync(timestamp: 1.0, duration: d)
+    _ = pacer.tick()
+    let arrival = 1.0 + 0.4 * d
+    clock.now = arrival + 0.001
+    pacer.put(0, arrival: arrival)
+    #expect(sink.presented == [0])
+    let stats = pacer.stats
+    #expect(stats.displayWaitSamples == 1)
+    #expect(abs(stats.displayWaitTotalMilliseconds - 1) < 1e-6)
+}
+
+@Test func catchUpDropsAddNoDisplayWait() {
+    let (_, stats) = run([2] + Array(repeating: 1, count: 39))
+    #expect(stats.catchUpDrops == 1)
+    #expect(stats.displayWaitSamples == stats.presented)
+}

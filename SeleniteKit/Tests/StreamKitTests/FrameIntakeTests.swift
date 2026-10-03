@@ -36,6 +36,19 @@ private func feed(_ intake: inout FrameIntake, _ number: Int32, overflows: Int =
     #expect(intake.networkDrops == 2)
 }
 
+@Test func aContiguousFrameDoesNotConsumeAnOverflow() {
+    // The overflow count can tick up between the log line and the queue flush: a contiguous frame
+    // pulled in that window must not advance overflowsAttributed, or the gap that follows reads
+    // as network loss instead of the queue drop it actually was.
+    var intake = FrameIntake()
+    feed(&intake, 1)
+    feed(&intake, 2)
+    feed(&intake, 3, overflows: 1)
+    feed(&intake, 9, overflows: 1)
+    #expect(intake.queueDrops == 5)
+    #expect(intake.networkDrops == 0)
+}
+
 @Test func zeroHostLatencyGivesNilRange() {
     var intake = FrameIntake()
     feed(&intake, 1, latency: 0)

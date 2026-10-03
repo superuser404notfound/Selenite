@@ -27,11 +27,11 @@ struct FrameIntake {
             let missing = Int(frameNumber - lastFrameNumber - 1)
             if overflowsSoFar > overflowsAttributed {
                 queueDrops += missing
+                overflowsAttributed = overflowsSoFar
             } else {
                 networkDrops += missing
             }
         }
-        overflowsAttributed = overflowsSoFar
         lastFrameNumber = frameNumber
         self.bytes += bytes
         if hostLatencyTenths > 0 {

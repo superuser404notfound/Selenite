@@ -60,7 +60,7 @@ import Testing
     overrides.codec = .h264
     overrides.bitrateMbps = 20
     overrides.resolution = .p720
-    overrides.audio = .stereo
+    overrides.audio = .automatic
     let split = global.forSplit(applying: overrides)
     #expect(split.codec == .h264)
     #expect(split.bitrateMbps == 100)
@@ -71,6 +71,7 @@ import Testing
     #expect(settings.bitrateKbps == 50_000)
     #expect(settings.codec == .h264)
     #expect(settings.fps == 60)
+    #expect(settings.audio == .stereo)
 }
 
 @Test func unknownStoredValuesDecodeAsNilPerField() throws {
