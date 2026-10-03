@@ -63,6 +63,12 @@ final class SplitContainerController: GCEventViewController {
     private var navigators: [ObjectIdentifier: RemoteNavigator] = [:]
     private var lastRemoteMenu = -Double.infinity
     private var handledArrows: Set<String> = []
+    private static let uikitClickWindow: Duration = .milliseconds(150)
+    /// UIKit may report the same click just before GameController does.
+    private static let uikitClickWindowSeconds = 0.15
+    private var gameControllerClickStart = -Double.infinity
+    /// When a UIKit arrow or select press last drove the overlay.
+    private var lastUIKitOverlayPress = -Double.infinity
 
     init(split: SplitController, content: AnyView) {
         self.split = split
@@ -176,11 +182,27 @@ final class SplitContainerController: GCEventViewController {
         apply(events)
     }
 
+    /// Only keeps a click from reading as a swipe. The click itself is taken from UIKit (see
+    /// `pressesBegan`): GameController reports an edge click as a click too, which selected
+    /// instead of moving (device round 2026-10-03).
+    ///
+    /// A centre click has once arrived through GameController alone, so a GameController click
+    /// still selects when UIKit reported nothing for it within `uikitClickWindow`.
     private func remoteClickChanged(id: ObjectIdentifier, pressed: Bool) {
         guard !tornDown, var navigator = navigators[id] else { return }
-        let events = navigator.click(pressed: pressed)
+        _ = navigator.click(pressed: pressed)
         navigators[id] = navigator
-        apply(events)
+        let now = CACurrentMediaTime()
+        guard !pressed else {
+            gameControllerClickStart = now
+            return
+        }
+        let start = gameControllerClickStart
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: Self.uikitClickWindow)
+            guard let self, !self.tornDown, self.lastUIKitOverlayPress < start - Self.uikitClickWindowSeconds, self.overlayTakesArrows else { return }
+            self.split.overlaySelect()
+        }
     }
 
     private func apply(_ events: [RemoteNavigator.Event]) {
@@ -199,17 +221,19 @@ final class SplitContainerController: GCEventViewController {
 
     // MARK: UIKit presses
 
-    /// A click on the edge of the Siri Remote's surface reaches the app only as a UIKit arrow press,
-    /// never through GameController (measured on device 2026-10-02), and each press arrives here
-    /// twice. While the overlay is open the arrows move its cursor, once per press.
+    /// Clicks on the Siri Remote's surface drive the overlay the way UIKit focus reads them in the
+    /// solo overlay: an edge click is an arrow press, a centre click a select press. GameController
+    /// cannot tell the two apart (measured on device 2026-10-02 and 03), so they are taken here,
+    /// and each press arrives here twice. Arrows move on the press, select acts on the release.
     override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
         var others = presses.filter { $0.type != .menu }
         if overlayTakesArrows {
-            let arrows = others.filter { Self.direction(of: $0.type) != nil }
-            for press in arrows where handledArrows.insert(Self.key(press)).inserted {
+            let taken = others.filter { Self.direction(of: $0.type) != nil || $0.type == .select }
+            for press in taken where handledArrows.insert(Self.key(press)).inserted {
+                lastUIKitOverlayPress = CACurrentMediaTime()
                 if let direction = Self.direction(of: press.type) { split.overlayMove(direction) }
             }
-            others.subtract(arrows)
+            others.subtract(taken)
         }
         if !others.isEmpty { super.pressesBegan(others, with: event) }
     }
@@ -229,10 +253,17 @@ final class SplitContainerController: GCEventViewController {
         }
     }
 
-    /// Arrows the overlay took stay away from UIKit until they are released.
-    private func releaseArrows(_ presses: Set<UIPress>) -> Set<UIPress> {
+    /// Presses the overlay took stay away from UIKit until they are released; a released select
+    /// chooses the item under the cursor, once.
+    private func releaseArrows(_ presses: Set<UIPress>, selects: Bool = false) -> Set<UIPress> {
         let taken = presses.filter { handledArrows.contains(Self.key($0)) }
-        for press in taken { handledArrows.remove(Self.key(press)) }
+        for press in taken {
+            handledArrows.remove(Self.key(press))
+            if selects, press.type == .select, overlayTakesArrows {
+                lastUIKitOverlayPress = CACurrentMediaTime()
+                split.overlaySelect()
+            }
+        }
         return presses.subtracting(taken)
     }
 
@@ -247,7 +278,7 @@ final class SplitContainerController: GCEventViewController {
     }
 
     override func pressesEnded(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
-        let others = releaseArrows(presses.filter { $0.type != .menu })
+        let others = releaseArrows(presses.filter { $0.type != .menu }, selects: true)
         if !others.isEmpty { super.pressesEnded(others, with: event) }
         guard presses.contains(where: { $0.type == .menu }) else { return }
         let released = CACurrentMediaTime()
