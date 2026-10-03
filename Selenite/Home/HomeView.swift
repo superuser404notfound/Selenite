@@ -6,6 +6,7 @@ import SwiftUI
 struct HomeView: View {
     @Environment(AppModel.self) private var model
     @Namespace private var focusScope
+    @State private var hostForSettings: PairedHost?
 
     var body: some View {
         // One vertical scroll for the whole page, so the grid never slides over the host row.
@@ -16,7 +17,7 @@ struct HomeView: View {
                 if model.directory.hosts.isEmpty && model.discovery.discovered.isEmpty {
                     EmptyHostsView()
                 } else {
-                    HostRow(focusScope: focusScope)
+                    HostRow(focusScope: focusScope, hostForSettings: $hostForSettings)
                         .focusSection()
                     RecentsRow()
                         .focusSection()
@@ -34,6 +35,9 @@ struct HomeView: View {
         .scrollClipDisabled()
         .background(Color.Theme.page.ignoresSafeArea())
         .focusScope(focusScope)
+        .menuPresentation(item: $hostForSettings) { host in
+            HostSettingsView(host: host).environment(model)
+        }
         .onAppear { model.homeAppeared() }
         .onDisappear { model.homeDisappeared() }
     }
@@ -59,6 +63,7 @@ struct HomeView: View {
 private struct HostRow: View {
     @Environment(AppModel.self) private var model
     let focusScope: Namespace.ID
+    @Binding var hostForSettings: PairedHost?
     @FocusState private var focusedHostID: String?
 
     var body: some View {
@@ -70,7 +75,9 @@ private struct HostRow: View {
                              onClick: { model.hostCardClicked(snapshot) },
                              onRemove: { model.pendingRemoval = snapshot.host },
                              onPairAgain: { model.addHostRequest = .pairAgain(snapshot.host) },
-                             onToggleWakeOnLAN: { model.setWakeOnLAN(snapshot.host, enabled: !snapshot.host.wakesOnLAN) })
+                             onToggleWakeOnLAN: { model.setWakeOnLAN(snapshot.host, enabled: !snapshot.host.wakesOnLAN) },
+                             hasOverrides: model.hostSettings.hasOverrides(hostID: snapshot.host.id),
+                             onStreamSettings: { hostForSettings = snapshot.host })
                         .focused($focusedHostID, equals: snapshot.id)
                         // Initial focus of the scope; the row's defaultFocus covers a move into the row.
                         .prefersDefaultFocus(isSelected, in: focusScope)

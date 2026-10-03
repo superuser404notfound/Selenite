@@ -57,6 +57,7 @@ final class AppModel {
     let commands: any HostCommands
     let recents = RecentsStore()
     let splitStore = SplitStore()
+    let hostSettings = HostSettingsStore()
     var activeStream: StreamController?
     var activeSplit: SplitController?
     var splitWizard: SplitWizardModel?
@@ -223,6 +224,7 @@ final class AppModel {
         catalog.forget(hostID: host.id)
         recents.removeAll(hostID: host.id)
         splitStore.removeHost(id: host.id)
+        hostSettings.remove(hostID: host.id)
         if settings.selectedHostID == host.id {
             settings.setSelectedHostID(directory.hosts.first?.id)
         }
@@ -426,7 +428,7 @@ final class AppModel {
         directory.stopPolling()
         discovery.stop()
         let codecs = directory.snapshot(id: host.id)?.codecModeSupport ?? 0
-        let preferences = settings.preferences
+        let preferences = settings.preferences.applying(hostSettings.overrides(for: host.id))
         let display = DisplayModeReader.current()
         Task {
             defer { isStarting = false }
@@ -619,8 +621,9 @@ final class AppModel {
         }
         let display = DisplayModeReader.current()
         let codecs = directory.snapshot(id: host.id)?.codecModeSupport ?? 0
-        let streamSettings = StreamSettingsResolver.resolveSplit(settings.preferences, layout: layout, format: format,
-                                                                 display: display, hostCodecModeSupport: codecs)
+        let streamSettings = StreamSettingsResolver.resolveSplit(
+            settings.preferences.forSplit(applying: hostSettings.overrides(for: host.id)),
+            layout: layout, format: format, display: display, hostCodecModeSupport: codecs)
         DiagnosticLog.note("split start: \(host.name) app \(app.id) \(streamSettings.width)x\(streamSettings.height)"
             + " at \(streamSettings.fps) fps, \(streamSettings.bitrateKbps) kbps, \(streamSettings.codec),"
             + " layout \(layout), format \(format), pacing \(streamSettings.pacing.rawValue),"

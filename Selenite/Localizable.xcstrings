@@ -178,6 +178,9 @@
     "Host did not wake up" : {
 
     },
+    "In split screen only the codec applies; the bitrate there is half the global one." : {
+
+    },
     "Layout" : {
 
     },
@@ -218,6 +221,9 @@
 
     },
     "Online" : {
+
+    },
+    "Own stream settings" : {
 
     },
     "Pair again" : {
@@ -319,6 +325,9 @@
     "Remove from list" : {
 
     },
+    "Reset to global" : {
+
+    },
     "Resolution" : {
 
     },
@@ -388,6 +397,12 @@
     "Stream ended" : {
 
     },
+    "Stream settings" : {
+
+    },
+    "Stream settings for %@" : {
+
+    },
     "Stream stats" : {
 
     },
@@ -452,6 +467,9 @@
 
     },
     "Try again" : {
+
+    },
+    "Use global (%@)" : {
 
     },
     "Waiting for picture…" : {

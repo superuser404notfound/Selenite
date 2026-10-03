@@ -33,6 +33,7 @@
 		9F22A3E8D26DF283C88C1080 /* LiveDependencies.swift in Sources */ = {isa = PBXBuildFile; fileRef = B991729B15A5D4B5BC2C7A7A /* LiveDependencies.swift */; };
 		A079B09DD4D0DC0D959F79E9 /* HostCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 536760E4329F49D368B1B8BD /* HostCard.swift */; };
 		A08C4B6DDBD4B39B48DCAF35 /* Prompts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AFF32ECFE4F5B57C7D3376D /* Prompts.swift */; };
+		AE38EDBD667980F3C2F871EB /* HostSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A08B86762A14C1761374B9D /* HostSettingsView.swift */; };
 		BB47697DDEA70547D1DCAC7D /* DeveloperView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45EAB5CCA5EF274867374D67 /* DeveloperView.swift */; };
 		C44E78C4EDFB53E5C70B370F /* MenuPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95FB195CF38E94D64367E7C8 /* MenuPresentation.swift */; };
 		C9D3D7D4294509AB483C9F86 /* StreamContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31071BC9355E89A5E5CA7339 /* StreamContainer.swift */; };
@@ -68,6 +69,7 @@
 		54F6C2BE12159B857CCF910D /* SplitWizardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitWizardView.swift; sourceTree = "<group>"; };
 		56AEAF6F7A60D4EE01BA1587 /* StreamOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamOverlayView.swift; sourceTree = "<group>"; };
 		587861A0A29BF0BAD44514E0 /* PromptPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromptPanel.swift; sourceTree = "<group>"; };
+		5A08B86762A14C1761374B9D /* HostSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostSettingsView.swift; sourceTree = "<group>"; };
 		68830DDB57D3AA87AD8A38C6 /* FailureText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FailureText.swift; sourceTree = "<group>"; };
 		7BE0886C65B71808D997F30A /* AppTile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTile.swift; sourceTree = "<group>"; };
 		95FB195CF38E94D64367E7C8 /* MenuPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuPresentation.swift; sourceTree = "<group>"; };
@@ -109,6 +111,7 @@
 				7BE0886C65B71808D997F30A /* AppTile.swift */,
 				273A08E874EAF5433651BECB /* HomeView.swift */,
 				536760E4329F49D368B1B8BD /* HostCard.swift */,
+				5A08B86762A14C1761374B9D /* HostSettingsView.swift */,
 				1AFF32ECFE4F5B57C7D3376D /* Prompts.swift */,
 				FDC88DAC646888CD387DFA80 /* RecentsRow.swift */,
 				37C8DEC225845017D34A9385 /* WakePanel.swift */,
@@ -308,6 +311,7 @@
 				FE2E1B2C36AC1AEF0DC84B61 /* FocusKit.swift in Sources */,
 				9E014C89E72ACA197D89FC43 /* HomeView.swift in Sources */,
 				A079B09DD4D0DC0D959F79E9 /* HostCard.swift in Sources */,
+				AE38EDBD667980F3C2F871EB /* HostSettingsView.swift in Sources */,
 				9F22A3E8D26DF283C88C1080 /* LiveDependencies.swift in Sources */,
 				C44E78C4EDFB53E5C70B370F /* MenuPresentation.swift in Sources */,
 				25C43362B5FA13ECE711080A /* PromptPanel.swift in Sources */,

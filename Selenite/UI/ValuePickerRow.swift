@@ -10,6 +10,7 @@ struct ValuePickerRow<Value: Hashable>: View {
     let options: [Value]
     let selection: Value
     let label: (Value) -> LocalizedStringKey
+    var isHighlighted = false
     let onSelect: (Value) -> Void
 
     @State private var isPicking = false
@@ -28,7 +29,7 @@ struct ValuePickerRow<Value: Hashable>: View {
             Text(label(selection))
                 .font(.body)
                 .fontWeight(.semibold)
-                .foregroundStyle(focused ? .primary : .secondary)
+                .foregroundStyle(isHighlighted ? AnyShapeStyle(.tint) : AnyShapeStyle(focused ? .primary : .secondary))
             Image(systemName: "chevron.right")
                 .font(.body)
                 .foregroundStyle(.secondary)

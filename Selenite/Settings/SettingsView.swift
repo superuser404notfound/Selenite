@@ -80,10 +80,28 @@ extension ResolutionPreference {
         case .matchDisplay: "Match display"
         }
     }
+
+    var text: String {
+        switch self {
+        case .p720: "720p"
+        case .p1080: "1080p"
+        case .p1440: "1440p"
+        case .p2160: "4K"
+        case .matchDisplay: "Match display"
+        }
+    }
 }
 
 extension FrameRatePreference {
     var label: LocalizedStringKey {
+        switch self {
+        case .fps30: "30 fps"
+        case .fps60: "60 fps"
+        case .matchDisplay: "Match display"
+        }
+    }
+
+    var text: String {
         switch self {
         case .fps30: "30 fps"
         case .fps60: "60 fps"
@@ -109,10 +127,25 @@ extension CodecPreference {
         case .h264: "H.264"
         }
     }
+
+    var text: String {
+        switch self {
+        case .automatic: "Automatic"
+        case .hevc: "HEVC"
+        case .h264: "H.264"
+        }
+    }
 }
 
 extension AudioPreference {
     var label: LocalizedStringKey {
+        switch self {
+        case .automatic: "Automatic (5.1 when available)"
+        case .stereo: "Stereo"
+        }
+    }
+
+    var text: String {
         switch self {
         case .automatic: "Automatic (5.1 when available)"
         case .stereo: "Stereo"
