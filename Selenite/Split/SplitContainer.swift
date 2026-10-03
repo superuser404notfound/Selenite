@@ -63,6 +63,8 @@ final class SplitContainerController: GCEventViewController {
     private var navigators: [ObjectIdentifier: RemoteNavigator] = [:]
     private var lastRemoteMenu = -Double.infinity
     private var handledArrows: Set<String> = []
+    /// The begin-time key of every press the overlay took, by press object.
+    private var pressKeys: [ObjectIdentifier: String] = [:]
     private static let uikitClickWindow: Duration = .milliseconds(150)
     /// UIKit may report the same click just before GameController does.
     private static let uikitClickWindowSeconds = 0.15
@@ -229,7 +231,10 @@ final class SplitContainerController: GCEventViewController {
         var others = presses.filter { $0.type != .menu }
         if overlayTakesArrows {
             let taken = others.filter { Self.direction(of: $0.type) != nil || $0.type == .select }
-            for press in taken where handledArrows.insert(Self.key(press)).inserted {
+            for press in taken {
+                let key = Self.key(press)
+                pressKeys[ObjectIdentifier(press)] = key
+                guard handledArrows.insert(key).inserted else { continue }
                 lastUIKitOverlayPress = CACurrentMediaTime()
                 if let direction = Self.direction(of: press.type) { split.overlayMove(direction) }
             }
@@ -240,7 +245,8 @@ final class SplitContainerController: GCEventViewController {
 
     private var overlayTakesArrows: Bool { split.isOverlayOpen && !split.isChoosingGame && !tornDown }
 
-    /// Both deliveries of one press carry the same type and timestamp.
+    /// Both deliveries of one press carry the same type and timestamp when they begin. The
+    /// timestamp moves on with every phase, so a release finds its key through `pressKeys`.
     private static func key(_ press: UIPress) -> String { "\(press.type.rawValue)@\(press.timestamp)" }
 
     private static func direction(of type: UIPress.PressType) -> OverlayDirection? {
@@ -256,9 +262,10 @@ final class SplitContainerController: GCEventViewController {
     /// Presses the overlay took stay away from UIKit until they are released; a released select
     /// chooses the item under the cursor, once.
     private func releaseArrows(_ presses: Set<UIPress>, selects: Bool = false) -> Set<UIPress> {
-        let taken = presses.filter { handledArrows.contains(Self.key($0)) }
+        let taken = presses.filter { pressKeys[ObjectIdentifier($0)] != nil }
         for press in taken {
-            handledArrows.remove(Self.key(press))
+            guard let key = pressKeys.removeValue(forKey: ObjectIdentifier(press)),
+                  handledArrows.remove(key) != nil else { continue }
             if selects, press.type == .select, overlayTakesArrows {
                 lastUIKitOverlayPress = CACurrentMediaTime()
                 split.overlaySelect()
