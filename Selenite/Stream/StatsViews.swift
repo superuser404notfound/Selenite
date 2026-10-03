@@ -2,9 +2,10 @@ import AppCore
 import StreamKit
 import SwiftUI
 
-/// The full stats list (M3-A spec): three groups, each with a small secondary heading, Grid rows
-/// with monospaced digits. Used by the solo overlay, every split overlay column and
-/// `FullStatsPanel`. Refreshed once per second by `StreamController`.
+/// The full stats list (M3-A spec): three groups, each with a bold secondary heading, Grid rows
+/// with monospaced digits. Sets no size of its own, the caller's `.font()` decides it (`.callout`
+/// in the solo and split overlays, `.caption` in `FullStatsPanel`). Used by the solo overlay,
+/// every split overlay column and `FullStatsPanel`. Refreshed once per second by `StreamController`.
 struct OverlayStats: View {
     let stats: StreamStatsSummary
     let pacing: FramePacingMode
@@ -78,7 +79,7 @@ struct OverlayStats: View {
                 }
             }
         }
-        .font(.callout.monospacedDigit())
+        .monospacedDigit()
         .foregroundStyle(.secondary)
     }
 
@@ -113,7 +114,6 @@ struct OverlayStats: View {
     private func group(_ heading: LocalizedStringKey, @ViewBuilder rows: () -> some View) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(heading)
-                .font(.caption2)
                 .fontWeight(.semibold)
             Grid(alignment: .leading, horizontalSpacing: 40, verticalSpacing: 8) {
                 rows()

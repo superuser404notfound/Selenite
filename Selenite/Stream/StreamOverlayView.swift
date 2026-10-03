@@ -34,6 +34,7 @@ struct StreamOverlayView: View {
             }
             if let stats = controller.liveStats {
                 OverlayStats(stats: stats, pacing: controller.settings.pacing)
+                    .font(.callout)
             }
             if controller.isConfirmingQuit {
                 Text("Quit \(controller.app.title) on \(controller.host.name)? Unsaved progress may be lost.")
