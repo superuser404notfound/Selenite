@@ -17,13 +17,14 @@ public final class VideoPipeline: @unchecked Sendable {
     private var finished: DispatchSemaphore?
     private var format: CMVideoFormatDescription?
     private var decoder: VideoDecoder?
-    private var lastFrameNumber: Int32 = 0
     private var decodeTimeTotal: Double = 0
     // Mutated only on the pull thread inside process(), but read from other threads by stats
     // (see VideoPipeline.decodedFrames / .networkDroppedFrames below), so every access goes
     // through `lock` rather than the `private(set) public var` the brief specified.
     private var decodedFramesCount = 0
-    private var networkDroppedFramesCount = 0
+    private var intake = FrameIntake()
+    private var overflowBase = 0
+    private var unrecoverableBase = 0
 
     public init(slot: Slot, codec: VideoCodec, color: ColorSignal, pacer: FramePacer<CMSampleBuffer>) {
         self.slot = slot; self.codec = codec; self.color = color; self.pacer = pacer
@@ -34,10 +35,7 @@ public final class VideoPipeline: @unchecked Sendable {
         return decodedFramesCount
     }
 
-    public var networkDroppedFrames: Int {
-        lock.lock(); defer { lock.unlock() }
-        return networkDroppedFramesCount
-    }
+    public var networkDroppedFrames: Int { lock.withLock { intake.networkDrops } }
 
     public var averageDecodeMilliseconds: Double {
         lock.lock(); defer { lock.unlock() }
@@ -50,6 +48,8 @@ public final class VideoPipeline: @unchecked Sendable {
         running = true
         let done = DispatchSemaphore(value: 0)
         finished = done
+        overflowBase = SlotLogCounters.shared.overflows(slot)
+        unrecoverableBase = SlotLogCounters.shared.unrecoverable(slot)
         lock.unlock()
         let thread = Thread { [self] in run(signalling: done) }
         thread.name = "Selenite video slot \(slot)"
@@ -85,11 +85,13 @@ public final class VideoPipeline: @unchecked Sendable {
     }
 
     private func process(_ unit: DECODE_UNIT) -> Int32 {
-        if lastFrameNumber != 0, unit.frameNumber > lastFrameNumber + 1 {
-            let dropped = Int(unit.frameNumber - lastFrameNumber - 1)
-            lock.lock(); networkDroppedFramesCount += dropped; lock.unlock()
+        let overflows = SlotLogCounters.shared.overflows(slot) - overflowBase
+        lock.withLock {
+            intake.receive(frameNumber: unit.frameNumber, bytes: Int(unit.fullLength),
+                           hostLatencyTenths: unit.frameHostProcessingLatency,
+                           receiveMicroseconds: unit.receiveTimeUs, enqueueMicroseconds: unit.enqueueTimeUs,
+                           overflowsSoFar: overflows)
         }
-        lastFrameNumber = unit.frameNumber
         var parameterSets: [Data] = []
         var picture = Data(capacity: Int(unit.fullLength))
         var entry = unit.bufferList
@@ -130,6 +132,30 @@ public final class VideoPipeline: @unchecked Sendable {
         } catch {
             diagnostic("frame \(unit.frameNumber) type \(unit.frameType) length \(unit.fullLength): \(error), requesting IDR")
             return DR_NEED_IDR
+        }
+    }
+
+    struct IntakeSnapshot {
+        var bytes: Int
+        var queueDrops: Int
+        var unrecoverable: Int
+        var hostLatencyTotalTenths: Int
+        var hostLatencySamples: Int
+        var hostLatencyRange: ClosedRange<Double>?
+        var receiveTotalMicroseconds: UInt64
+        var receiveSamples: Int
+    }
+
+    /// Drains the host latency range: call once per stats sample.
+    func takeIntakeSnapshot() -> IntakeSnapshot {
+        let unrecoverable = SlotLogCounters.shared.unrecoverable(slot) - lock.withLock { unrecoverableBase }
+        return lock.withLock {
+            IntakeSnapshot(bytes: intake.bytes, queueDrops: intake.queueDrops, unrecoverable: unrecoverable,
+                           hostLatencyTotalTenths: intake.hostLatencyTotalTenths,
+                           hostLatencySamples: intake.hostLatencySamples,
+                           hostLatencyRange: intake.takeHostLatencyRange(),
+                           receiveTotalMicroseconds: intake.receiveTotalMicroseconds,
+                           receiveSamples: intake.receiveSamples)
         }
     }
 }
