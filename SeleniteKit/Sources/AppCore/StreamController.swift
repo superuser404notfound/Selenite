@@ -106,8 +106,8 @@ public final class StreamController: Identifiable {
     }
 
     /// Menu, from any path. While loading it cancels. While running it opens the overlay; with the
-    /// overlay open it backs out of the quit confirmation first, and otherwise disconnects (the game
-    /// keeps running). A gamepad's B closes the overlay through `closeOverlay` instead.
+    /// overlay open it backs out of the quit confirmation first, and otherwise closes the overlay.
+    /// Only the overlay's Disconnect ends the stream.
     public func menuPressed(now: Double) {
         guard now - lastMenuPress >= Self.menuDebounceSeconds else { return }
         lastMenuPress = now
@@ -118,7 +118,7 @@ public final class StreamController: Identifiable {
             if isConfirmingQuit {
                 isConfirmingQuit = false
             } else if isOverlayOpen {
-                disconnect()
+                closeOverlay()
             } else {
                 setOverlay(open: true)
             }

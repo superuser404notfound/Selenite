@@ -58,13 +58,6 @@ struct StreamOverlayView: View {
                 }
                 .frame(maxWidth: .infinity)
             }
-            // Menu backs out of the confirmation instead, so the hint only shows without it.
-            if !controller.isConfirmingQuit {
-                Text("Press Menu again to leave the stream.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity)
-            }
         }
         .padding(48)
         .frame(width: 960)
