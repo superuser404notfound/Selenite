@@ -4,6 +4,9 @@
     "4K" : {
 
     },
+    "16:9" : {
+
+    },
     "30 fps" : {
 
     },
@@ -17,6 +20,9 @@
 
     },
     "1440p" : {
+
+    },
+    "%@ + %@" : {
 
     },
     "%@ did not wake up. Check that Wake-on-LAN is enabled on the PC." : {
@@ -55,6 +61,12 @@
     "Address" : {
 
     },
+    "Already used by Player 1" : {
+
+    },
+    "Already used by Player 2" : {
+
+    },
     "Another game is running on %@. Starting %@ quits it." : {
 
     },
@@ -70,9 +82,6 @@
     "Audio underruns" : {
 
     },
-    "Audio: %@" : {
-
-    },
     "Automatic" : {
 
     },
@@ -82,10 +91,7 @@
     "Bitrate" : {
 
     },
-    "Bitrate %lld Mbps: +10" : {
-
-    },
-    "Bitrate %lld Mbps: -10" : {
+    "Bottom" : {
 
     },
     "Busy" : {
@@ -95,6 +101,9 @@
 
     },
     "Checking…" : {
+
+    },
+    "Choose game" : {
 
     },
     "Codec" : {
@@ -124,16 +133,25 @@
     "Disconnect" : {
 
     },
+    "Disconnected. Press A to reconnect." : {
+
+    },
     "Disconnecting…" : {
 
     },
     "Dropped frames" : {
 
     },
+    "End split" : {
+
+    },
     "Enter the IP address or hostname of the PC running Sunshine." : {
 
     },
     "Enter this PIN in Sunshine's web UI (PIN tab)" : {
+
+    },
+    "Fill half" : {
 
     },
     "Frame pacing" : {
@@ -148,10 +166,10 @@
     "Game did not quit" : {
 
     },
-    "H.264" : {
+    "Game quit. Press A to restart." : {
 
     },
-    "HDR (solo only)" : {
+    "H.264" : {
 
     },
     "HEVC" : {
@@ -160,10 +178,10 @@
     "Host did not wake up" : {
 
     },
-    "IP address" : {
+    "Layout" : {
 
     },
-    "Layout" : {
+    "Left" : {
 
     },
     "Lowest latency" : {
@@ -176,6 +194,12 @@
 
     },
     "New" : {
+
+    },
+    "New controller: point left or right and press A" : {
+
+    },
+    "New controller: point up or down and press A" : {
 
     },
     "No video arrived from the host. A firewall may be blocking UDP port 47998." : {
@@ -196,9 +220,6 @@
     "Online" : {
 
     },
-    "Pair" : {
-
-    },
     "Pair again" : {
 
     },
@@ -217,13 +238,52 @@
     "Pairing was cancelled." : {
 
     },
-    "PIN %@" : {
+    "Paused. Press A to resume." : {
+
+    },
+    "Picture format" : {
+
+    },
+    "Player 1: choose a game" : {
+
+    },
+    "Player 1: choose a host" : {
+
+    },
+    "Player 2: choose a game" : {
+
+    },
+    "Player 2: choose a host" : {
+
+    },
+    "Point left or right and press A. Start begins." : {
+
+    },
+    "Point up or down and press A. Start begins." : {
 
     },
     "Present on arrival (experimental)" : {
 
     },
+    "Press A to join" : {
+
+    },
+    "Press A to reconnect" : {
+
+    },
+    "Press A to restart" : {
+
+    },
+    "Press again to quit" : {
+
+    },
+    "Press B to cancel" : {
+
+    },
     "Press Menu again to leave the stream." : {
+
+    },
+    "Press Start to play" : {
 
     },
     "Quit %@ on %@? Unsaved progress may be lost." : {
@@ -244,7 +304,13 @@
     "Quitting game…" : {
 
     },
+    "Reassign controllers" : {
+
+    },
     "Recently played" : {
+
+    },
+    "Reconnect" : {
 
     },
     "Remove" : {
@@ -259,7 +325,13 @@
     "Resolution" : {
 
     },
+    "Restart" : {
+
+    },
     "Resume" : {
+
+    },
+    "Right" : {
 
     },
     "Round trip" : {
@@ -274,6 +346,9 @@
     "Running" : {
 
     },
+    "Screen split" : {
+
+    },
     "Selenite" : {
 
     },
@@ -286,13 +361,13 @@
     "Selenite forgets this host. Pair it again to stream from it." : {
 
     },
-    "Selenite M0 harness" : {
-
-    },
     "Send Wake-on-LAN to saved hosts" : {
 
     },
     "Settings" : {
+
+    },
+    "Side by side" : {
 
     },
     "Smooth" : {
@@ -301,10 +376,10 @@
     "Something went wrong: %@" : {
 
     },
-    "Stalls" : {
+    "Split screen" : {
 
     },
-    "Start" : {
+    "Stalls" : {
 
     },
     "Starting game…" : {
@@ -320,6 +395,9 @@
 
     },
     "Sunshine is already pairing with another device. Finish or cancel that first." : {
+
+    },
+    "Swap sides" : {
 
     },
     "The app list could not be loaded." : {
@@ -368,6 +446,12 @@
 
     },
     "The PIN did not match. Try again with the new PIN." : {
+
+    },
+    "Top" : {
+
+    },
+    "Top and bottom" : {
 
     },
     "Try again" : {

@@ -1,0 +1,401 @@
+import AppCore
+import AVFoundation
+import GameController
+import InputKit
+import Observation
+import QuartzCore
+import StreamKit
+import SwiftUI
+import UIKit
+
+/// The split screen, in place of Home like `StreamContainer` and for the same reason: nothing
+/// presented means nothing tvOS can dismiss on Menu.
+struct SplitContainer: UIViewControllerRepresentable {
+    let split: SplitController
+    let model: AppModel
+
+    func makeUIViewController(context: Context) -> SplitContainerController {
+        SplitContainerController(split: split,
+                                 content: AnyView(SplitScreenView(split: split).environment(model).tint(.cyan)))
+    }
+
+    func updateUIViewController(_ container: SplitContainerController, context: Context) {}
+
+    /// The split ends here and only here: a disappear also comes with a presentation over the split
+    /// (the one-side game wizard), which must not stop the remotes, the pacer or the display mode.
+    static func dismantleUIViewController(_ container: SplitContainerController, coordinator: ()) {
+        container.teardown()
+    }
+}
+
+/// Which half a side shows in: `first` left or top, swapped when `isSwapped`.
+enum SplitGeometry {
+    static func frame(of side: SplitSide, in bounds: CGRect, layout: SplitLayout, swapped: Bool) -> CGRect {
+        let leading = (side == .first) != swapped
+        switch layout {
+        case .sideBySide:
+            let width = bounds.width / 2
+            return CGRect(x: bounds.minX + (leading ? 0 : width), y: bounds.minY, width: width, height: bounds.height)
+        case .topBottom:
+            let height = bounds.height / 2
+            return CGRect(x: bounds.minX, y: bounds.minY + (leading ? 0 : height), width: bounds.width, height: height)
+        }
+    }
+}
+
+/// Controller user interaction stays off, so every gamepad button goes to GameController only; it
+/// is on only while the one-side game wizard is up. The Siri Remote is never forwarded in split:
+/// its Menu, touch surface and click drive the split overlay here. Gamepad B belongs to the game.
+///
+/// Every `.menu` press that reaches UIKit is swallowed; it is acted on only when no Siri Remote
+/// reported Menu around the same moment, which leaves the TV remotes over HDMI-CEC.
+@MainActor
+final class SplitContainerController: GCEventViewController {
+    private static let pressSettleDelay: Duration = .milliseconds(150)
+
+    private let split: SplitController
+    private let surface: SplitSurfaceController
+    private let host: UIHostingController<AnyView>
+    private var tornDown = false
+    private var remoteObservers: [NSObjectProtocol] = []
+    private var remotes: [ObjectIdentifier: GCController] = [:]
+    /// One per Siri Remote: swipes and edge clicks move the overlay cursor, a centre click selects.
+    private var navigators: [ObjectIdentifier: RemoteNavigator] = [:]
+    private var lastRemoteMenu = -Double.infinity
+    private var handledArrows: Set<String> = []
+    /// The begin-time key of every press the overlay took, by press object.
+    private var pressKeys: [ObjectIdentifier: String] = [:]
+    private static let uikitClickWindow: Duration = .milliseconds(150)
+    /// UIKit may report the same click just before GameController does.
+    private static let uikitClickWindowSeconds = 0.15
+    private var gameControllerClickStart = -Double.infinity
+    /// When a UIKit arrow or select press last drove the overlay.
+    private var lastUIKitOverlayPress = -Double.infinity
+
+    init(split: SplitController, content: AnyView) {
+        self.split = split
+        self.surface = SplitSurfaceController(split: split)
+        self.host = UIHostingController(rootView: content)
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    required init?(coder: NSCoder) { fatalError("unused") }
+
+    override var preferredFocusEnvironments: [any UIFocusEnvironment] { [surface] }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .black
+        for child in [surface, host] as [UIViewController] {
+            addChild(child)
+            child.view.frame = view.bounds
+            child.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            view.addSubview(child.view)
+            child.didMove(toParent: self)
+        }
+        host.view.backgroundColor = .clear
+        observeChoosingGame()
+        startObservingRemotes()
+    }
+
+    /// The one-side game wizard is a focus panel: controllers navigate it through UIKit while it is up.
+    private func observeChoosingGame() {
+        guard !tornDown else { return }
+        let choosing = withObservationTracking {
+            split.isChoosingGame
+        } onChange: { [weak self] in
+            Task { @MainActor in self?.observeChoosingGame() }
+        }
+        let wasChoosing = controllerUserInteractionEnabled
+        controllerUserInteractionEnabled = choosing
+        surface.setAcceptsFocus(!choosing)
+        if wasChoosing, !choosing {
+            setNeedsFocusUpdate()
+            updateFocusIfNeeded()
+        }
+    }
+
+    // MARK: Siri Remote
+
+    private func startObservingRemotes() {
+        guard remoteObservers.isEmpty else { return }
+        let center = NotificationCenter.default
+        for name in [Notification.Name.GCControllerDidConnect, .GCControllerDidDisconnect] {
+            remoteObservers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.refreshRemotes() }
+            })
+        }
+        refreshRemotes()
+    }
+
+    /// A micro profile without an extended one is a Siri Remote; gamepads are left to `SplitInput`.
+    private func refreshRemotes() {
+        let connected = GCController.controllers()
+        let live = Set(connected.map(ObjectIdentifier.init))
+        for id in remotes.keys where !live.contains(id) {
+            if let gone = remotes.removeValue(forKey: id) { Self.clearHandlers(gone) }
+            navigators.removeValue(forKey: id)
+        }
+        for controller in connected where remotes[ObjectIdentifier(controller)] == nil {
+            guard controller.extendedGamepad == nil, let pad = controller.microGamepad else { continue }
+            let id = ObjectIdentifier(controller)
+            pad.reportsAbsoluteDpadValues = true
+            navigators[id] = RemoteNavigator()
+            pad.buttonMenu.pressedChangedHandler = { [weak self] _, _, pressed in
+                MainActor.assumeIsolated { self?.remoteMenuChanged(pressed: pressed) }
+            }
+            pad.dpad.valueChangedHandler = { [weak self] _, x, y in
+                MainActor.assumeIsolated { self?.remoteDpadChanged(id: id, x: x, y: y) }
+            }
+            pad.buttonA.pressedChangedHandler = { [weak self] _, _, pressed in
+                MainActor.assumeIsolated { self?.remoteClickChanged(id: id, pressed: pressed) }
+            }
+            remotes[id] = controller
+        }
+    }
+
+    private static func clearHandlers(_ controller: GCController) {
+        guard controller.extendedGamepad == nil, let pad = controller.microGamepad else { return }
+        pad.buttonMenu.pressedChangedHandler = nil
+        pad.dpad.valueChangedHandler = nil
+        pad.buttonA.pressedChangedHandler = nil
+        pad.reportsAbsoluteDpadValues = false
+    }
+
+    private func stopObservingRemotes() {
+        remoteObservers.forEach(NotificationCenter.default.removeObserver)
+        remoteObservers.removeAll()
+        for controller in remotes.values { Self.clearHandlers(controller) }
+        remotes.removeAll()
+        navigators.removeAll()
+    }
+
+    private func remoteMenuChanged(pressed: Bool) {
+        guard !pressed, !tornDown else { return }
+        let now = CACurrentMediaTime()
+        lastRemoteMenu = now
+        split.menuPressed(now: now)
+    }
+
+    private func remoteDpadChanged(id: ObjectIdentifier, x: Float, y: Float) {
+        guard !tornDown, var navigator = navigators[id] else { return }
+        let events = navigator.touch(x: x, y: y)
+        navigators[id] = navigator
+        apply(events)
+    }
+
+    /// Only keeps a click from reading as a swipe. The click itself is taken from UIKit (see
+    /// `pressesBegan`): GameController reports an edge click as a click too, which selected
+    /// instead of moving (device round 2026-10-03).
+    ///
+    /// A centre click has once arrived through GameController alone, so a GameController click
+    /// still selects when UIKit reported nothing for it within `uikitClickWindow`.
+    private func remoteClickChanged(id: ObjectIdentifier, pressed: Bool) {
+        guard !tornDown, var navigator = navigators[id] else { return }
+        _ = navigator.click(pressed: pressed)
+        navigators[id] = navigator
+        let now = CACurrentMediaTime()
+        guard !pressed else {
+            gameControllerClickStart = now
+            return
+        }
+        let start = gameControllerClickStart
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: Self.uikitClickWindow)
+            guard let self, !self.tornDown, self.lastUIKitOverlayPress < start - Self.uikitClickWindowSeconds, self.overlayTakesArrows else { return }
+            self.split.overlaySelect()
+        }
+    }
+
+    private func apply(_ events: [RemoteNavigator.Event]) {
+        guard split.isOverlayOpen else { return }
+        for event in events {
+            switch event {
+            case .select: split.overlaySelect()
+            case .move(.left): split.overlayMove(.left)
+            case .move(.right): split.overlayMove(.right)
+            case .move(.up): split.overlayMove(.up)
+            case .move(.down): split.overlayMove(.down)
+            case .move(.center): break
+            }
+        }
+    }
+
+    // MARK: UIKit presses
+
+    /// Clicks on the Siri Remote's surface drive the overlay the way UIKit focus reads them in the
+    /// solo overlay: an edge click is an arrow press, a centre click a select press. GameController
+    /// cannot tell the two apart (measured on device 2026-10-02 and 03), so they are taken here,
+    /// and each press arrives here twice. Arrows move on the press, select acts on the release.
+    override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+        var others = presses.filter { $0.type != .menu }
+        if overlayTakesArrows {
+            let taken = others.filter { Self.direction(of: $0.type) != nil || $0.type == .select }
+            for press in taken {
+                let key = Self.key(press)
+                pressKeys[ObjectIdentifier(press)] = key
+                guard handledArrows.insert(key).inserted else { continue }
+                lastUIKitOverlayPress = CACurrentMediaTime()
+                if let direction = Self.direction(of: press.type) { split.overlayMove(direction) }
+            }
+            others.subtract(taken)
+        }
+        if !others.isEmpty { super.pressesBegan(others, with: event) }
+    }
+
+    private var overlayTakesArrows: Bool { split.isOverlayOpen && !split.isChoosingGame && !tornDown }
+
+    /// Both deliveries of one press carry the same type and timestamp when they begin. The
+    /// timestamp moves on with every phase, so a release finds its key through `pressKeys`.
+    private static func key(_ press: UIPress) -> String { "\(press.type.rawValue)@\(press.timestamp)" }
+
+    private static func direction(of type: UIPress.PressType) -> OverlayDirection? {
+        switch type {
+        case .upArrow: .up
+        case .downArrow: .down
+        case .leftArrow: .left
+        case .rightArrow: .right
+        default: nil
+        }
+    }
+
+    /// Presses the overlay took stay away from UIKit until they are released; a released select
+    /// chooses the item under the cursor, once.
+    private func releaseArrows(_ presses: Set<UIPress>, selects: Bool = false) -> Set<UIPress> {
+        let taken = presses.filter { pressKeys[ObjectIdentifier($0)] != nil }
+        for press in taken {
+            guard let key = pressKeys.removeValue(forKey: ObjectIdentifier(press)),
+                  handledArrows.remove(key) != nil else { continue }
+            if selects, press.type == .select, overlayTakesArrows {
+                lastUIKitOverlayPress = CACurrentMediaTime()
+                split.overlaySelect()
+            }
+        }
+        return presses.subtracting(taken)
+    }
+
+    override func pressesChanged(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+        let others = presses.filter { $0.type != .menu }
+        if !others.isEmpty { super.pressesChanged(others, with: event) }
+    }
+
+    override func pressesCancelled(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+        let others = releaseArrows(presses.filter { $0.type != .menu })
+        if !others.isEmpty { super.pressesCancelled(others, with: event) }
+    }
+
+    override func pressesEnded(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+        let others = releaseArrows(presses.filter { $0.type != .menu }, selects: true)
+        if !others.isEmpty { super.pressesEnded(others, with: event) }
+        guard presses.contains(where: { $0.type == .menu }) else { return }
+        let released = CACurrentMediaTime()
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: Self.pressSettleDelay)
+            self?.uikitMenuReleased(at: released)
+        }
+    }
+
+    private func uikitMenuReleased(at released: Double) {
+        guard !tornDown else { return }
+        if abs(released - lastRemoteMenu) < StreamController.menuDebounceSeconds { return }
+        split.menuPressed(now: released)
+    }
+
+    func teardown() {
+        guard !tornDown else { return }
+        tornDown = true
+        stopObservingRemotes()
+        controllerUserInteractionEnabled = true
+        surface.teardown()
+    }
+}
+
+/// Both videos on one display pacer, so the halves change on the same refresh; the display mode
+/// and the idle timer as in `StreamSurfaceController`.
+@MainActor
+final class SplitSurfaceController: UIViewController {
+    private let split: SplitController
+    private let pacer = DisplayPacer()
+    private let videoViews: [SplitSide: VideoLayerView] = [.first: VideoLayerView(), .second: VideoLayerView()]
+    /// The StreamController each side's layer is attached to.
+    private var attached: [SplitSide: UUID] = [:]
+    private weak var displayWindow: UIWindow?
+    private var tornDown = false
+
+    init(split: SplitController) {
+        self.split = split
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    required init?(coder: NSCoder) { fatalError("unused") }
+
+    override func loadView() {
+        view = SurfaceRootView()
+    }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .black
+        for side in SplitSide.allCases {
+            guard let video = videoViews[side] else { continue }
+            video.displayLayer.videoGravity = .resizeAspect
+            video.displayLayer.preferredDynamicRange = .standard
+            view.addSubview(video)
+        }
+        observeSplit()
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        for side in SplitSide.allCases {
+            videoViews[side]?.frame = SplitGeometry.frame(of: side, in: view.bounds,
+                                                          layout: split.plan.layout, swapped: split.isSwapped)
+        }
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        guard !tornDown else { return }
+        UIApplication.shared.isIdleTimerDisabled = true
+        if let window = view.window {
+            displayWindow = window
+            DisplayModeController.apply(hdr: false, refreshRate: 60, window: window)
+        }
+        pacer.start()
+    }
+
+    func setAcceptsFocus(_ accepts: Bool) {
+        (view as? SurfaceRootView)?.acceptsFocus = accepts
+    }
+
+    /// Follows the streams (a reconnect brings a new controller for a side), the swap and the layout.
+    private func observeSplit() {
+        guard !tornDown else { return }
+        let streams = withObservationTracking {
+            _ = split.isSwapped
+            _ = split.plan.layout
+            return split.streams
+        } onChange: { [weak self] in
+            Task { @MainActor in self?.observeSplit() }
+        }
+        for side in SplitSide.allCases {
+            guard let video = videoViews[side] else { continue }
+            let stream = streams[side]
+            guard stream?.id != attached[side] else { continue }
+            if attached[side] != nil { pacer.detach(layer: video.displayLayer) }
+            if let stream { pacer.attach(pacer: stream.session.pacer, layer: video.displayLayer) }
+            attached[side] = stream?.id
+        }
+        view.setNeedsLayout()
+    }
+
+    /// Called by `SplitContainerController.teardown` only, never on a disappear.
+    func teardown() {
+        guard !tornDown else { return }
+        tornDown = true
+        UIApplication.shared.isIdleTimerDisabled = false
+        pacer.stop()
+        attached.removeAll()
+        if let window = view.window ?? displayWindow { DisplayModeController.reset(window: window) }
+    }
+}

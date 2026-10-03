@@ -38,6 +38,13 @@ public final class ControllerForwarder {
         return out
     }
 
+    /// Keeps `buttons` off the host until the controller releases them, as if they were held at a
+    /// resume: a pad seated on a running split side arrives with the press that seated it.
+    public func maskUntilReleased(number: UInt8, buttons: Int32) {
+        guard buttons != 0 else { return }
+        heldAtResume[number, default: 0] |= buttons
+    }
+
     public func touch(number: UInt8, event: UInt8, pointer: UInt32, x: Float, y: Float, pressure: Float) {
         guard isForwarding else { return }
         sink?.controllerTouch(number: number, event: event, pointer: pointer, x: x, y: y, pressure: pressure)

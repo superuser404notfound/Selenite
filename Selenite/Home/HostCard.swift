@@ -22,9 +22,9 @@ struct HostCard: View {
                     .lineLimit(1)
                 HStack(spacing: 10) {
                     Circle()
-                        .fill(statusColor)
+                        .fill(snapshot.statusColor)
                         .frame(width: 14, height: 14)
-                    Text(statusText)
+                    Text(snapshot.statusText)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -53,20 +53,24 @@ struct HostCard: View {
             Button("Remove", systemImage: "trash", role: .destructive) { onRemove() }
         }
     }
+}
 
-    private var statusText: LocalizedStringKey {
-        switch snapshot.status {
+/// The live-status line and dot shown on a host card. Shared by `HostCard` and the split wizard's
+/// own host cards, so the two never drift apart.
+extension HostSnapshot {
+    var statusText: LocalizedStringKey {
+        switch status {
         case .unknown: "Checking…"
-        case .offline: HostWaker.canWake(snapshot.host) ? "Asleep" : "Offline"
+        case .offline: HostWaker.canWake(host) ? "Asleep" : "Offline"
         case .online: "Online"
         case .busy: "Busy"
         }
     }
 
-    private var statusColor: Color {
-        switch snapshot.status {
+    var statusColor: Color {
+        switch status {
         case .unknown: .gray
-        case .offline: HostWaker.canWake(snapshot.host) ? .gray : Color.Theme.destructive
+        case .offline: HostWaker.canWake(host) ? .gray : Color.Theme.destructive
         case .online: Color.Theme.success
         case .busy: Color.Theme.warning
         }

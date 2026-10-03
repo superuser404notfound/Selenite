@@ -108,6 +108,31 @@ private func pressing(_ buttons: Int32) -> GamepadState {
     #expect(sink.states == expected)
 }
 
+@MainActor @Test func aJoiningPressStaysMaskedUntilReleased() {
+    // A pad seated on a running side arrives with the A that seated it still down.
+    let (sink, forwarder) = twoControllers()
+    forwarder.maskUntilReleased(number: 0, buttons: 0x1000)
+    forwarder.state(number: 0, mask: 0b11, state: pressing(0x1000 | 0x2000))
+    forwarder.state(number: 1, mask: 0b11, state: pressing(0x1000))
+    forwarder.state(number: 0, mask: 0b11, state: GamepadState())
+    forwarder.state(number: 0, mask: 0b11, state: pressing(0x1000))
+    let expected: [RecordingSink.Sent] = [
+        .init(number: 0, mask: 0b11, state: pressing(0x2000)),
+        .init(number: 1, mask: 0b11, state: pressing(0x1000)),
+        .init(number: 0, mask: 0b11, state: GamepadState()),
+        .init(number: 0, mask: 0b11, state: pressing(0x1000)),
+    ]
+    #expect(sink.states == expected)
+}
+
+@MainActor @Test func maskingNothingChangesNothing() {
+    let (sink, forwarder) = twoControllers()
+    forwarder.maskUntilReleased(number: 0, buttons: 0)
+    forwarder.state(number: 0, mask: 0b11, state: pressing(0x1000))
+    let expected: [RecordingSink.Sent] = [.init(number: 0, mask: 0b11, state: pressing(0x1000))]
+    #expect(sink.states == expected)
+}
+
 @MainActor @Test func theMaskIsPerController() {
     let (sink, forwarder) = twoControllers()
     forwarder.setForwarding(false)

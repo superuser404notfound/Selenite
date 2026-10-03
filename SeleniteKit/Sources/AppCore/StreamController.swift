@@ -14,6 +14,7 @@ public protocol StreamSessionHandle: AnyObject, Sendable {
     func sendMouseMove(dx: Int16, dy: Int16)
     func sendMouseButton(_ button: MouseButton, pressed: Bool)
     func sendScroll(amount: Int16)
+    func setVolume(_ volume: Float)
 }
 
 extension StreamSession: StreamSessionHandle {}
@@ -184,6 +185,12 @@ public final class StreamController: Identifiable {
     /// Stops the stream, then quits the game on the host.
     public func confirmQuit() {
         guard isConfirmingQuit else { return }
+        finish(failure: nil, quitGame: true)
+    }
+
+    /// Split: the overlay confirms, then the side stops and the game quits on the host.
+    public func quitGame() {
+        guard phase == .running || phase == .waitingForPicture else { return }
         finish(failure: nil, quitGame: true)
     }
 

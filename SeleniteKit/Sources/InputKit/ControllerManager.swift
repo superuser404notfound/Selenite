@@ -38,9 +38,20 @@ public final class ControllerManager {
     private var controllers: [UInt8: GCController] = [:]
     private var touching: [UInt8: Bool] = [:]
     private var observers: [NSObjectProtocol] = []
+    private let admits: @MainActor (GCController) -> Bool
+    private let lightIndex: GCControllerPlayerIndex?
+    /// Split only: the buttons a pad holds when it is taken stay off the host until released.
+    private let masksJoiningPress: Bool
+    /// Every input report of a held controller, before it is forwarded; the split lobby listens
+    /// here while controllers are reassigned.
+    public var onInput: (@MainActor (PadID, GCExtendedGamepad) -> Void)?
 
-    public init(sink: any ControllerEventSink) {
+    public init(sink: any ControllerEventSink, admits: @escaping @MainActor (GCController) -> Bool = { _ in true },
+                lightIndex: GCControllerPlayerIndex? = nil, masksJoiningPress: Bool = false) {
         forwarder = ControllerForwarder(sink: sink)
+        self.admits = admits
+        self.lightIndex = lightIndex
+        self.masksJoiningPress = masksJoiningPress
     }
 
     /// False while the stream overlay owns the input. Pausing sends one neutral state per
@@ -48,6 +59,10 @@ public final class ControllerManager {
     public var isForwarding: Bool {
         get { forwarder.isForwarding }
         set { forwarder.setForwarding(newValue) }
+    }
+
+    public func holds(_ pad: PadID) -> Bool {
+        controllers.values.contains { ObjectIdentifier($0) == pad }
     }
 
     /// Idempotent: a second call while already observing is a no-op.
@@ -77,17 +92,28 @@ public final class ControllerManager {
         refreshControllers()
     }
 
+    /// Re-applies `admits` after a split seat change: releases what it no longer admits, takes
+    /// what it now does. Does nothing before `start()`.
+    public func refresh() {
+        guard !observers.isEmpty else { return }
+        refreshControllers()
+    }
+
     /// Diffs `GCController.controllers()` against what is tracked: releases anything that vanished
-    /// without a notification, connects anything new that the ledger does not mark as a ghost.
+    /// without a notification, connects anything new that the ledger does not mark as a ghost and
+    /// that `admits` currently accepts.
     private func refreshControllers() {
         let connected = GCController.controllers()
         let liveIDs = Set(connected.map(ObjectIdentifier.init))
         for controller in Array(controllers.values) where !liveIDs.contains(ObjectIdentifier(controller)) {
             disconnect(id: ObjectIdentifier(controller))
         }
+        for controller in Array(controllers.values) where !admits(controller) {
+            disconnect(id: ObjectIdentifier(controller), markGhost: false)
+        }
         let tracked = Set(controllers.values.map(ObjectIdentifier.init))
         let admitted = Set(ledger.admissible(live: connected.map(ObjectIdentifier.init), tracked: tracked))
-        for controller in connected where admitted.contains(ObjectIdentifier(controller)) {
+        for controller in connected where admitted.contains(ObjectIdentifier(controller)) && admits(controller) {
             connect(controller)
         }
     }
@@ -132,19 +158,44 @@ public final class ControllerManager {
         guard let gamepad = controller.extendedGamepad else { return }   // Siri Remote stays with the UI
         let number = roster.connect(id: ObjectIdentifier(controller))
         controllers[number] = controller
-        controller.playerIndex = GCControllerPlayerIndex(rawValue: Int(number)) ?? .indexUnset
+        controller.playerIndex = lightIndex ?? GCControllerPlayerIndex(rawValue: Int(number)) ?? .indexUnset
         forwarder.arrived(number: number, mask: roster.mask, kind: Self.kind(of: controller))
-        gamepad.valueChangedHandler = { [weak self] pad, _ in
-            MainActor.assumeIsolated { self?.send(pad, number: number) }
+        let id = ObjectIdentifier(controller)
+        // valueChangedHandler is one slot shared by whoever currently owns the physical controller.
+        // A not-admitted release (disconnect(markGhost: false)) leaves a prior handler in place
+        // instead of racing to nil it, so this closure re-checks ownership on every report: once
+        // `controllers[number]` no longer points at this same controller, it goes quiet by itself
+        // instead of sending under a number this manager no longer has.
+        gamepad.valueChangedHandler = { [weak self, weak controller] pad, _ in
+            MainActor.assumeIsolated {
+                guard let self, let controller, self.controllers[number] === controller else { return }
+                // Forward first: a Start that finishes reassigning resumes forwarding from inside
+                // onInput, and the resume must already see Start held to mask it.
+                self.send(pad, number: number)
+                self.onInput?(id, pad)
+            }
+        }
+        if masksJoiningPress {
+            forwarder.maskUntilReleased(number: number, buttons: GamepadMapper.state(from: Self.snapshot(of: gamepad)).buttons)
         }
         send(gamepad, number: number)
     }
 
-    private func disconnect(id: ObjectIdentifier) {
+    /// Releases the controller on `number`. `markGhost` should be false only when the controller
+    /// stays connected but is no longer admitted here (a split seat change): the physical device is
+    /// not going anywhere, so latching it in the ledger would block a real reconnect notification
+    /// that will never come. For the same reason `valueChangedHandler` is left alone on that path:
+    /// the pad's next owner (another manager's `connect`, or the lobby) overwrites it once it picks
+    /// the controller up, and until then the outgoing `connect` closure's own ownership check keeps
+    /// it quiet. Clearing it here would risk wiping a handler a faster-refreshing new owner already
+    /// installed.
+    private func disconnect(id: ObjectIdentifier, markGhost: Bool = true) {
         guard let number = roster.disconnect(id: id) else { return }
-        ledger.markReleased(id)
-        // A departed controller object can outlive this call; its handler must not keep sending.
-        controllers[number]?.extendedGamepad?.valueChangedHandler = nil
+        if markGhost {
+            ledger.markReleased(id)
+            // A departed controller object can outlive this call; its handler must not keep sending.
+            controllers[number]?.extendedGamepad?.valueChangedHandler = nil
+        }
         controllers[number] = nil
         touching[number] = nil
         forwarder.released(number: number, remainingMask: roster.mask)

@@ -24,6 +24,10 @@ final class FramePresenter: @unchecked Sendable {
             if renderer.status == .failed { renderer.flush() }
         }
     }
+
+    func clear() {
+        lock.withLock { renderer.flush(removingDisplayedImage: true, completionHandler: nil) }
+    }
 }
 
 /// One CADisplayLink for all sessions: on every vsync each layer gets the newest decoded frame,
@@ -33,6 +37,7 @@ public final class DisplayPacer {
     private struct Output {
         let pacer: FramePacer<CMSampleBuffer>
         let presenter: FramePresenter
+        let layer: AVSampleBufferDisplayLayer
     }
 
     // CADisplayLink fires on the main run loop it was added to.
@@ -55,7 +60,21 @@ public final class DisplayPacer {
     public func attach(pacer: FramePacer<CMSampleBuffer>, layer: AVSampleBufferDisplayLayer) {
         let presenter = FramePresenter(renderer: layer.sampleBufferRenderer)
         pacer.setPresenter { presenter.enqueue($0) }
-        outputs.append(Output(pacer: pacer, presenter: presenter))
+        outputs.append(Output(pacer: pacer, presenter: presenter, layer: layer))
+    }
+
+    /// Stops feeding `layer` and clears its picture; a layer this pacer never fed is only cleared.
+    public func detach(layer: AVSampleBufferDisplayLayer) {
+        let detached = outputs.filter { $0.layer === layer }
+        guard !detached.isEmpty else {
+            layer.sampleBufferRenderer.flush(removingDisplayedImage: true, completionHandler: nil)
+            return
+        }
+        outputs.removeAll { $0.layer === layer }
+        for output in detached {
+            output.pacer.setPresenter(nil)
+            output.presenter.clear()
+        }
     }
 
     public func start() {

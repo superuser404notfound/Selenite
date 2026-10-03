@@ -74,7 +74,7 @@ let package = Package(
             // without this the framework is never loaded and the call dies in doesNotRecognizeSelector.
             linkerSettings: [.linkedFramework("AVKit", .when(platforms: [.tvOS]))]
         ),
-        .target(name: "AppCore", dependencies: ["HostKit", "StreamKit", "MoonlightCore"]),
+        .target(name: "AppCore", dependencies: ["HostKit", "StreamKit", "MoonlightCore", "InputKit"]),
         .testTarget(name: "HostKitTests", dependencies: [
             "HostKit",
             .product(name: "X509", package: "swift-certificates"),
@@ -82,6 +82,6 @@ let package = Package(
         .testTarget(name: "MoonlightCoreTests", dependencies: ["MbedCrypto", "MoonlightCore", "MoonlightSlotA", "MoonlightSlotB"]),
         .testTarget(name: "StreamKitTests", dependencies: ["StreamKit"]),
         .testTarget(name: "InputKitTests", dependencies: ["InputKit", "MoonlightCore"]),
-        .testTarget(name: "AppCoreTests", dependencies: ["AppCore", "HostKit", "StreamKit"]),
+        .testTarget(name: "AppCoreTests", dependencies: ["AppCore", "HostKit", "StreamKit", "InputKit"]),
     ]
 )

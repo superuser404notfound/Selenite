@@ -4,8 +4,6 @@ import StreamKit
 import SwiftUI
 import UIKit
 
-// Adapted from Selenite/Developer/StreamStageView.swift (the harness stage), solo only.
-
 struct StreamSurface: UIViewControllerRepresentable {
     let controller: StreamController
     /// Read in the parent's body, so an overlay change re-renders this representable.

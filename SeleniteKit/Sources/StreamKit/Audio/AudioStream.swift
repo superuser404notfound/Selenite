@@ -40,6 +40,10 @@ final class AudioStream: @unchecked Sendable {
         AudioOutput.shared.detach(attachment)
     }
 
+    func setVolume(_ volume: Float) {
+        AudioOutput.shared.setVolume(volume, for: attachment)
+    }
+
     deinit { pcm.deallocate() }
 
     var stats: AudioRingStats { ring.stats }

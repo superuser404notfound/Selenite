@@ -79,7 +79,7 @@ struct StreamOverlayView: View {
 }
 
 /// The overlay's stats, refreshed once per second by `StreamController`.
-private struct OverlayStats: View {
+struct OverlayStats: View {
     let stats: StreamStatsSummary
     let pacing: FramePacingMode
 
