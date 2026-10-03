@@ -60,8 +60,8 @@ struct SplitOverlayView: View {
                     .lineLimit(1)
             }
             if let stream = split.streams[side], let stats = stream.liveStats {
-                OverlayStats(stats: stats, pacing: stream.settings.pacing)
-                    .font(.callout)
+                OverlayStats(stats: stats, pacing: stream.settings.pacing, columns: 2)
+                    .font(.caption)
             }
             volumeRow(position: position, side: side)
             labelCell(.primary(position), label: primaryLabel(side),

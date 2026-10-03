@@ -117,6 +117,8 @@ private struct SplitHalfView: View {
         }
     }
 
+    /// The stats HUD yields to the split overlay while it is open (it covers both halves at once);
+    /// the poor-connection symbol stays, it means something different.
     private func running(_ stream: StreamController) -> some View {
         ZStack {
             HStack(spacing: 16) {
@@ -127,7 +129,9 @@ private struct SplitHalfView: View {
                         .padding(14)
                         .background(.ultraThinMaterial, in: Circle())
                 }
-                StatsHUD(level: model.settings.preferences.stats, stats: stream.liveStats, pacing: stream.settings.pacing)
+                if !split.isOverlayOpen {
+                    StatsHUD(level: model.settings.preferences.stats, stats: stream.liveStats, pacing: stream.settings.pacing)
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
             if seated == 0 {

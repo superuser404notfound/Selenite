@@ -42,7 +42,9 @@ struct StreamCoverView: View {
     }
 }
 
-/// Top right while running: the poor-connection symbol while it lasts, and the stats HUD.
+/// Top right while running: the poor-connection symbol while it lasts, and the stats HUD. The HUD
+/// yields to the Menu overlay while it is open (same stats, no point behind it); the poor-connection
+/// symbol stays, it means something different.
 private struct StreamIndicators: View {
     let controller: StreamController
     let level: StatsPreference
@@ -58,7 +60,9 @@ private struct StreamIndicators: View {
                         .padding(14)
                         .background(.ultraThinMaterial, in: Circle())
                 }
-                StatsHUD(level: level, stats: controller.liveStats, pacing: controller.settings.pacing)
+                if !controller.isOverlayOpen {
+                    StatsHUD(level: level, stats: controller.liveStats, pacing: controller.settings.pacing)
+                }
             }
             Spacer()
         }

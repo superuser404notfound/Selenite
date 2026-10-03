@@ -4,83 +4,121 @@ import SwiftUI
 
 /// The full stats list (M3-A spec): three groups, each with a bold secondary heading, Grid rows
 /// with monospaced digits. Sets no size of its own, the caller's `.font()` decides it (`.callout`
-/// in the solo and split overlays, `.caption` in `FullStatsPanel`). Used by the solo overlay,
-/// every split overlay column and `FullStatsPanel`. Refreshed once per second by `StreamController`.
+/// in the solo overlay, `.caption` in the split overlay columns and in `FullStatsPanel`).
+/// `columns` lays the three groups out for whatever space the caller actually has: 1 (default)
+/// stacks them (`FullStatsPanel`), 3 puts Video | Latency | Quality side by side (the solo Menu
+/// overlay), 2 puts Video above Quality in one column next to Latency (each split overlay column).
+/// Used by the solo overlay, every split overlay column and `FullStatsPanel`. Refreshed once per
+/// second by `StreamController`.
 struct OverlayStats: View {
     let stats: StreamStatsSummary
     let pacing: FramePacingMode
+    var columns: Int = 1
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            group("Video") {
-                GridRow {
-                    Text("Resolution")
-                    Text(verbatim: "\(stats.width)x\(stats.height)")
-                }
-                GridRow {
-                    Text("Frame rate")
-                    Text("\(stats.fps) fps")
-                }
-                GridRow {
-                    Text("Codec")
-                    Text(stats.codec.label)
-                }
-                GridRow {
-                    Text("Frame pacing")
-                    Text(pacing.label)
-                }
-                GridRow {
-                    Text("Bitrate")
-                    Text("\(StatsFormat.megabits(stats.measuredBitrateMbps)) of \(stats.bitrateMbps) Mbps")
-                }
+        layout
+            .monospacedDigit()
+            .foregroundStyle(.secondary)
+    }
+
+    @ViewBuilder private var layout: some View {
+        switch columns {
+        case 3:
+            HStack(alignment: .top, spacing: 40) {
+                videoGroup
+                latencyGroup
+                qualityGroup
             }
-            group("Latency") {
-                GridRow {
-                    Text("Host")
-                    hostLatency
+        case 2:
+            HStack(alignment: .top, spacing: 40) {
+                VStack(alignment: .leading, spacing: 20) {
+                    videoGroup
+                    qualityGroup
                 }
-                GridRow {
-                    Text("Network receive")
-                    optionalMilliseconds(stats.networkMilliseconds)
-                }
-                GridRow {
-                    Text("Decode")
-                    Text("\(StatsFormat.milliseconds(stats.decodeMilliseconds)) ms")
-                }
-                GridRow {
-                    Text("Display wait")
-                    optionalMilliseconds(stats.displayMilliseconds)
-                }
-                GridRow {
-                    Text("Round trip")
-                    roundTrip
-                }
+                latencyGroup
             }
-            group("Quality") {
-                GridRow {
-                    Text("Jitter")
-                    Text("\(StatsFormat.milliseconds(stats.jitterMilliseconds)) ms")
-                }
-                GridRow {
-                    Text("Dropped frames")
-                    Text("\(stats.networkDrops) network, \(stats.queueDrops) queue, \(stats.pacerDrops) pacer")
-                }
-                GridRow {
-                    Text("Unrecoverable frames")
-                    Text(verbatim: "\(stats.unrecoverableFrames)")
-                }
-                GridRow {
-                    Text("Stalls")
-                    Text(verbatim: "\(stats.stalls)")
-                }
-                GridRow {
-                    Text("Audio underruns")
-                    Text(verbatim: "\(stats.audioUnderruns)")
-                }
+        default:
+            VStack(alignment: .leading, spacing: 20) {
+                videoGroup
+                latencyGroup
+                qualityGroup
             }
         }
-        .monospacedDigit()
-        .foregroundStyle(.secondary)
+    }
+
+    private var videoGroup: some View {
+        group("Video") {
+            GridRow {
+                Text("Resolution")
+                Text(verbatim: "\(stats.width)x\(stats.height)")
+            }
+            GridRow {
+                Text("Frame rate")
+                Text("\(stats.fps) fps")
+            }
+            GridRow {
+                Text("Codec")
+                Text(stats.codec.label)
+            }
+            GridRow {
+                Text("Frame pacing")
+                Text(pacing.label)
+            }
+            GridRow {
+                Text("Bitrate")
+                Text("\(StatsFormat.megabits(stats.measuredBitrateMbps)) of \(stats.bitrateMbps) Mbps")
+            }
+        }
+    }
+
+    private var latencyGroup: some View {
+        group("Latency") {
+            GridRow {
+                Text("Host processing")
+                hostLatency
+            }
+            GridRow {
+                Text("Network receive")
+                optionalMilliseconds(stats.networkMilliseconds)
+            }
+            GridRow {
+                Text("Decode")
+                Text("\(StatsFormat.milliseconds(stats.decodeMilliseconds)) ms")
+            }
+            GridRow {
+                Text("Display wait")
+                optionalMilliseconds(stats.displayMilliseconds)
+            }
+            GridRow {
+                Text("Round trip")
+                roundTrip
+            }
+        }
+    }
+
+    private var qualityGroup: some View {
+        group("Quality") {
+            GridRow {
+                Text("Jitter")
+                Text("\(StatsFormat.milliseconds(stats.jitterMilliseconds)) ms")
+            }
+            GridRow {
+                Text("Dropped frames")
+                Text("\(stats.networkDrops) network, \(stats.queueDrops) queue, \(stats.pacerDrops) pacer")
+            }
+            GridRow {
+                Text("Unrecoverable frames")
+                Text(verbatim: "\(stats.unrecoverableFrames)")
+            }
+            GridRow {
+                Text("Stalls")
+                Text(verbatim: "\(stats.stalls)")
+            }
+            GridRow {
+                Text("Audio underruns")
+                Text(verbatim: "\(stats.audioUnderruns)")
+            }
+        }
     }
 
     @ViewBuilder private var hostLatency: some View {
@@ -160,8 +198,9 @@ struct FullStatsPanel: View {
 }
 
 /// The top-right stats HUD for a running stream, solo or one split half: nothing, the compact pill
-/// or the full panel. At Full, a half narrower than the panel falls back to the pill instead of
-/// overflowing or clipping.
+/// or the full panel. At Full, a half narrower or shorter than the panel falls back to the pill
+/// instead of overflowing or clipping: a top/bottom split half is short enough that only the
+/// vertical axis would otherwise catch it, so both axes are checked.
 struct StatsHUD: View {
     let level: StatsPreference
     let stats: StreamStatsSummary?
@@ -175,7 +214,7 @@ struct StatsHUD: View {
             case .compact:
                 CompactStatsPill(stats: stats)
             case .full:
-                ViewThatFits(in: .horizontal) {
+                ViewThatFits(in: [.horizontal, .vertical]) {
                     FullStatsPanel(stats: stats, pacing: pacing)
                     CompactStatsPill(stats: stats)
                 }

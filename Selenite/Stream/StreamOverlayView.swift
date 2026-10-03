@@ -33,7 +33,7 @@ struct StreamOverlayView: View {
                     .foregroundStyle(.secondary)
             }
             if let stats = controller.liveStats {
-                OverlayStats(stats: stats, pacing: controller.settings.pacing)
+                OverlayStats(stats: stats, pacing: controller.settings.pacing, columns: 3)
                     .font(.callout)
             }
             if controller.isConfirmingQuit {
@@ -61,7 +61,7 @@ struct StreamOverlayView: View {
             }
         }
         .padding(48)
-        .frame(width: 960)
+        .frame(width: 1500)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 32))
         .overlay(RoundedRectangle(cornerRadius: 32).strokeBorder(Color.Theme.panelEdge, lineWidth: 1))
         .defaultFocus($focused, .resume)

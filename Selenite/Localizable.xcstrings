@@ -193,10 +193,10 @@
     "HEVC" : {
 
     },
-    "Host" : {
+    "Host did not wake up" : {
 
     },
-    "Host did not wake up" : {
+    "Host processing" : {
 
     },
     "In split screen only the codec applies; the bitrate there is half the global one." : {
