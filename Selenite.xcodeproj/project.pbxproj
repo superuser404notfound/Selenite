@@ -25,6 +25,7 @@
 		6DF9D32C15A12D0C2955FE33 /* FailureText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68830DDB57D3AA87AD8A38C6 /* FailureText.swift */; };
 		6E89F70DE09BD4F802273DA2 /* AppTile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BE0886C65B71808D997F30A /* AppTile.swift */; };
 		71A30642922B8F8B29A65265 /* AddHostFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31D65A510D94364F3B5D7626 /* AddHostFlowView.swift */; };
+		73F507CB26C9C6D55E451C45 /* StatsViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49C2BBD8A47916EEE19987CA /* StatsViews.swift */; };
 		81B8795B97796488DA74FFC8 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 12D1C745A4359BA90A9D9162 /* Localizable.xcstrings */; };
 		8EA122957D8DABD53DCA34B7 /* SplitContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14D5D5B06C94898B89C00BD1 /* SplitContainer.swift */; };
 		9546C00191F51DA116A05798 /* SplitWizardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54F6C2BE12159B857CCF910D /* SplitWizardView.swift */; };
@@ -65,6 +66,7 @@
 		37C8DEC225845017D34A9385 /* WakePanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WakePanel.swift; sourceTree = "<group>"; };
 		45E145C40671B3024384F31F /* AsyncCachedImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AsyncCachedImage.swift; sourceTree = "<group>"; };
 		45EAB5CCA5EF274867374D67 /* DeveloperView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperView.swift; sourceTree = "<group>"; };
+		49C2BBD8A47916EEE19987CA /* StatsViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsViews.swift; sourceTree = "<group>"; };
 		536760E4329F49D368B1B8BD /* HostCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostCard.swift; sourceTree = "<group>"; };
 		54F6C2BE12159B857CCF910D /* SplitWizardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitWizardView.swift; sourceTree = "<group>"; };
 		56AEAF6F7A60D4EE01BA1587 /* StreamOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamOverlayView.swift; sourceTree = "<group>"; };
@@ -147,6 +149,7 @@
 			isa = PBXGroup;
 			children = (
 				A94CE08B4C9A3E680A947E22 /* ErrorPanel.swift */,
+				49C2BBD8A47916EEE19987CA /* StatsViews.swift */,
 				31071BC9355E89A5E5CA7339 /* StreamContainer.swift */,
 				10D449D417CA0BAC6F70C675 /* StreamCoverView.swift */,
 				DA2DB4429BE59BAC3854583B /* StreamLoadingView.swift */,
@@ -325,6 +328,7 @@
 				DFCC100449E4B9582F992142 /* SplitOverlayView.swift in Sources */,
 				53FA1B28082BB906B32F81FC /* SplitScreenView.swift in Sources */,
 				9546C00191F51DA116A05798 /* SplitWizardView.swift in Sources */,
+				73F507CB26C9C6D55E451C45 /* StatsViews.swift in Sources */,
 				C9D3D7D4294509AB483C9F86 /* StreamContainer.swift in Sources */,
 				3444C9834442D162D4AFDEE1 /* StreamCoverView.swift in Sources */,
 				37E4DAF36DD2A84FC1F1BFD5 /* StreamLoadingView.swift in Sources */,

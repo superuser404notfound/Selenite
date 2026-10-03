@@ -34,10 +34,22 @@
     "%@ is running on %@. Starting %@ quits it." : {
 
     },
+    "%@ Mbps" : {
+
+    },
     "%@ ms" : {
 
     },
+    "%@ ms (%@ to %@)" : {
+
+    },
     "%@ ms decode" : {
+
+    },
+    "%@ of %lld Mbps" : {
+
+    },
+    "%lld ± %lld ms" : {
 
     },
     "%lld drops" : {
@@ -52,7 +64,7 @@
     "%lld ms" : {
 
     },
-    "%lld network, %lld pacer" : {
+    "%lld network, %lld queue, %lld pacer" : {
 
     },
     "Add host" : {
@@ -124,7 +136,7 @@
     "Continue" : {
 
     },
-    "Decode time" : {
+    "Decode" : {
 
     },
     "Developer" : {
@@ -137,6 +149,9 @@
 
     },
     "Disconnecting…" : {
+
+    },
+    "Display wait" : {
 
     },
     "Dropped frames" : {
@@ -178,10 +193,19 @@
     "HEVC" : {
 
     },
+    "Host" : {
+
+    },
     "Host did not wake up" : {
 
     },
     "In split screen only the codec applies; the bitrate there is half the global one." : {
+
+    },
+    "Jitter" : {
+
+    },
+    "Latency" : {
 
     },
     "Layout" : {
@@ -197,6 +221,9 @@
 
     },
     "n/a" : {
+
+    },
+    "Network receive" : {
 
     },
     "New" : {
@@ -290,6 +317,9 @@
 
     },
     "Press Start to play" : {
+
+    },
+    "Quality" : {
 
     },
     "Quit %@ on %@? Unsaved progress may be lost." : {
@@ -472,7 +502,13 @@
     "Try again" : {
 
     },
+    "Unrecoverable frames" : {
+
+    },
     "Use global (%@)" : {
+
+    },
+    "Video" : {
 
     },
     "Waiting for picture…" : {

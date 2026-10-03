@@ -54,6 +54,7 @@ struct SplitScreenView: View {
 }
 
 private struct SplitHalfView: View {
+    @Environment(AppModel.self) private var model
     let split: SplitController
     let side: SplitSide
     let hostName: String
@@ -118,14 +119,17 @@ private struct SplitHalfView: View {
 
     private func running(_ stream: StreamController) -> some View {
         ZStack {
-            if stream.isPoorConnection {
-                Image(systemName: "wifi.exclamationmark")
-                    .font(.title3)
-                    .foregroundStyle(Color.Theme.warning)
-                    .padding(14)
-                    .background(.ultraThinMaterial, in: Circle())
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+            HStack(spacing: 16) {
+                if stream.isPoorConnection {
+                    Image(systemName: "wifi.exclamationmark")
+                        .font(.title3)
+                        .foregroundStyle(Color.Theme.warning)
+                        .padding(14)
+                        .background(.ultraThinMaterial, in: Circle())
+                }
+                StatsHUD(level: model.settings.preferences.stats, stats: stream.liveStats, pacing: stream.settings.pacing)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
             if seated == 0 {
                 bottom { capsule(progress: false) { Text("Press A to join") } }
             }

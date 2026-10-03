@@ -1,5 +1,6 @@
 import AppCore
 import QuartzCore
+import StreamKit
 import SwiftUI
 
 /// The full-screen stream (spec 4.4): the surface, the loading view until the first frame, the
@@ -18,7 +19,7 @@ struct StreamCoverView: View {
                     .transition(.opacity)
             }
             if controller.phase == .running, controller.ending == nil {
-                StreamIndicators(controller: controller, showsStats: model.settings.preferences.stats != .off)
+                StreamIndicators(controller: controller, level: model.settings.preferences.stats)
             }
             if controller.isOverlayOpen {
                 StreamOverlayView(controller: controller)
@@ -41,10 +42,10 @@ struct StreamCoverView: View {
     }
 }
 
-/// Top right while running: the poor-connection symbol while it lasts, and the compact stats pill.
+/// Top right while running: the poor-connection symbol while it lasts, and the stats HUD.
 private struct StreamIndicators: View {
     let controller: StreamController
-    let showsStats: Bool
+    let level: StatsPreference
 
     var body: some View {
         VStack {
@@ -57,40 +58,11 @@ private struct StreamIndicators: View {
                         .padding(14)
                         .background(.ultraThinMaterial, in: Circle())
                 }
-                if showsStats, let stats = controller.liveStats {
-                    CompactStatsPill(stats: stats)
-                }
+                StatsHUD(level: level, stats: controller.liveStats, pacing: controller.settings.pacing)
             }
             Spacer()
         }
         .padding(48)
         .allowsHitTesting(false)
-    }
-}
-
-struct CompactStatsPill: View {
-    let stats: StreamStatsSummary
-
-    var body: some View {
-        HStack(spacing: 20) {
-            Text("\(stats.fps) fps")
-            Text("\(StatsFormat.milliseconds(stats.decodeMilliseconds)) ms decode")
-            if let rtt = stats.rttMilliseconds {
-                Text("RTT \(rtt) ms")
-            } else {
-                Text("RTT n/a")
-            }
-            Text("\(stats.networkDrops + stats.pacerDrops) drops")
-        }
-        .font(.caption.monospacedDigit())
-        .padding(.horizontal, 20)
-        .padding(.vertical, 10)
-        .background(.ultraThinMaterial, in: Capsule())
-    }
-}
-
-enum StatsFormat {
-    static func milliseconds(_ value: Double) -> String {
-        String(format: "%.1f", value)
     }
 }
