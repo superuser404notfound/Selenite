@@ -32,6 +32,9 @@ struct SplitWizardView: View {
             .frame(maxWidth: .infinity, alignment: .topLeading)
         }
         .scrollClipDisabled()
+        // A fresh scroll view per step: the offset of a long game grid must not carry over into
+        // the next, shorter step and leave its title above the screen.
+        .id(String(describing: wizard.step))
         .background(Color.Theme.page.ignoresSafeArea())
         .focusScope(focusScope)
         // One-side mode has no layout step: the plan is already complete once the game is chosen.
