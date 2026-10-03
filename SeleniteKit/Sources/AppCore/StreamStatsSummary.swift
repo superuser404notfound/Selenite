@@ -80,7 +80,9 @@ public struct StreamStatsSummary: Equatable, Sendable {
             deltaTotal = current.hostLatencyTotalTenths
             deltaSamples = current.hostLatencySamples
         }
-        guard deltaSamples > 0 else { return nil }
+        // A negative delta means the counter went backwards (a new session's stats read against a
+        // stale `previous`): no window data, not a negative mean.
+        guard deltaTotal >= 0, deltaSamples > 0 else { return nil }
         let mean = Double(deltaTotal) / Double(deltaSamples) / 10
         return HostLatency(mean: mean, min: range.lowerBound, max: range.upperBound)
     }
@@ -89,13 +91,15 @@ public struct StreamStatsSummary: Equatable, Sendable {
         let deltaTotal: Double
         let deltaSamples: Int
         if let previous {
-            deltaTotal = Double(current.networkReceiveTotalMicroseconds - previous.networkReceiveTotalMicroseconds)
+            // Both UInt64; subtract as Double first so a counter that went backwards produces a
+            // negative delta instead of trapping.
+            deltaTotal = Double(current.networkReceiveTotalMicroseconds) - Double(previous.networkReceiveTotalMicroseconds)
             deltaSamples = current.networkReceiveSamples - previous.networkReceiveSamples
         } else {
             deltaTotal = Double(current.networkReceiveTotalMicroseconds)
             deltaSamples = current.networkReceiveSamples
         }
-        guard deltaSamples > 0 else { return nil }
+        guard deltaTotal >= 0, deltaSamples > 0 else { return nil }
         return deltaTotal / Double(deltaSamples) / 1000
     }
 
@@ -109,7 +113,7 @@ public struct StreamStatsSummary: Equatable, Sendable {
             deltaTotal = current.pacer.displayWaitTotalMilliseconds
             deltaSamples = current.pacer.displayWaitSamples
         }
-        guard deltaSamples > 0 else { return nil }
+        guard deltaTotal >= 0, deltaSamples > 0 else { return nil }
         return deltaTotal / Double(deltaSamples)
     }
 }

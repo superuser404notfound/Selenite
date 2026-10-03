@@ -57,3 +57,23 @@ private let settings = StreamSettings(width: 1920, height: 1080, fps: 60, bitrat
     #expect(summary.networkMilliseconds == nil)
     #expect(summary.displayMilliseconds == nil)
 }
+
+@Test func aCounterThatWentBackwardsGivesNoNetworkWindow() {
+    let previous = StreamStats(sampledAt: 1, networkReceiveTotalMicroseconds: 400_000, networkReceiveSamples: 200)
+    let current = StreamStats(sampledAt: 2, networkReceiveTotalMicroseconds: 100_000, networkReceiveSamples: 300)
+    let summary = StreamStatsSummary(current: current, previous: previous, settings: settings)
+    #expect(summary.networkMilliseconds == nil)
+}
+
+@Test func withoutAPreviousSampleTheRunningTotalsAreUsed() {
+    var pacer = PacerStats()
+    pacer.displayWaitTotalMilliseconds = 50
+    pacer.displayWaitSamples = 50
+    let current = StreamStats(pacer: pacer, hostLatencyTotalTenths: 600, hostLatencySamples: 100,
+                              hostLatencyRange: 3...9, networkReceiveTotalMicroseconds: 300_000,
+                              networkReceiveSamples: 100)
+    let summary = StreamStatsSummary(current: current, previous: nil, settings: settings)
+    #expect(summary.hostLatency == HostLatency(mean: 0.6, min: 3, max: 9))
+    #expect(abs((summary.networkMilliseconds ?? -1) - 3) < 1e-9)
+    #expect(abs((summary.displayMilliseconds ?? -1) - 1) < 1e-9)
+}
