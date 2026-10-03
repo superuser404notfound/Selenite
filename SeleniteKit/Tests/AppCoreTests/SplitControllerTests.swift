@@ -370,17 +370,20 @@ private func host(_ id: String) -> PairedHost {
     #expect(!rig.controller.isOverlayOpen)
 }
 
-@MainActor @Test func menuWithTheOverlayOpenEndsTheSplitLikeSolo() async {
+@MainActor @Test func menuWithTheOverlayOpenClosesItAndKeepsBothSides() async {
     let (rig, _, _) = await runningRig()
     rig.controller.menuPressed(now: 10)
     #expect(rig.controller.isOverlayOpen)
     rig.controller.menuPressed(now: 11)
     #expect(!rig.controller.isOverlayOpen)
-    let finished = await eventually { rig.finished == [.ended] }
-    #expect(finished)
+    #expect(rig.finished.isEmpty)
+    #expect(rig.session("A")?.stopCount == 0)
+    #expect(rig.session("B")?.stopCount == 0)
+    rig.controller.menuPressed(now: 12)
+    #expect(rig.controller.isOverlayOpen)
 }
 
-@MainActor @Test func menuBacksOutOfAnArmedQuitBeforeEnding() async {
+@MainActor @Test func menuBacksOutOfAnArmedQuitBeforeClosing() async {
     let (rig, _, _) = await runningRig()
     rig.session("A")?.presentFirstFrame()
     _ = await eventually { rig.controller.streams[.first]?.phase == .running }

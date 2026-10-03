@@ -197,20 +197,17 @@ private final class FakeCommands: HostCommands, @unchecked Sendable {
     #expect(forwarding == [false])
 }
 
-@MainActor @Test func menuWithTheOverlayOpenDisconnectsAndLeavesTheGameRunning() async {
+@MainActor @Test func menuWithTheOverlayOpenClosesItAndKeepsStreaming() async {
     let rig = await runningRig()
     rig.controller.menuPressed(now: 10)
     rig.controller.menuPressed(now: 11)
-    let during: StreamEnding? = rig.controller.ending
-    #expect(during == .disconnecting)
-    await rig.controller.endTask?.value
-    let calls: [StreamFailure?] = rig.ended.calls
-    let quits: [Int] = rig.commands.stopsAtQuit
-    #expect(rig.controller.phase == .ended)
-    #expect(calls == [nil])
-    #expect(quits.isEmpty)
-    #expect(rig.session.stopCount == 1)
-    #expect(rig.input.ended == 1)
+    #expect(!rig.controller.isOverlayOpen)
+    #expect(rig.controller.phase == .running)
+    let ending: StreamEnding? = rig.controller.ending
+    #expect(ending == nil)
+    #expect(rig.session.stopCount == 0)
+    let forwarding: [Bool] = rig.input.forwarding
+    #expect(forwarding == [false, true])
 }
 
 @MainActor @Test func menuAfterResumeOpensTheOverlayAgain() async {
