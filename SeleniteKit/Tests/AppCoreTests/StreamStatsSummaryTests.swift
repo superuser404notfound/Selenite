@@ -33,11 +33,11 @@ private let settings = StreamSettings(width: 1920, height: 1080, fps: 60, bitrat
     currentPacer.displayWaitTotalMilliseconds = 160
     currentPacer.displayWaitSamples = 110
     currentPacer.jitterMilliseconds = 1.5
-    let previous = StreamStats(pacer: previousPacer, sampledAt: 1, hostLatencyTotalTenths: 400,
+    let previous = StreamStats(pacer: previousPacer, sampledAt: 1, hostLatencyTotalTenths: 4000,
                                hostLatencySamples: 100, networkReceiveTotalMicroseconds: 100_000,
                                networkReceiveSamples: 100)
     let current = StreamStats(pacer: currentPacer, rttMilliseconds: 4, sampledAt: 2, queueDroppedFrames: 3,
-                              unrecoverableFrames: 2, hostLatencyTotalTenths: 1000, hostLatencySamples: 200,
+                              unrecoverableFrames: 2, hostLatencyTotalTenths: 10000, hostLatencySamples: 200,
                               hostLatencyRange: 3...9, networkReceiveTotalMicroseconds: 400_000,
                               networkReceiveSamples: 200, rttVarianceMilliseconds: 2)
     let summary = StreamStatsSummary(current: current, previous: previous, settings: settings)

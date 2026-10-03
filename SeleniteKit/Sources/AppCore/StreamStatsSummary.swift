@@ -81,7 +81,7 @@ public struct StreamStatsSummary: Equatable, Sendable {
             deltaSamples = current.hostLatencySamples
         }
         guard deltaSamples > 0 else { return nil }
-        let mean = Double(deltaTotal) / Double(deltaSamples)
+        let mean = Double(deltaTotal) / Double(deltaSamples) / 10
         return HostLatency(mean: mean, min: range.lowerBound, max: range.upperBound)
     }
 
