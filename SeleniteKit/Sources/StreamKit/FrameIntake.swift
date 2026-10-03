@@ -10,8 +10,14 @@ struct FrameIntake {
     private(set) var receiveSamples = 0
     private var lastFrameNumber: Int32 = 0
     private var overflowsAttributed = 0
-    private var windowMinTenths: UInt16?
-    private var windowMaxTenths: UInt16?
+    // Host latency keeps a rolling 1-second-bucket pair (current + previous) instead of draining
+    // on read, so a caller that polls stats() without pacing (e.g. the first-frame wait loop)
+    // doesn't erase the window before anyone sees it.
+    private var currentBucket: UInt64?
+    private var currentMinTenths: UInt16?
+    private var currentMaxTenths: UInt16?
+    private var previousMinTenths: UInt16?
+    private var previousMaxTenths: UInt16?
 
     /// `overflowsSoFar` is the slot's decode-queue overflow count since this session started: the
     /// first gap after a new overflow is the frames moonlight-common-c flushed on the client.
@@ -31,8 +37,27 @@ struct FrameIntake {
         if hostLatencyTenths > 0 {
             hostLatencyTotalTenths += Int(hostLatencyTenths)
             hostLatencySamples += 1
-            windowMinTenths = min(windowMinTenths ?? hostLatencyTenths, hostLatencyTenths)
-            windowMaxTenths = max(windowMaxTenths ?? hostLatencyTenths, hostLatencyTenths)
+            // A frame with no receive timestamp joins whatever bucket is already current.
+            let bucket = receiveMicroseconds > 0 ? receiveMicroseconds / 1_000_000 : (currentBucket ?? 0)
+            if let current = currentBucket, bucket > current {
+                if bucket == current + 1 {
+                    previousMinTenths = currentMinTenths
+                    previousMaxTenths = currentMaxTenths
+                } else {
+                    previousMinTenths = nil
+                    previousMaxTenths = nil
+                }
+                currentBucket = bucket
+                currentMinTenths = hostLatencyTenths
+                currentMaxTenths = hostLatencyTenths
+            } else if currentBucket == nil {
+                currentBucket = bucket
+                currentMinTenths = hostLatencyTenths
+                currentMaxTenths = hostLatencyTenths
+            } else {
+                currentMinTenths = min(currentMinTenths ?? hostLatencyTenths, hostLatencyTenths)
+                currentMaxTenths = max(currentMaxTenths ?? hostLatencyTenths, hostLatencyTenths)
+            }
         }
         if receiveMicroseconds > 0, enqueueMicroseconds >= receiveMicroseconds {
             receiveTotalMicroseconds += enqueueMicroseconds - receiveMicroseconds
@@ -40,10 +65,20 @@ struct FrameIntake {
         }
     }
 
-    /// The host latency range since the last call, in milliseconds; nil when the host sent none.
-    mutating func takeHostLatencyRange() -> ClosedRange<Double>? {
-        defer { windowMinTenths = nil; windowMaxTenths = nil }
-        guard let low = windowMinTenths, let high = windowMaxTenths else { return nil }
+    /// The host latency range over the current and previous 1-second bucket, in milliseconds; nil
+    /// when neither bucket has a sample. Reading this never mutates the buckets.
+    var hostLatencyRange: ClosedRange<Double>? {
+        var low: UInt16?
+        var high: UInt16?
+        if let currentMinTenths, let currentMaxTenths {
+            low = currentMinTenths
+            high = currentMaxTenths
+        }
+        if let previousMinTenths, let previousMaxTenths {
+            low = min(low ?? previousMinTenths, previousMinTenths)
+            high = max(high ?? previousMaxTenths, previousMaxTenths)
+        }
+        guard let low, let high else { return nil }
         return Double(low) / 10...Double(high) / 10
     }
 }

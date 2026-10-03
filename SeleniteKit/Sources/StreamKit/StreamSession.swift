@@ -325,7 +325,7 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
         var rtt: UInt32 = 0
         var variance: UInt32 = 0
         let hasRTT = slot.api.getEstimatedRttInfo!(&rtt, &variance)
-        let intake = pipeline?.takeIntakeSnapshot()
+        let intake = pipeline?.intakeSnapshot()
         return StreamStats(decodedFrames: pipeline?.decodedFrames ?? 0,
                            networkDroppedFrames: pipeline?.networkDroppedFrames ?? 0,
                            pacer: pacer.stats,

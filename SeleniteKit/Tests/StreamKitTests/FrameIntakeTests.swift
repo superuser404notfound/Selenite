@@ -36,16 +36,43 @@ private func feed(_ intake: inout FrameIntake, _ number: Int32, overflows: Int =
     #expect(intake.networkDrops == 2)
 }
 
-@Test func hostLatencyIgnoresZeroAndDrainsItsRange() {
+@Test func zeroHostLatencyGivesNilRange() {
     var intake = FrameIntake()
     feed(&intake, 1, latency: 0)
-    #expect(intake.takeHostLatencyRange() == nil)
-    feed(&intake, 2, latency: 40)
-    feed(&intake, 3, latency: 80)
+    #expect(intake.hostLatencyRange == nil)
+}
+
+@Test func sameSecondSamplesGiveARangeThatReadsStable() {
+    var intake = FrameIntake()
+    feed(&intake, 1, latency: 40, receive: 1_000_000)
+    feed(&intake, 2, latency: 80, receive: 1_500_000)
     #expect(intake.hostLatencySamples == 2)
     #expect(intake.hostLatencyTotalTenths == 120)
-    #expect(intake.takeHostLatencyRange() == 4.0...8.0)
-    #expect(intake.takeHostLatencyRange() == nil)
+    #expect(intake.hostLatencyRange == 4.0...8.0)
+    #expect(intake.hostLatencyRange == 4.0...8.0)
+}
+
+@Test func theNextSecondKeepsThePreviousSecondInRange() {
+    var intake = FrameIntake()
+    feed(&intake, 1, latency: 40, receive: 1_000_000)
+    feed(&intake, 2, latency: 80, receive: 1_500_000)
+    feed(&intake, 3, latency: 20, receive: 2_100_000)
+    #expect(intake.hostLatencyRange == 2.0...8.0)
+}
+
+@Test func aGapOfTwoOrMoreSecondsDropsTheOldValues() {
+    var intake = FrameIntake()
+    feed(&intake, 1, latency: 40, receive: 1_000_000)
+    feed(&intake, 2, latency: 80, receive: 1_500_000)
+    feed(&intake, 3, latency: 20, receive: 4_000_000)
+    #expect(intake.hostLatencyRange == 2.0...2.0)
+}
+
+@Test func receiveZeroJoinsTheLastKnownBucket() {
+    var intake = FrameIntake()
+    feed(&intake, 1, latency: 40, receive: 1_000_000)
+    feed(&intake, 2, latency: 80, receive: 0)
+    #expect(intake.hostLatencyRange == 4.0...8.0)
 }
 
 @Test func networkReceiveTimeIsEnqueueMinusReceive() {

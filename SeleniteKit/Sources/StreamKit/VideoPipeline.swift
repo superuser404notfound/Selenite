@@ -146,14 +146,14 @@ public final class VideoPipeline: @unchecked Sendable {
         var receiveSamples: Int
     }
 
-    /// Drains the host latency range: call once per stats sample.
-    func takeIntakeSnapshot() -> IntakeSnapshot {
+    /// Read-only: no draining, safe to call as often as a caller likes (e.g. a poll loop).
+    func intakeSnapshot() -> IntakeSnapshot {
         let unrecoverable = SlotLogCounters.shared.unrecoverable(slot) - lock.withLock { unrecoverableBase }
         return lock.withLock {
             IntakeSnapshot(bytes: intake.bytes, queueDrops: intake.queueDrops, unrecoverable: unrecoverable,
                            hostLatencyTotalTenths: intake.hostLatencyTotalTenths,
                            hostLatencySamples: intake.hostLatencySamples,
-                           hostLatencyRange: intake.takeHostLatencyRange(),
+                           hostLatencyRange: intake.hostLatencyRange,
                            receiveTotalMicroseconds: intake.receiveTotalMicroseconds,
                            receiveSamples: intake.receiveSamples)
         }
