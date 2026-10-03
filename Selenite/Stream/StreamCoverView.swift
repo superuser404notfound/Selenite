@@ -18,7 +18,7 @@ struct StreamCoverView: View {
                     .transition(.opacity)
             }
             if controller.phase == .running, controller.ending == nil {
-                StreamIndicators(controller: controller, showsStats: model.settings.preferences.stats == .compact)
+                StreamIndicators(controller: controller, showsStats: model.settings.preferences.stats != .off)
             }
             if controller.isOverlayOpen {
                 StreamOverlayView(controller: controller)

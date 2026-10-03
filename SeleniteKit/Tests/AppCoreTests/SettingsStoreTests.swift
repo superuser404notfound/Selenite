@@ -58,3 +58,12 @@ private func freshDefaults() -> UserDefaults {
     store.setSelectedHostID(nil)
     #expect(SettingsStore(defaults: defaults).selectedHostID == nil)
 }
+
+@MainActor @Test func theStatsLevelsRoundTrip() {
+    let defaults = freshDefaults()
+    defaults.set("compact", forKey: SettingsStore.Key.stats)
+    #expect(SettingsStore(defaults: defaults).preferences.stats == .compact)
+    let store = SettingsStore(defaults: defaults)
+    store.set(\.stats, .full)
+    #expect(SettingsStore(defaults: defaults).preferences.stats == .full)
+}

@@ -17,7 +17,7 @@ public enum AudioPreference: String, CaseIterable, Sendable {
 }
 
 public enum StatsPreference: String, CaseIterable, Sendable {
-    case off, compact
+    case off, compact, full
 }
 
 /// The user's stream settings (M1-B spec, section 4.3), global for every host.

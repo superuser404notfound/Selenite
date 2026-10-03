@@ -158,6 +158,7 @@ extension StatsPreference {
         switch self {
         case .off: "Off"
         case .compact: "Compact"
+        case .full: "Full"
         }
     }
 }
