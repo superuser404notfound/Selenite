@@ -578,3 +578,35 @@ private func simulateDirect(_ mode: FramePacingMode = .lowLatency, directPresent
     #expect(shown == 0)
     #expect(direct == 0)
 }
+
+// MARK: - Display wait
+
+private final class ManualClock: @unchecked Sendable {
+    var now = 0.0
+}
+
+@Test func displayWaitIsArrivalToTick() {
+    let clock = ManualClock()
+    let pacer = FramePacer<Int>(mode: .lowLatency, clock: { clock.now })
+    pacer.put(1, arrival: 1.000)
+    clock.now = 1.004
+    #expect(pacer.tick() == 1)
+    pacer.put(2, arrival: 1.010)
+    clock.now = 1.020
+    #expect(pacer.tick() == 2)
+    let stats = pacer.stats
+    #expect(stats.displayWaitSamples == 2)
+    #expect(abs(stats.displayWaitTotalMilliseconds - 14) < 1e-6)
+}
+
+@Test func droppedFramesAddNoDisplayWait() {
+    let clock = ManualClock()
+    let pacer = FramePacer<Int>(mode: .lowLatency, clock: { clock.now })
+    pacer.put(1, arrival: 0)
+    pacer.put(2, arrival: 0)
+    pacer.put(3, arrival: 0)
+    clock.now = 0.002
+    #expect(pacer.tick() == 2)
+    #expect(pacer.stats.overflowDrops == 1)
+    #expect(pacer.stats.displayWaitSamples == 1)
+}

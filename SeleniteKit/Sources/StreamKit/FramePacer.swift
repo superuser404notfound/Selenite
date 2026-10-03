@@ -1,4 +1,5 @@
 import Foundation
+import QuartzCore
 
 public enum FramePacingMode: String, Sendable, CaseIterable {
     case lowLatency, smooth
@@ -26,6 +27,10 @@ public struct PacerStats: Sendable, Equatable {
     public var arrivalIntervalMilliseconds: Double = 0
     public var vsyncIntervalMilliseconds: Double = 0
     public var vsyncs = 0
+    /// Sum of (shown time - arrival) over every frame actually shown, milliseconds. Dropped frames
+    /// (overflow, catch-up) add nothing.
+    public var displayWaitTotalMilliseconds: Double = 0
+    public var displayWaitSamples = 0
 
     public init() {}
 }
@@ -83,6 +88,9 @@ public final class FramePacer<Frame>: @unchecked Sendable {
 
     private let lock = NSLock()
     private var queue: [Frame] = []
+    /// Arrival time of each frame in `queue`, same index, appended and removed alongside it.
+    private var arrivals: [Double] = []
+    private let clock: @Sendable () -> Double
     private var backlogTicks = 0
     private var primed = false
     private var counters = PacerStats()
@@ -111,11 +119,14 @@ public final class FramePacer<Frame>: @unchecked Sendable {
     public let directPresent: Bool
     private var present: ((Frame) -> Void)?
 
-    public init(mode: FramePacingMode = .lowLatency, frameRate: Int = 0, directPresent: Bool = false) {
+    public init(mode: FramePacingMode = .lowLatency, frameRate: Int = 0, directPresent: Bool = false,
+                clock: @escaping @Sendable () -> Double = { CACurrentMediaTime() }) {
         self.mode = mode
         self.frameRate = frameRate
         self.directPresent = directPresent
+        self.clock = clock
         queue.reserveCapacity(capacity + 1)
+        arrivals.reserveCapacity(capacity + 1)
         phaseDistances.reserveCapacity(Self.phaseWindow)
     }
 
@@ -128,13 +139,25 @@ public final class FramePacer<Frame>: @unchecked Sendable {
             record(arrival: arrival)
             if queue.count >= capacity {
                 queue.removeFirst()
+                arrivals.removeFirst()
                 counters.overflowDrops += 1
             }
             queue.append(frame)
+            arrivals.append(arrival)
+            assertQueueInSync()
             if isDirect, !intervalServed, let present {
                 present(presentNext(direct: true))
             }
         }
+    }
+
+    private func assertQueueInSync() {
+        assert(queue.count == arrivals.count, "queue and arrivals must track each other 1:1")
+    }
+
+    private func recordDisplayWait(_ arrival: Double) {
+        counters.displayWaitTotalMilliseconds += (clock() - arrival) * 1000
+        counters.displayWaitSamples += 1
     }
 
     private func record(arrival: Double) {
@@ -190,19 +213,23 @@ public final class FramePacer<Frame>: @unchecked Sendable {
         }
         ticksSincePresent = 0
         var frame = queue.removeFirst()
+        var frameArrival = arrivals.removeFirst()
         if queue.isEmpty {
             backlogTicks = 0
         } else {
             backlogTicks += 1
             if backlogTicks >= Self.lowLatencyCatchUpTicks, arrivalsAreAwayFromTheTick {
                 frame = queue.removeFirst()
+                frameArrival = arrivals.removeFirst()
                 counters.catchUpDrops += 1
                 backlogTicks = 0
             } else {
                 counters.bufferedTicks += 1
             }
         }
+        assertQueueInSync()
         counters.presented += 1
+        recordDisplayWait(frameArrival)
         return frame
     }
 
@@ -226,6 +253,7 @@ public final class FramePacer<Frame>: @unchecked Sendable {
         backlogTicks += 1
         if backlogTicks >= Self.lowLatencyCatchUpTicks, arrivalsAreAwayFromTheTick {
             queue.removeFirst()
+            arrivals.removeFirst()
             counters.catchUpDrops += 1
             backlogTicks = 0
             // Left unserved on purpose: the next arrival in this interval presents directly.
@@ -238,6 +266,8 @@ public final class FramePacer<Frame>: @unchecked Sendable {
     private func presentNext(direct: Bool) -> Frame {
         intervalServed = true
         let frame = queue.removeFirst()
+        let frameArrival = arrivals.removeFirst()
+        assertQueueInSync()
         if queue.isEmpty {
             if direct { backlogTicks = 0 }
         } else {
@@ -246,6 +276,7 @@ public final class FramePacer<Frame>: @unchecked Sendable {
         }
         counters.presented += 1
         if direct { counters.directPresents += 1 }
+        recordDisplayWait(frameArrival)
         return frame
     }
 
@@ -259,6 +290,7 @@ public final class FramePacer<Frame>: @unchecked Sendable {
         guard !queue.isEmpty else { return stall() }
         presentedOnCadence()
         var frame = queue.removeFirst()
+        var frameArrival = arrivals.removeFirst()
         if queue.count >= 2 {
             backlogTicks += 1
         } else {
@@ -266,12 +298,15 @@ public final class FramePacer<Frame>: @unchecked Sendable {
         }
         if backlogTicks >= Self.smoothCatchUpFrames {
             frame = queue.removeFirst()
+            frameArrival = arrivals.removeFirst()
             counters.catchUpDrops += 1
             backlogTicks = 0
         } else if !queue.isEmpty {
             counters.bufferedTicks += 1
         }
+        assertQueueInSync()
         counters.presented += 1
+        recordDisplayWait(frameArrival)
         return frame
     }
 
