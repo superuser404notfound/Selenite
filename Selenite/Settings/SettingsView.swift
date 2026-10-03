@@ -83,11 +83,11 @@ extension ResolutionPreference {
 
     var text: String {
         switch self {
-        case .p720: "720p"
-        case .p1080: "1080p"
-        case .p1440: "1440p"
-        case .p2160: "4K"
-        case .matchDisplay: "Match display"
+        case .p720: String(localized: "720p")
+        case .p1080: String(localized: "1080p")
+        case .p1440: String(localized: "1440p")
+        case .p2160: String(localized: "4K")
+        case .matchDisplay: String(localized: "Match display")
         }
     }
 }
@@ -103,9 +103,9 @@ extension FrameRatePreference {
 
     var text: String {
         switch self {
-        case .fps30: "30 fps"
-        case .fps60: "60 fps"
-        case .matchDisplay: "Match display"
+        case .fps30: String(localized: "30 fps")
+        case .fps60: String(localized: "60 fps")
+        case .matchDisplay: String(localized: "Match display")
         }
     }
 }
@@ -130,9 +130,9 @@ extension CodecPreference {
 
     var text: String {
         switch self {
-        case .automatic: "Automatic"
-        case .hevc: "HEVC"
-        case .h264: "H.264"
+        case .automatic: String(localized: "Automatic")
+        case .hevc: String(localized: "HEVC")
+        case .h264: String(localized: "H.264")
         }
     }
 }
@@ -147,8 +147,8 @@ extension AudioPreference {
 
     var text: String {
         switch self {
-        case .automatic: "Automatic (5.1 when available)"
-        case .stereo: "Stereo"
+        case .automatic: String(localized: "Automatic (5.1 when available)")
+        case .stereo: String(localized: "Stereo")
         }
     }
 }

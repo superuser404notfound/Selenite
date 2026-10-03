@@ -32,7 +32,7 @@ struct HostSettingsView: View {
                 }
             row(icon: "antenna.radiowaves.left.and.right", title: "Bitrate", all: StreamPreferences.bitrateChoicesMbps,
                 current: overrides.bitrateMbps, global: global.bitrateMbps, label: { "\($0) Mbps" },
-                text: { "\($0) Mbps" }) { value in
+                text: { String(localized: "\($0) Mbps") }) { value in
                     update { $0.bitrateMbps = value }
                 }
             row(icon: "film", title: "Codec", all: CodecPreference.allCases,
