@@ -50,23 +50,21 @@ private struct StreamIndicators: View {
     let level: StatsPreference
 
     var body: some View {
-        VStack {
-            HStack(spacing: 16) {
-                Spacer()
-                if controller.isPoorConnection {
-                    Image(systemName: "wifi.exclamationmark")
-                        .font(.title3)
-                        .foregroundStyle(Color.Theme.warning)
-                        .padding(14)
-                        .background(.ultraThinMaterial, in: Circle())
-                }
-                if !controller.isOverlayOpen {
-                    StatsHUD(level: level, stats: controller.liveStats, pacing: controller.settings.pacing)
-                }
+        // A frame, not a Spacer: the HUD must be offered the full height, or Full falls back to the pill.
+        HStack(alignment: .top, spacing: 16) {
+            if controller.isPoorConnection {
+                Image(systemName: "wifi.exclamationmark")
+                    .font(.title3)
+                    .foregroundStyle(Color.Theme.warning)
+                    .padding(14)
+                    .background(.ultraThinMaterial, in: Circle())
             }
-            Spacer()
+            if !controller.isOverlayOpen {
+                StatsHUD(level: level, stats: controller.liveStats, pacing: controller.settings.pacing)
+            }
         }
         .padding(48)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
         .allowsHitTesting(false)
     }
 }
