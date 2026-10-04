@@ -725,6 +725,27 @@ private final class ManualClock: @unchecked Sendable {
     #expect(stalls == 1)
 }
 
+@Test func aLateVsyncCallbackNeverPresentsTwoFramesForOneVsync() {
+    let (pacer, sink) = directPacer()
+    let d = 1.0 / 60
+    pacer.vsync(timestamp: 1.0, duration: d, tickTime: 1.001)
+    _ = pacer.tick()
+    pacer.put(0, arrival: 1.0 + 0.5 * d)
+    // The callbacks for 1 + d and 1 + 2d run late: an arrival after 1 + 2d opens that interval
+    // first, then the callback for 1 + d reports the older vsync.
+    pacer.put(1, arrival: 1.0 + 2 * d + 0.001)
+    pacer.vsync(timestamp: 1.0 + d, duration: d, tickTime: 1.0 + 2 * d + 0.002)
+    let tick: Int? = pacer.tick()
+    // Same display interval as frame 1: it waits instead of going out directly.
+    pacer.put(2, arrival: 1.0 + 2 * d + 0.003)
+    let rendered: [Int] = sink.presented
+    #expect(tick == nil)
+    #expect(rendered == [0, 1])
+    pacer.vsync(timestamp: 1.0 + 3 * d, duration: d, tickTime: 1.0 + 3 * d + 0.001)
+    let next: Int? = pacer.tick()
+    #expect(next == 2)
+}
+
 @Test func laggingPresentsCountFramesThatWaitedThroughAVsync() {
     var noise = Noise(seed: 46)
     let times = arrivals(count: 700) { _ in 0.5 + 0.2 * noise.next() }
@@ -741,8 +762,9 @@ private final class ManualClock: @unchecked Sendable {
 
 /// Hitches (repeats + drops) per scenario summed over seeds 1 to 3, measured with the rule this
 /// replaced (catch-up only when 16 arrivals in a row stayed 0.1 of an interval from the tick,
-/// interval boundary at the tick). One hitch of slack: the near-tick burst runs differ by one
-/// event in six simulated minutes either way, see .superpowers/pacer-report.md.
+/// interval boundary at the tick). One hitch of slack: in the near-tick burst runs both rules keep
+/// the lag almost throughout and absorb the bursts, so the counts are a handful of single events
+/// that can land one either way (tick+1ms burst is 5 against 4 here).
 private let previousRuleHitches: [String: Int] = [
     "mid 2ms": 0, "mid burst": 80, "tick-1ms 2ms": 0, "tick-1ms burst": 3, "tick 2ms": 0, "tick burst": 3,
     "tick+1ms 2ms": 0, "tick+1ms burst": 4, "drift 60.05 2ms": 74, "drift 60.05 burst": 114,

@@ -3,7 +3,7 @@ import Testing
 @testable import StreamKit
 
 /// The full pacer comparison: every scenario of `PacerSimulator.scenarios()` for 10 simulated
-/// minutes and three seeds, per pacing mode. Takes about a minute, so it only runs on request:
+/// minutes and three seeds, per pacing mode. Takes about ten seconds, so it only runs on request:
 /// `PACER_COMPARISON=1 swift test --package-path SeleniteKit --filter pacerComparison`
 /// (`PACER_SECONDS`, `PACER_TICKDELAY` and `PACER_LATCH` override the model, `PACER_OUT` names a
 /// file for the table).

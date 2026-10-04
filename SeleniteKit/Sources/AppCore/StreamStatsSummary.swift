@@ -17,8 +17,8 @@ public struct HostLatency: Equatable, Sendable {
 /// the stream started, frames per second is the delta of presented frames over the real elapsed
 /// interval. The window fields (`networkMilliseconds`, `displayMilliseconds`, `laggingPercent`,
 /// `hostLatency`) average just the samples that arrived since `previous`, falling back to the
-/// running totals of `current` when there is none. `displayHz` and `streamFps` read the pacer's running means directly, so they
-/// need no `previous` sample.
+/// running totals of `current` when there is none. `displayHz` and `streamFps` read the pacer's
+/// running means directly, so they need no `previous` sample.
 public struct StreamStatsSummary: Equatable, Sendable {
     public var width: Int
     public var height: Int

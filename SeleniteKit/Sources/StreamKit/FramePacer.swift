@@ -35,8 +35,9 @@ public struct PacerStats: Sendable, Equatable {
     public var displayWaitTotalMilliseconds: Double = 0
     public var displayWaitSamples = 0
     /// Presented frames that had already arrived before the vsync preceding their enqueue, so they
-    /// reached the screen one refresh later than they could have. Nearly every frame in smooth and
-    /// in lowLatency without direct present, since those wait for a tick.
+    /// reached the screen one refresh later than they could have. In smooth and in lowLatency
+    /// without direct present that is every presented frame except those that arrived between a
+    /// vsync and its tick.
     public var laggingPresents = 0
 
     public init() {}
@@ -231,7 +232,8 @@ public final class FramePacer<Frame>: @unchecked Sendable {
                 endedIntervalServed = intervalServed
                 intervalServed = false
             }
-            intervalStart = timestamp
+            // A late callback reports a vsync an arrival may already have moved past.
+            intervalStart = max(intervalStart, timestamp)
             if lastVsync > 0, timestamp > lastVsync {
                 vsyncIntervalSum += (timestamp - lastVsync) * 1000
                 if duration > 0 {
