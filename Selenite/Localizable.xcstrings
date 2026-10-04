@@ -160,6 +160,9 @@
     "Dropped frames" : {
 
     },
+    "Each host can override resolution, frame rate, bitrate, codec and audio." : {
+
+    },
     "End split" : {
 
     },
@@ -190,6 +193,9 @@
     "Game quit. Press A to restart." : {
 
     },
+    "Global" : {
+
+    },
     "H.264" : {
 
     },
@@ -200,6 +206,9 @@
 
     },
     "Host processing" : {
+
+    },
+    "Hosts" : {
 
     },
     "In split screen only the codec applies; the bitrate there is half the global one." : {
@@ -260,6 +269,9 @@
 
     },
     "Online" : {
+
+    },
+    "Own settings" : {
 
     },
     "Own stream settings" : {

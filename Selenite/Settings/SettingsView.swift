@@ -36,6 +36,18 @@ struct SettingsView: View {
                 ValuePickerRow(icon: "chart.bar", title: "Stream stats",
                                options: StatsPreference.allCases, selection: preferences.stats,
                                label: \.label) { model.settings.set(\.stats, $0) }
+                if !model.directory.hosts.isEmpty {
+                    Text("Hosts")
+                        .font(.headline)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 28)
+                    ForEach(model.directory.hosts, id: \.host.id) { snapshot in
+                        HostSettingsRow(host: snapshot.host)
+                    }
+                    Text("Each host can override resolution, frame rate, bitrate, codec and audio.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 about
                 // Visually quiet, at the very bottom: experimental switches for the real streams.
                 Button("Developer") { showsDeveloper = true }

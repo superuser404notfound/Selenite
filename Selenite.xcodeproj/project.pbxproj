@@ -22,6 +22,7 @@
 		48190944DC9CF5EB8BCC5D17 /* RecentsRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDC88DAC646888CD387DFA80 /* RecentsRow.swift */; };
 		52AC0336E4A7777DB30D201F /* MoonlightCore in Frameworks */ = {isa = PBXBuildFile; productRef = 9FE785F1EF1DE3002B7959FE /* MoonlightCore */; };
 		53FA1B28082BB906B32F81FC /* SplitScreenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20FE94F627DB05CFAF9A536D /* SplitScreenView.swift */; };
+		6B977D97AD3446A8E1DD32F5 /* HostSettingsRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D244D1FF2D3F5DB9B1014221 /* HostSettingsRow.swift */; };
 		6DF9D32C15A12D0C2955FE33 /* FailureText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68830DDB57D3AA87AD8A38C6 /* FailureText.swift */; };
 		6E89F70DE09BD4F802273DA2 /* AppTile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BE0886C65B71808D997F30A /* AppTile.swift */; };
 		71A30642922B8F8B29A65265 /* AddHostFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31D65A510D94364F3B5D7626 /* AddHostFlowView.swift */; };
@@ -82,6 +83,7 @@
 		B660E02E5ABAFD106CB03193 /* ArtworkTile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkTile.swift; sourceTree = "<group>"; };
 		B991729B15A5D4B5BC2C7A7A /* LiveDependencies.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveDependencies.swift; sourceTree = "<group>"; };
 		C17D93938F3EF35FC7048224 /* SeleniteApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeleniteApp.swift; sourceTree = "<group>"; };
+		D244D1FF2D3F5DB9B1014221 /* HostSettingsRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostSettingsRow.swift; sourceTree = "<group>"; };
 		DA2DB4429BE59BAC3854583B /* StreamLoadingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamLoadingView.swift; sourceTree = "<group>"; };
 		E06B05EB5A9C79E42910DCC6 /* SeleniteKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = SeleniteKit; path = SeleniteKit; sourceTree = SOURCE_ROOT; };
 		ED727DA465B015CE790EDF05 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
@@ -163,6 +165,7 @@
 			isa = PBXGroup;
 			children = (
 				45EAB5CCA5EF274867374D67 /* DeveloperView.swift */,
+				D244D1FF2D3F5DB9B1014221 /* HostSettingsRow.swift */,
 				A81EDC7452537FA8570F814B /* SettingsView.swift */,
 			);
 			path = Settings;
@@ -314,6 +317,7 @@
 				FE2E1B2C36AC1AEF0DC84B61 /* FocusKit.swift in Sources */,
 				9E014C89E72ACA197D89FC43 /* HomeView.swift in Sources */,
 				A079B09DD4D0DC0D959F79E9 /* HostCard.swift in Sources */,
+				6B977D97AD3446A8E1DD32F5 /* HostSettingsRow.swift in Sources */,
 				AE38EDBD667980F3C2F871EB /* HostSettingsView.swift in Sources */,
 				9F22A3E8D26DF283C88C1080 /* LiveDependencies.swift in Sources */,
 				C44E78C4EDFB53E5C70B370F /* MenuPresentation.swift in Sources */,
