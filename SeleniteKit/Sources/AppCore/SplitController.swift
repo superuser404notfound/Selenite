@@ -235,7 +235,7 @@ public final class SplitController: Identifiable {
         isSwapped.toggle()
     }
 
-    /// The join screen over running streams; Start on a seated pad with both sides filled finishes it.
+    /// The join screen over running streams; Start on a seated pad finishes it.
     public func reassignControllers() {
         guard stage == .running, !isEnding else { return }
         closeOverlay()
