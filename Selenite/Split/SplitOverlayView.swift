@@ -91,7 +91,8 @@ struct SplitOverlayView: View {
         HStack(spacing: 16) {
             labelCell(.swap, label: "Swap sides")
             labelCell(.reassign, label: "Reassign controllers")
-            labelCell(.endSplit, label: "End split", isDestructive: true)
+            labelCell(.endSplit, label: split.endSplitArmed ? "Press again to end split" : "End split",
+                      isDestructive: true)
             labelCell(.resume, label: "Resume")
         }
     }

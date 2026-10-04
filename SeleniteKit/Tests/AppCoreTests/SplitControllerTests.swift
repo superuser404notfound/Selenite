@@ -502,6 +502,28 @@ private func host(_ id: String) -> PairedHost {
     #expect(rig.state(.second) == .ended(.disconnected))
 }
 
+@MainActor @Test func endSplitFromTheOverlayAsksFirst() async {
+    let (rig, _, _) = await runningRig()
+    rig.controller.menuPressed(now: 10)
+    rig.controller.overlayMove(.left)
+    #expect(rig.controller.cursor.item == .endSplit)
+    rig.controller.overlaySelect()
+    #expect(rig.controller.endSplitArmed)
+    #expect(rig.controller.isOverlayOpen)
+    #expect(rig.controller.streams.count == 2)
+    rig.controller.overlayMove(.left)
+    #expect(!rig.controller.endSplitArmed)
+    rig.controller.overlayMove(.right)
+    rig.controller.overlaySelect()
+    rig.controller.menuPressed(now: 11)
+    #expect(!rig.controller.endSplitArmed)
+    #expect(rig.controller.isOverlayOpen)
+    rig.controller.overlaySelect()
+    rig.controller.overlaySelect()
+    let finished = await eventually { rig.finished == [.ended] }
+    #expect(finished)
+}
+
 @MainActor @Test func endSplitWhileWakingFinishesOnce() async {
     let rig = Rig()
     rig.wakeHosts = ["B"]
