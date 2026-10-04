@@ -26,7 +26,7 @@ struct SplitOverlayView: View {
             }
             bottomRow
         }
-        .padding(48)
+        .padding(40)
         .frame(width: 1760)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 32))
         .overlay(RoundedRectangle(cornerRadius: 32).strokeBorder(Color.Theme.panelEdge, lineWidth: 1))
@@ -45,25 +45,29 @@ struct SplitOverlayView: View {
 
     private func column(_ position: SplitSide) -> some View {
         let side = split.realSide(position)
-        return VStack(alignment: .leading, spacing: 20) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(columnTitle(position))
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.secondary)
-                Text(split.plan[side].app.title)
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .lineLimit(1)
-                Text(hostName(side))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+        return VStack(alignment: .leading, spacing: 18) {
+            // The volume sits beside the title: it is still the column's top cursor row.
+            HStack(alignment: .center, spacing: 24) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(columnTitle(position))
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.secondary)
+                    Text(split.plan[side].app.title)
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .lineLimit(1)
+                    Text(hostName(side))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                volumeRow(position: position, side: side)
             }
             if let stream = split.streams[side], let stats = stream.liveStats {
                 OverlayStats(stats: stats, pacing: stream.settings.pacing, columns: 2)
                     .font(.caption)
             }
-            volumeRow(position: position, side: side)
             labelCell(.primary(position), label: primaryLabel(side),
                      isDestructive: isPrimaryDestructive(side), isDimmed: isPrimaryDimmed(side))
             labelCell(.secondary(position), label: secondaryLabel(side),
@@ -150,7 +154,7 @@ struct SplitOverlayView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 18)
+                .padding(.vertical, 14)
                 .padding(.horizontal, 20)
         }
     }
