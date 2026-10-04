@@ -77,3 +77,40 @@ private let settings = StreamSettings(width: 1920, height: 1080, fps: 60, bitrat
     #expect(abs((summary.networkMilliseconds ?? -1) - 3) < 1e-9)
     #expect(abs((summary.displayMilliseconds ?? -1) - 1) < 1e-9)
 }
+
+@Test func fpsUsesTheRealInterval() {
+    var previousPacer = PacerStats()
+    previousPacer.presented = 0
+    var currentPacer = PacerStats()
+    currentPacer.presented = 126
+    let previous = StreamStats(pacer: previousPacer, sampledAt: 10)
+    let current = StreamStats(pacer: currentPacer, sampledAt: 12.1)
+    let summary = StreamStatsSummary(current: current, previous: previous, settings: settings)
+    #expect(summary.fps == 60)
+}
+
+@Test func fpsWithoutTimestampsKeepsTheRawDelta() {
+    var previousPacer = PacerStats()
+    previousPacer.presented = 100
+    var currentPacer = PacerStats()
+    currentPacer.presented = 159
+    let previous = StreamStats(pacer: previousPacer)
+    let current = StreamStats(pacer: currentPacer)
+    let summary = StreamStatsSummary(current: current, previous: previous, settings: settings)
+    #expect(summary.fps == 59)
+}
+
+@Test func displayAndStreamRatesComeFromThePacerMeans() {
+    var pacer = PacerStats()
+    pacer.vsyncIntervalMilliseconds = 16.6833
+    pacer.arrivalIntervalMilliseconds = 16.6667
+    let summary = StreamStatsSummary(current: StreamStats(pacer: pacer), previous: nil, settings: settings)
+    #expect(abs((summary.displayHz ?? -1) - 59.94) < 0.01)
+    #expect(abs((summary.streamFps ?? -1) - 60.00) < 0.01)
+}
+
+@Test func noPacerMeansNoRates() {
+    let summary = StreamStatsSummary(current: StreamStats(), previous: nil, settings: settings)
+    #expect(summary.displayHz == nil)
+    #expect(summary.streamFps == nil)
+}

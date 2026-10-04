@@ -57,6 +57,10 @@ struct OverlayStats: View {
                 Text("\(stats.fps) fps")
             }
             GridRow {
+                Text("Display / stream")
+                displayStreamRate
+            }
+            GridRow {
                 Text("Codec")
                 Text(stats.codec.label)
             }
@@ -124,6 +128,14 @@ struct OverlayStats: View {
     @ViewBuilder private var hostLatency: some View {
         if let latency = stats.hostLatency {
             Text("\(StatsFormat.milliseconds(latency.mean)) ms (\(StatsFormat.milliseconds(latency.min)) to \(StatsFormat.milliseconds(latency.max)))")
+        } else {
+            Text("n/a")
+        }
+    }
+
+    @ViewBuilder private var displayStreamRate: some View {
+        if let displayHz = stats.displayHz, let streamFps = stats.streamFps {
+            Text("\(StatsFormat.hertz(displayHz)) / \(StatsFormat.hertz(streamFps)) Hz")
         } else {
             Text("n/a")
         }
@@ -230,6 +242,10 @@ enum StatsFormat {
 
     static func megabits(_ value: Double) -> String {
         String(format: "%.1f", value)
+    }
+
+    static func hertz(_ value: Double) -> String {
+        String(format: "%.2f", value)
     }
 }
 

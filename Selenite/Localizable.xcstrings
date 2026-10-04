@@ -22,6 +22,9 @@
     "1440p" : {
 
     },
+    "%@ / %@ Hz" : {
+
+    },
     "%@ + %@" : {
 
     },
@@ -149,6 +152,9 @@
 
     },
     "Disconnecting…" : {
+
+    },
+    "Display / stream" : {
 
     },
     "Display wait" : {

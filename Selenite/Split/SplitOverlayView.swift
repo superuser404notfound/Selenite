@@ -27,7 +27,7 @@ struct SplitOverlayView: View {
             bottomRow
         }
         .padding(48)
-        .frame(width: 1500)
+        .frame(width: 1760)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 32))
         .overlay(RoundedRectangle(cornerRadius: 32).strokeBorder(Color.Theme.panelEdge, lineWidth: 1))
     }

@@ -14,9 +14,11 @@ public struct HostLatency: Equatable, Sendable {
 }
 
 /// One overlay refresh: `current` against the sample one second earlier. Counters are totals since
-/// the stream started, frames per second is the difference of presented frames. The window fields
-/// (`networkMilliseconds`, `displayMilliseconds`, `hostLatency`) average just the samples that
-/// arrived since `previous`, falling back to the running totals of `current` when there is none.
+/// the stream started, frames per second is the delta of presented frames over the real elapsed
+/// interval. The window fields (`networkMilliseconds`, `displayMilliseconds`, `hostLatency`) average
+/// just the samples that arrived since `previous`, falling back to the running totals of `current`
+/// when there is none. `displayHz` and `streamFps` read the pacer's running means directly, so they
+/// need no `previous` sample.
 public struct StreamStatsSummary: Equatable, Sendable {
     public var width: Int
     public var height: Int
@@ -37,12 +39,14 @@ public struct StreamStatsSummary: Equatable, Sendable {
     public var displayMilliseconds: Double?
     public var rttVarianceMilliseconds: Int?
     public var jitterMilliseconds: Double
+    public var displayHz: Double?
+    public var streamFps: Double?
 
     /// `previous` is nil for the first sample, which reports 0 fps.
     public init(current: StreamStats, previous: StreamStats?, settings: StreamSettings) {
         width = settings.width
         height = settings.height
-        fps = previous.map { max(0, current.pacer.presented - $0.pacer.presented) } ?? 0
+        fps = Self.fps(current: current, previous: previous)
         bitrateMbps = settings.bitrateKbps / 1000
         measuredBitrateMbps = Self.measuredBitrateMbps(current: current, previous: previous)
         codec = settings.codec
@@ -59,6 +63,28 @@ public struct StreamStatsSummary: Equatable, Sendable {
         displayMilliseconds = Self.displayMilliseconds(current: current, previous: previous)
         rttVarianceMilliseconds = current.rttVarianceMilliseconds.map { Int($0) }
         jitterMilliseconds = current.pacer.jitterMilliseconds
+        displayHz = Self.rate(fromIntervalMilliseconds: current.pacer.vsyncIntervalMilliseconds)
+        streamFps = Self.rate(fromIntervalMilliseconds: current.pacer.arrivalIntervalMilliseconds)
+    }
+
+    /// The presented-frame delta over the real elapsed interval, rounded to the nearest fps. A
+    /// sample taken without a clock (both `sampledAt` still 0, as in tests built without it) falls
+    /// back to the raw delta, which assumed a 1 s sample.
+    private static func fps(current: StreamStats, previous: StreamStats?) -> Int {
+        guard let previous else { return 0 }
+        let delta = current.pacer.presented - previous.pacer.presented
+        guard delta >= 0 else { return 0 }
+        if current.sampledAt == 0, previous.sampledAt == 0 {
+            return delta
+        }
+        let interval = current.sampledAt - previous.sampledAt
+        guard interval > 0 else { return 0 }
+        return Int((Double(delta) / interval).rounded())
+    }
+
+    private static func rate(fromIntervalMilliseconds interval: Double) -> Double? {
+        guard interval > 0 else { return nil }
+        return 1000 / interval
     }
 
     private static func measuredBitrateMbps(current: StreamStats, previous: StreamStats?) -> Double {
