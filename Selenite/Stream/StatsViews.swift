@@ -6,8 +6,9 @@ import SwiftUI
 /// with monospaced digits. Sets no size of its own, the caller's `.font()` decides it (`.callout`
 /// in the solo overlay, `.caption` in the split overlay columns and in `FullStatsPanel`).
 /// `columns` lays the three groups out for whatever space the caller actually has: 1 (default)
-/// stacks them (`FullStatsPanel`), 3 puts Video | Latency | Quality side by side (the solo Menu
-/// overlay), 2 puts Video above Latency in one column next to Quality (each split overlay column).
+/// stacks them, 3 puts Video | Latency | Quality side by side (the solo Menu
+/// overlay), 2 puts Video above Latency in one column next to Quality (each split overlay column
+/// and `FullStatsPanel`).
 /// Used by the solo overlay, every split overlay column and `FullStatsPanel`. Refreshed once per
 /// second by `StreamController`.
 struct OverlayStats: View {
@@ -216,7 +217,8 @@ struct FullStatsPanel: View {
     let pacing: FramePacingMode
 
     var body: some View {
-        OverlayStats(stats: stats, pacing: pacing)
+        // Two columns: stacked, the list is taller than the screen leaves a top-right HUD.
+        OverlayStats(stats: stats, pacing: pacing, columns: 2)
             .font(.caption)
             .padding(24)
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24))
