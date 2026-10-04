@@ -2,8 +2,10 @@ import Foundation
 import Testing
 @testable import StreamKit
 
-/// The full pacer comparison: every scenario of `PacerSimulator.scenarios()` for 10 simulated
-/// minutes and three seeds, per pacing mode. Takes about ten seconds, so it only runs on request:
+/// The full pacer comparison: every scenario of `PacerSimulator.scenarios()` and
+/// `repeaterScenarios()` for 10 simulated minutes and three seeds, per pacing mode, with the
+/// pacer's own counters next to the measured ones. Takes about 20 seconds, so it only runs on
+/// request:
 /// `PACER_COMPARISON=1 swift test --package-path SeleniteKit --filter pacerComparison`
 /// (`PACER_SECONDS`, `PACER_TICKDELAY` and `PACER_LATCH` override the model, `PACER_OUT` names a
 /// file for the table).
@@ -19,9 +21,11 @@ func pacerComparison() {
         ("smooth", .smooth, false),
     ]
     let seeds: [UInt64] = [1, 2, 3]
-    var lines = ["mode | scenario | latency ms | lagging % | repeats/min | drops/min | hitches/min | Lagging stat %"]
+    var lines = ["mode | scenario | latency ms | lagging % | repeats/min | drops/min | hitches/min | Lagging stat % | "
+        + "Display wait ms | pacer stalls/min | pacer drops/min | jitter ms"]
+    let scenarios = PacerSimulator.scenarios(seconds: seconds) + PacerSimulator.repeaterScenarios(seconds: seconds)
     for (name, mode, direct) in modes {
-        for var scenario in PacerSimulator.scenarios(seconds: seconds) {
+        for var scenario in scenarios {
             scenario.tickDelayMs = tickDelay
             scenario.latchMs = latch
             let results = seeds.map { seed -> PacerSimResult in
@@ -34,7 +38,8 @@ func pacerComparison() {
             }
             lines.append([name, scenario.name, mean(\.meanLatencyMs), mean { $0.laggingShare * 100 },
                           mean(\.repeatsPerMinute), mean(\.dropsPerMinute), mean(\.hitchesPerMinute),
-                          mean { Double($0.stats.laggingPresents) / Double(max(1, $0.stats.presented)) * 100 }]
+                          mean(\.laggingStatPercent), mean(\.displayWaitMs), mean(\.pacerStallsPerMinute),
+                          mean(\.pacerDropsPerMinute), mean { $0.stats.jitterMilliseconds }]
                 .joined(separator: " | "))
         }
     }

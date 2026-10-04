@@ -25,6 +25,9 @@ public final class VideoPipeline: @unchecked Sendable {
     private var intake = FrameIntake()
     private var overflowBase = 0
     private var unrecoverableBase = 0
+    /// The unit being decoded: the session decodes synchronously, so its output callback runs
+    /// inside `decode` on the pull thread and reads this to tell the pacer which frame it got.
+    private var decodingFrameNumber = 0
 
     public init(slot: Slot, codec: VideoCodec, color: ColorSignal, pacer: FramePacer<CMSampleBuffer>) {
         self.slot = slot; self.codec = codec; self.color = color; self.pacer = pacer
@@ -110,8 +113,10 @@ public final class VideoPipeline: @unchecked Sendable {
                 if decoder.map({ !$0.canAccept(newFormat, color: color) }) ?? true {
                     decoder?.invalidate()
                     decoder = nil
-                    decoder = try VideoDecoder(format: newFormat, color: color) { [pacer] pixelBuffer in
-                        if let sample = try? DisplaySample.make(pixelBuffer) { pacer.put(sample, arrival: CACurrentMediaTime()) }
+                    decoder = try VideoDecoder(format: newFormat, color: color) { [weak self, pacer] pixelBuffer in
+                        if let sample = try? DisplaySample.make(pixelBuffer) {
+                            pacer.put(sample, arrival: CACurrentMediaTime(), frameNumber: self?.decodingFrameNumber)
+                        }
                     }
                 }
                 format = newFormat
@@ -123,6 +128,7 @@ public final class VideoPipeline: @unchecked Sendable {
             let sample = try NALPackager.sampleBuffer(annexB: picture, format: format,
                                                       pts: CMTime(value: Int64(unit.rtpTimestamp), timescale: 90000))
             let started = CACurrentMediaTime()
+            decodingFrameNumber = Int(unit.frameNumber)
             try decoder.decode(sample)
             lock.lock()
             decodeTimeTotal += CACurrentMediaTime() - started

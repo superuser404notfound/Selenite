@@ -37,6 +37,7 @@ public struct StreamStatsSummary: Equatable, Sendable {
     public var audioUnderruns: Int
     public var hostLatency: HostLatency?
     public var networkMilliseconds: Double?
+    /// Arrival to the vsync that shows the frame, so a frame of lag shows here as a full interval.
     public var displayMilliseconds: Double?
     /// Share of presented frames that reached the screen a refresh late (`PacerStats.laggingPresents`).
     public var laggingPercent: Int?

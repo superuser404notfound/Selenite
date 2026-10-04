@@ -30,8 +30,9 @@ public struct PacerStats: Sendable, Equatable {
     /// Extra refresh intervals a vsync callback skipped over (a missed CADisplayLink tick), counted
     /// from the gap between consecutive `vsync` timestamps against the reported duration.
     public var missedTicks = 0
-    /// Sum of (shown time - arrival) over every frame actually shown, milliseconds. Dropped frames
-    /// (overflow, catch-up) add nothing.
+    /// Sum of (shown time - arrival) over every frame actually shown, milliseconds, where the shown
+    /// time is the vsync ending the interval the frame was enqueued in (before any vsync is known,
+    /// the enqueue itself). Dropped frames (overflow, catch-up) add nothing.
     public var displayWaitTotalMilliseconds: Double = 0
     public var displayWaitSamples = 0
     /// Presented frames that had already arrived before the vsync preceding their enqueue, so they
@@ -49,11 +50,13 @@ public struct PacerStats: Sendable, Equatable {
 /// `lowLatency` holds at most two frames and presents the oldest. A one-frame backlog that stands
 /// for `lowLatencyCatchUpTicks` ticks is cut, but only when none of the recent arrivals came close
 /// to the tick: while they straddle it, cutting the lag leaves the next tick empty (a drop followed
-/// by a stall), so the lag is kept until the arrival phase has moved on. With direct present a
-/// lag is also cut while arrivals sit near the tick, as long as the next frame is expected early
-/// enough before its vsync that the worst lateness of the last two minutes still makes it
-/// (`nextArrivalHasSlack`): only an arrival that slips past the vsync costs a stall there, and the
-/// lag is what absorbs late frames, so it is kept while recent lateness would not fit.
+/// by a stall), so the lag is kept until the arrival phase has moved on. With direct present the
+/// cut also needs the frames to make their vsync with one frame less of lag: the median display
+/// wait of the recent presents minus one interval (`waitAfterCut`) must exceed the routine
+/// lateness (the `typicalLateness` quantile) when arrivals stay away from the tick, and the rare
+/// lateness (`rareLateness`) otherwise. Lateness is measured against a smoothed arrival clock that
+/// steps over lost frames (gaps in the frame numbers) and re-anchors after a pause, so neither
+/// counts. A lag that rare lateness would not fit through is the jitter buffer absorbing it.
 ///
 /// `smooth` keeps one frame standing as a jitter buffer: it holds up to three, primes to two before
 /// presenting (after the start and after every stall), shows each frame for the stream's cadence,
@@ -94,12 +97,21 @@ public final class FramePacer<Frame>: @unchecked Sendable {
     static var phaseWindow: Int { 16 }
     /// The closest any of those arrivals may have come to the tick, as a fraction of the interval.
     static var safePhaseDistance: Double { 0.1 }
-    /// How long one late frame keeps a near-tick lag standing, seconds, kept as the largest
-    /// lateness per `latenessBucket` seconds.
+    /// Lateness is kept as a histogram over this many seconds, in `latenessSlices` slices, with
+    /// `latenessBin` second bins up to `latenessBins` of them.
     static var latenessWindow: Double { 120 }
-    static var latenessBucket: Double { 10 }
-    /// Slack the next frame needs beyond the lateness envelope, seconds.
+    static var latenessSlices: Int { 6 }
+    static var latenessBin: Double { 0.00025 }
+    static var latenessBins: Int { 201 }
+    /// Quantiles of recent lateness: routine jitter, and the rare outlier a lag has to absorb.
+    static var typicalLateness: Double { 0.95 }
+    static var rareLateness: Double { 0.9995 }
+    /// Slack a frame needs beyond that lateness, seconds.
     static var slackMargin: Double { 0.001 }
+    /// A gap of at least this many frame periods followed by regular spacing is a pause.
+    static var pauseGap: Double { 2.5 }
+    /// Presents whose display wait estimates the standing lag.
+    static var waitWindow: Int { 16 }
     /// Inter-arrival samples before the arrival estimate is trusted.
     static var arrivalWarmup: Int { 60 }
 
@@ -139,11 +151,20 @@ public final class FramePacer<Frame>: @unchecked Sendable {
     private var idleIntervals = 0
     /// Direct present: the vsync that starts the interval `intervalServed` belongs to.
     private var intervalStart = 0.0
-    /// Smoothed arrival time of the latest frame, and the largest lateness against it per bucket
-    /// of the last `latenessWindow` seconds (ring indexed by bucket number), seconds.
+    /// Smoothed arrival time of the latest frame and that frame's number, if the caller knows it.
     private var smoothedArrival: Double?
-    private var latenessBuckets: [Double]
-    private var latenessBucketNumber = 0
+    private var lastFrameNumber: Int?
+    /// The latest frame's lateness, gap since the frame before (frame periods) and arrival: decided
+    /// on at the next arrival, since only that shows whether the gap was a pause.
+    private var pendingLateness: (lateness: Double, gap: Double, time: Double)?
+    /// Lateness counts per bin, one row per slice of `latenessWindow` (ring indexed by slice
+    /// number), and their sum over the window.
+    private var latenessHistogram: [[Int]]
+    private var latenessCounts: [Int]
+    private var latenessTotal = 0
+    private var latenessSlice = 0
+    /// Display waits of the latest presents, seconds.
+    private var recentWaits: [Double] = []
 
     public let directPresent: Bool
     private var present: ((Frame) -> Void)?
@@ -154,7 +175,8 @@ public final class FramePacer<Frame>: @unchecked Sendable {
         self.frameRate = frameRate
         self.directPresent = directPresent
         self.clock = clock
-        latenessBuckets = Array(repeating: 0, count: Int(Self.latenessWindow / Self.latenessBucket))
+        latenessHistogram = Array(repeating: Array(repeating: 0, count: Self.latenessBins), count: Self.latenessSlices)
+        latenessCounts = Array(repeating: 0, count: Self.latenessBins)
         queue.reserveCapacity(capacity + 1)
         arrivals.reserveCapacity(capacity + 1)
         phaseDistances.reserveCapacity(Self.phaseWindow)
@@ -164,9 +186,11 @@ public final class FramePacer<Frame>: @unchecked Sendable {
         lock.withLock { self.present = present }
     }
 
-    public func put(_ frame: Frame, arrival: Double) {
+    /// `frameNumber` is the stream's number for this frame, when known: a gap means frames were
+    /// lost, which then do not count as lateness.
+    public func put(_ frame: Frame, arrival: Double, frameNumber: Int? = nil) {
         lock.withLock {
-            record(arrival: arrival)
+            record(arrival: arrival, frameNumber: frameNumber)
             if isDirect { openIntervalIfVsyncPassed(arrival) }
             if queue.count >= capacity {
                 queue.removeFirst()
@@ -186,10 +210,15 @@ public final class FramePacer<Frame>: @unchecked Sendable {
         assert(queue.count == arrivals.count, "queue and arrivals must track each other 1:1")
     }
 
+    /// Arrival to the vsync that shows the frame: every present (direct or tick) is enqueued inside
+    /// the current interval, so that is the vsync ending it. Before any vsync, the enqueue itself.
     private func recordDisplayWait(_ arrival: Double) {
-        counters.displayWaitTotalMilliseconds += (clock() - arrival) * 1000
+        let shown = intervalStart > 0 && vsyncDuration > 0 ? intervalStart + vsyncDuration : clock()
+        counters.displayWaitTotalMilliseconds += (shown - arrival) * 1000
         counters.displayWaitSamples += 1
         if arrival < intervalStart { counters.laggingPresents += 1 }
+        recentWaits.append(shown - arrival)
+        if recentWaits.count > Self.waitWindow { recentWaits.removeFirst() }
     }
 
     /// Direct present: an arrival at or after the vsync that ends the current interval belongs to
@@ -202,7 +231,7 @@ public final class FramePacer<Frame>: @unchecked Sendable {
         intervalStart += intervals * vsyncDuration
     }
 
-    private func record(arrival: Double) {
+    private func record(arrival: Double, frameNumber: Int?) {
         if let last = lastArrival {
             let interval = (arrival - last) * 1000
             intervalCount += 1
@@ -210,7 +239,7 @@ public final class FramePacer<Frame>: @unchecked Sendable {
             intervalMean += delta / Double(intervalCount)
             intervalM2 += delta * (interval - intervalMean)
         }
-        recordLateness(arrival)
+        recordLateness(arrival, frameNumber: frameNumber)
         lastArrival = arrival
         var distance = 0.5
         if lastTick > 0, vsyncDuration > 0 {
@@ -305,7 +334,7 @@ public final class FramePacer<Frame>: @unchecked Sendable {
         }
         // This frame waited through an interval that was already served: one refresh of latency.
         backlogTicks += 1
-        if backlogTicks >= Self.lowLatencyCatchUpTicks, arrivalsAreAwayFromTheTick || nextArrivalHasSlack {
+        if backlogTicks >= Self.lowLatencyCatchUpTicks, catchUpIsClean {
             queue.removeFirst()
             arrivals.removeFirst()
             counters.catchUpDrops += 1
@@ -421,35 +450,85 @@ public final class FramePacer<Frame>: @unchecked Sendable {
         return intervalMean / 1000
     }
 
-    /// Tracks a smoothed arrival clock and, once warmed up, the largest lateness against it.
-    private func recordLateness(_ arrival: Double) {
-        guard let previous = smoothedArrival else {
+    /// Tracks a smoothed arrival clock and, once warmed up, the lateness against it. A frame's
+    /// lateness is committed at the next arrival: a gap of `pauseGap` periods or more followed by
+    /// regular spacing was a pause, so the clock moves on instead.
+    private func recordLateness(_ arrival: Double, frameNumber: Int?) {
+        defer { lastFrameNumber = frameNumber }
+        guard var anchor = smoothedArrival, let last = lastArrival else {
             smoothedArrival = arrival
             return
         }
-        let expected = previous + framePeriod
+        let period = framePeriod
+        var steps = 1.0
+        if let frameNumber, let lastFrameNumber, frameNumber > lastFrameNumber {
+            steps = Double(frameNumber - lastFrameNumber)
+        }
+        let gap = (arrival - last) / period
+        if let pending = pendingLateness {
+            if pending.gap >= Self.pauseGap, abs(gap - steps) <= 0.25 * steps {
+                anchor += (pending.gap - 1).rounded() * period * 15 / 16
+            } else {
+                commitLateness(pending.lateness, at: pending.time)
+            }
+            pendingLateness = nil
+        }
+        let expected = anchor + steps * period
         let lateness = arrival - expected
         smoothedArrival = expected + lateness / 16
-        guard intervalCount > Self.arrivalWarmup else { return }
-        let bucket = Int(arrival / Self.latenessBucket)
-        if bucket > latenessBucketNumber {
-            for skipped in 1...min(latenessBuckets.count, bucket - latenessBucketNumber) {
-                latenessBuckets[(latenessBucketNumber + skipped) % latenessBuckets.count] = 0
-            }
-            latenessBucketNumber = bucket
+        if intervalCount > Self.arrivalWarmup {
+            pendingLateness = (lateness, gap - (steps - 1), arrival)
         }
-        let index = bucket % latenessBuckets.count
-        latenessBuckets[index] = max(latenessBuckets[index], lateness)
     }
 
-    /// Direct present: the next frame is expected before its vsync by more than the recent
-    /// lateness envelope, so cutting the lag now leaves no interval empty.
-    private var nextArrivalHasSlack: Bool {
-        guard let smoothedArrival, intervalCount > Self.arrivalWarmup, vsyncDuration > 0 else { return false }
-        let expected = smoothedArrival + framePeriod
-        var slack = (lastVsync + vsyncDuration - expected).truncatingRemainder(dividingBy: vsyncDuration)
-        if slack < 0 { slack += vsyncDuration }
-        return slack > (latenessBuckets.max() ?? 0) + Self.slackMargin
+    private func commitLateness(_ lateness: Double, at time: Double) {
+        let slice = Int(time / (Self.latenessWindow / Double(Self.latenessSlices)))
+        if slice > latenessSlice {
+            for skipped in 1...min(Self.latenessSlices, slice - latenessSlice) {
+                let expired = (latenessSlice + skipped) % Self.latenessSlices
+                for (bin, count) in latenessHistogram[expired].enumerated() where count > 0 {
+                    latenessCounts[bin] -= count
+                    latenessTotal -= count
+                    latenessHistogram[expired][bin] = 0
+                }
+            }
+            latenessSlice = slice
+        }
+        let bin = min(Self.latenessBins - 1, max(0, Int((lateness / Self.latenessBin).rounded(.up))))
+        latenessHistogram[slice % Self.latenessSlices][bin] += 1
+        latenessCounts[bin] += 1
+        latenessTotal += 1
+    }
+
+    /// The `typicalLateness` and `rareLateness` quantiles of the lateness in the window, seconds;
+    /// 0 before any was measured.
+    private var latenessQuantiles: (typical: Double, rare: Double) {
+        let total = Double(latenessTotal)
+        guard total > 0 else { return (0, 0) }
+        func quantile(_ q: Double) -> Double {
+            var seen = 0
+            for (bin, count) in latenessCounts.enumerated() {
+                seen += count
+                if Double(seen) >= total * q { return Double(bin) * Self.latenessBin }
+            }
+            return Double(Self.latenessBins - 1) * Self.latenessBin
+        }
+        return (quantile(Self.typicalLateness), quantile(Self.rareLateness))
+    }
+
+    /// Direct present: what a typical frame would have left before its vsync with one frame less
+    /// of lag (median display wait of the latest presents minus one interval), seconds.
+    private var waitAfterCut: Double? {
+        guard recentWaits.count >= Self.waitWindow / 2, vsyncDuration > 0 else { return nil }
+        return recentWaits.sorted()[recentWaits.count / 2] - vsyncDuration
+    }
+
+    /// Direct present: cutting the standing lag leaves the stream clean (see the type comment).
+    private var catchUpIsClean: Bool {
+        guard let after = waitAfterCut else { return arrivalsAreAwayFromTheTick }
+        let lateness = latenessQuantiles
+        return (arrivalsAreAwayFromTheTick && after > lateness.typical + Self.slackMargin)
+            || after > lateness.rare + Self.slackMargin
     }
 
     public var stats: PacerStats {

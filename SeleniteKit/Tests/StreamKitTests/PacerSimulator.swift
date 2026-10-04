@@ -49,6 +49,26 @@ struct PacerScenario: Sendable {
     var tickDelayMs = 1.0
     /// The renderer must have a frame this long before the vsync to show it there.
     var latchMs = 0.0
+    /// Replaces the Gaussian `jitterMs` noise with a measured link model when set.
+    var link: LinkProfile?
+}
+
+/// Wi-Fi through a repeater, calibrated to the split device run (host processing 2.2 to 9.5 ms,
+/// mean 4.8, jitter stat 3.0 to 3.2 ms): every frame pays host processing (a floor plus an
+/// exponential tail, capped) and Gaussian network noise; rarely a frame is held up by an outlier
+/// (later frames queue behind it), lost (never arrives), or the host pauses for a few frames
+/// (static content sends nothing new).
+struct LinkProfile: Sendable {
+    var hostMinMs = 2.2
+    var hostExtraMeanMs = 2.2
+    var hostMaxMs = 10.0
+    var networkSigmaMs = 0.8
+    var outlierChance = 0.002
+    var outlierMinMs = 8.0
+    var outlierMaxMs = 30.0
+    var lossChance = 0.0
+    var pauseChance = 0.0
+    var pauseFramesMax = 6
 }
 
 struct PacerSimResult: Sendable {
@@ -64,7 +84,15 @@ struct PacerSimResult: Sendable {
     /// Frames that arrived and were never on screen (pacer drops and frames the renderer replaced
     /// before their vsync).
     var drops = 0
+    /// Pacer counters over the measured span only, what the overlay shows on device.
     var stats = PacerStats()
+    /// Frames the link lost or the host skipped (gaps in the arrivals), not counted as drops.
+    var lostFrames = 0
+
+    var pacerStallsPerMinute: Double { Double(stats.stalls) / minutes }
+    var pacerDropsPerMinute: Double { Double(stats.overflowDrops + stats.catchUpDrops) / minutes }
+    var laggingStatPercent: Double { Double(stats.laggingPresents) / Double(max(1, stats.presented)) * 100 }
+    var displayWaitMs: Double { stats.displayWaitTotalMilliseconds / Double(max(1, stats.displayWaitSamples)) }
 
     var repeatsPerMinute: Double { Double(repeats) / minutes }
     var dropsPerMinute: Double { Double(drops) / minutes }
@@ -84,6 +112,12 @@ enum PacerSimulator {
     /// Frame arrival times in seconds, in order (a decoder hands frames over serially, so a
     /// delayed frame holds back the ones behind it).
     static func arrivals(_ scenario: PacerScenario, start: Double) -> [Double] {
+        frames(scenario, start: start).times
+    }
+
+    /// Arrival times plus the stream's frame number for each: a lost frame leaves a gap in the
+    /// numbers, a host pause (nothing new to send) does not.
+    static func frames(_ scenario: PacerScenario, start: Double) -> (times: [Double], numbers: [Int]) {
         var random = SimRandom(seed: scenario.seed)
         let period = 1 / scenario.fps
         let refresh = 1 / scenario.refreshHz
@@ -91,12 +125,34 @@ enum PacerSimulator {
         let count = Int(scenario.seconds * scenario.fps)
         var burstStart = scenario.bursts ? start + exponential(&random, mean: scenario.burstEverySeconds) : .infinity
         var times: [Double] = []
+        var numbers: [Int] = []
+        var number = 0
         times.reserveCapacity(count + 1)
         let base = start + scenario.tickDelayMs / 1000 + scenario.phase * refresh
         var previous = -Double.infinity
+        var skip = 0
         for n in 0..<count {
             let nominal = base + Double(n) * period
             var t = nominal + sigma * random.gaussian()
+            if let link = scenario.link {
+                let host = min(link.hostMaxMs, link.hostMinMs + exponential(&random, mean: link.hostExtraMeanMs))
+                t = nominal + (host + link.networkSigmaMs * random.gaussian()) / 1000
+                if random.uniform() < link.outlierChance {
+                    t += (link.outlierMinMs + random.uniform() * (link.outlierMaxMs - link.outlierMinMs)) / 1000
+                }
+                if skip == 0, random.uniform() < link.pauseChance {
+                    skip = 2 + Int(random.uniform() * Double(max(1, link.pauseFramesMax - 1)))
+                }
+                if skip == 0, random.uniform() < link.lossChance {
+                    skip = 1
+                    number += 1
+                }
+                if skip > 0, n > 2 {
+                    skip -= 1
+                    continue
+                }
+                skip = 0
+            }
             while nominal > burstStart + scenario.burstSeconds {
                 burstStart += scenario.burstSeconds + exponential(&random, mean: scenario.burstEverySeconds)
             }
@@ -106,11 +162,13 @@ enum PacerSimulator {
             t = max(t, previous + 0.0002)
             previous = t
             times.append(t)
+            numbers.append(number)
+            number += 1
         }
         if scenario.startupPair, times.count > 1 {
             times[0] = times[1] - 0.001
         }
-        return times
+        return (times, numbers)
     }
 
     private static func exponential(_ random: inout SimRandom, mean: Double) -> Double {
@@ -135,7 +193,7 @@ enum PacerSimulator {
         let refresh = 1 / scenario.refreshHz
         let tickDelay = scenario.tickDelayMs / 1000
         let latch = scenario.latchMs / 1000
-        let times = arrivals(scenario, start: start)
+        let (times, numbers) = frames(scenario, start: start)
         let vsyncCount = Int(scenario.seconds * scenario.refreshHz)
         var next = 0
         var shownAt = [Int](repeating: -1, count: times.count)
@@ -143,13 +201,16 @@ enum PacerSimulator {
         var lastShown = -1
         let measureFrom = start + warmupSeconds
         var result = PacerSimResult(scenario: scenario.name, minutes: (scenario.seconds - warmupSeconds) / 60)
+        result.lostFrames = Int(scenario.seconds * scenario.fps) - times.count
+        var atMeasureStart: PacerStats?
         for k in 0..<vsyncCount {
             let vsync = start + Double(k) * refresh
+            if atMeasureStart == nil, vsync >= measureFrom { atMeasureStart = pacer.stats }
             let tick = vsync + tickDelay
             func putArrivals(before time: Double) {
                 while next < times.count, times[next] < time {
                     clock.now = times[next]
-                    pacer.put(next, arrival: times[next])
+                    pacer.put(next, arrival: times[next], frameNumber: numbers[next])
                     next += 1
                 }
             }
@@ -190,8 +251,46 @@ enum PacerSimulator {
         }
         result.meanLatencyMs = result.shown > 0 ? latencySum / Double(result.shown) * 1000 : 0
         result.laggingShare = result.shown > 0 ? Double(lagging) / Double(result.shown) : 0
-        result.stats = pacer.stats
+        result.stats = span(pacer.stats, since: atMeasureStart ?? PacerStats())
         return result
+    }
+
+    private static func span(_ end: PacerStats, since start: PacerStats) -> PacerStats {
+        var stats = end
+        stats.presented -= start.presented
+        stats.stalls -= start.stalls
+        stats.overflowDrops -= start.overflowDrops
+        stats.catchUpDrops -= start.catchUpDrops
+        stats.directPresents -= start.directPresents
+        stats.laggingPresents -= start.laggingPresents
+        stats.displayWaitTotalMilliseconds -= start.displayWaitTotalMilliseconds
+        stats.displayWaitSamples -= start.displayWaitSamples
+        return stats
+    }
+
+    /// Wi-Fi through a repeater (`LinkProfile`), as in the split device run: a dynamic stream
+    /// (Steam, 60.02 fps when drifting) and a static one (desktop, rare lost frames and pauses,
+    /// 60.01 when drifting), each at the phases that decide the pacer's behaviour. Phase is where
+    /// the host captures relative to the tick; host processing (mean 4.4 ms) comes on top, so
+    /// "mid" arrives about 3 ms before the vsync.
+    static func repeaterScenarios(seconds: Double = 600, seed: UInt64 = 1, outlierChance: Double = 0.002) -> [PacerScenario] {
+        let interval = 1000 / 60.0
+        var dynamic = LinkProfile()
+        dynamic.outlierChance = outlierChance
+        var still = dynamic
+        still.lossChance = 0.0002
+        still.pauseChance = 0.0003
+        let shapes: [(String, Double, Double)] = [
+            ("mid", 60, 0.5), ("tick-1ms", 60, 1 - 1 / interval), ("tick", 60, 0), ("tick+1ms", 60, 1 / interval),
+            ("tick+3ms", 60, 3 / interval),
+        ]
+        return [("dyn", dynamic, 60.02), ("static", still, 60.01)].flatMap { label, link, drift in
+            (shapes + [("drift \(drift)", drift, 0.5)]).map { name, fps, phase in
+                var scenario = PacerScenario(name: "\(label) \(name)", fps: fps, phase: phase, seconds: seconds, seed: seed)
+                scenario.link = link
+                return scenario
+            }
+        }
     }
 
     /// The scenario set the pacer is judged on: phase mid-interval, at the tick (just before,
