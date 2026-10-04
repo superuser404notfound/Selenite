@@ -97,6 +97,10 @@ struct OverlayStats: View {
                 optionalMilliseconds(stats.displayMilliseconds)
             }
             GridRow {
+                Text("Lagging")
+                optionalPercent(stats.laggingPercent)
+            }
+            GridRow {
                 Text("Round trip")
                 roundTrip
             }
@@ -171,6 +175,14 @@ struct OverlayStats: View {
     @ViewBuilder private func optionalMilliseconds(_ value: Double?) -> some View {
         if let value {
             Text("\(StatsFormat.milliseconds(value)) ms")
+        } else {
+            Text("n/a")
+        }
+    }
+
+    @ViewBuilder private func optionalPercent(_ value: Int?) -> some View {
+        if let value {
+            Text("\(value) %")
         } else {
             Text("n/a")
         }

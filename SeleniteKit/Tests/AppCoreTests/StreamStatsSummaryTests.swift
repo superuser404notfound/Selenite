@@ -121,3 +121,18 @@ private let settings = StreamSettings(width: 1920, height: 1080, fps: 60, bitrat
     #expect(summary.displayHz == nil)
     #expect(summary.streamFps == nil)
 }
+
+@Test func laggingIsTheWindowShareOfLatePresents() {
+    var previousPacer = PacerStats()
+    previousPacer.presented = 100
+    previousPacer.laggingPresents = 90
+    var currentPacer = PacerStats()
+    currentPacer.presented = 160
+    currentPacer.laggingPresents = 105
+    let summary = StreamStatsSummary(current: StreamStats(pacer: currentPacer, sampledAt: 2),
+                                     previous: StreamStats(pacer: previousPacer, sampledAt: 1), settings: settings)
+    #expect(summary.laggingPercent == 25)
+    let empty = StreamStatsSummary(current: StreamStats(sampledAt: 2), previous: StreamStats(sampledAt: 1),
+                                   settings: settings)
+    #expect(empty.laggingPercent == nil)
+}

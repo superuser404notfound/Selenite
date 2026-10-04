@@ -52,6 +52,9 @@
     "%@ of %lld Mbps" : {
 
     },
+    "%lld %%" : {
+
+    },
     "%lld ± %lld ms" : {
 
     },
@@ -215,6 +218,9 @@
 
     },
     "Jitter" : {
+
+    },
+    "Lagging" : {
 
     },
     "Latency" : {

@@ -15,9 +15,9 @@ public struct HostLatency: Equatable, Sendable {
 
 /// One overlay refresh: `current` against the sample one second earlier. Counters are totals since
 /// the stream started, frames per second is the delta of presented frames over the real elapsed
-/// interval. The window fields (`networkMilliseconds`, `displayMilliseconds`, `hostLatency`) average
-/// just the samples that arrived since `previous`, falling back to the running totals of `current`
-/// when there is none. `displayHz` and `streamFps` read the pacer's running means directly, so they
+/// interval. The window fields (`networkMilliseconds`, `displayMilliseconds`, `laggingPercent`,
+/// `hostLatency`) average just the samples that arrived since `previous`, falling back to the
+/// running totals of `current` when there is none. `displayHz` and `streamFps` read the pacer's running means directly, so they
 /// need no `previous` sample.
 public struct StreamStatsSummary: Equatable, Sendable {
     public var width: Int
@@ -38,6 +38,8 @@ public struct StreamStatsSummary: Equatable, Sendable {
     public var hostLatency: HostLatency?
     public var networkMilliseconds: Double?
     public var displayMilliseconds: Double?
+    /// Share of presented frames that reached the screen a refresh late (`PacerStats.laggingPresents`).
+    public var laggingPercent: Int?
     public var rttVarianceMilliseconds: Int?
     public var jitterMilliseconds: Double
     public var displayHz: Double?
@@ -63,6 +65,7 @@ public struct StreamStatsSummary: Equatable, Sendable {
         hostLatency = Self.hostLatency(current: current, previous: previous)
         networkMilliseconds = Self.networkMilliseconds(current: current, previous: previous)
         displayMilliseconds = Self.displayMilliseconds(current: current, previous: previous)
+        laggingPercent = Self.laggingPercent(current: current, previous: previous)
         rttVarianceMilliseconds = current.rttVarianceMilliseconds.map { Int($0) }
         jitterMilliseconds = current.pacer.jitterMilliseconds
         displayHz = Self.rate(fromIntervalMilliseconds: current.pacer.vsyncIntervalMilliseconds)
@@ -129,6 +132,13 @@ public struct StreamStatsSummary: Equatable, Sendable {
         }
         guard deltaTotal >= 0, deltaSamples > 0 else { return nil }
         return deltaTotal / Double(deltaSamples) / 1000
+    }
+
+    private static func laggingPercent(current: StreamStats, previous: StreamStats?) -> Int? {
+        let lagging = current.pacer.laggingPresents - (previous?.pacer.laggingPresents ?? 0)
+        let presented = current.pacer.presented - (previous?.pacer.presented ?? 0)
+        guard lagging >= 0, presented > 0 else { return nil }
+        return Int((Double(lagging) / Double(presented) * 100).rounded())
     }
 
     private static func displayMilliseconds(current: StreamStats, previous: StreamStats?) -> Double? {
