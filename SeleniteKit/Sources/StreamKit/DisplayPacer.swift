@@ -40,9 +40,11 @@ private struct TickOutput: Sendable {
 }
 
 /// Owns the CADisplayLink and the dedicated thread it runs on, off the main thread. `add`/
-/// `remove`/`stop` mutate `outputs` under `lock`; `tick(_:)` holds that same lock for its whole
-/// pass over `outputs`, so a caller that waits for the lock (all three do) never returns while a
-/// frame from one of those outputs is still being enqueued.
+/// `remove`/`clearOutputs` mutate `outputs` under `lock`; `tick(_:)` holds that same lock for its
+/// whole pass over `outputs`, so a caller that waits for the lock (all three do) never returns
+/// while a frame from one of those outputs is still being enqueued. `start`/`stop` only start and
+/// stop the thread: they never touch `outputs`, so a second `start()` while already running, or a
+/// `stop()` that is not immediately followed by `clearOutputs()`, leaves attached outputs intact.
 private final class DisplayLinkThread: NSObject, @unchecked Sendable {
     private let lock = NSLock()
     private var outputs: [TickOutput] = []
@@ -51,28 +53,35 @@ private final class DisplayLinkThread: NSObject, @unchecked Sendable {
     private var link: CADisplayLink?
     private var stopped: DispatchSemaphore?
 
-    /// Starts the thread and its run loop, tearing down a previous one first if still running.
+    /// Starts the thread and its run loop; a no-op if one is already running, so a caller that
+    /// starts on every appearance without a matching stop in between does not tear down and
+    /// recreate the thread (which used to drop every attached output along the way).
     func start() {
-        stop()
+        guard thread == nil else { return }
+        let ready = DispatchSemaphore(value: 0)
         let stopped = DispatchSemaphore(value: 0)
         self.stopped = stopped
         let thread = Thread { [self] in
-            self.runLoopBody()
+            self.runLoopBody(ready: ready)
             stopped.signal()
         }
         thread.name = "Selenite display link"
         thread.qualityOfService = .userInteractive
         self.thread = thread
         thread.start()
+        // Wait for the link and run loop to exist before returning, so a stop() that follows
+        // immediately always has something to signal.
+        ready.wait()
     }
 
-    private func runLoopBody() {
+    private func runLoopBody(ready: DispatchSemaphore) {
         let link = CADisplayLink(target: self, selector: #selector(tick(_:)))
         link.add(to: .current, forMode: .common)
         lock.withLock {
             self.link = link
             self.runLoop = CFRunLoopGetCurrent()
         }
+        ready.signal()
         CFRunLoopRun()
     }
 
@@ -92,24 +101,29 @@ private final class DisplayLinkThread: NSObject, @unchecked Sendable {
         }
     }
 
-    /// Runs on the display-link thread (via `perform(_:on:with:waitUntilDone:)`): invalidating the
-    /// link from any other thread is undefined, and stopping the run loop from outside it would
-    /// just be ignored.
-    @objc private func invalidateAndStopRunLoop() {
-        link?.invalidate()
-        link = nil
-        if let runLoop { CFRunLoopStop(runLoop) }
+    /// Stops the run loop and waits for the thread to have left it, so no tick fires after this
+    /// returns; a no-op if the thread is not running. Safe to call from any thread except the
+    /// link thread itself: scheduling a block onto a run loop and then blocking until that block
+    /// has run, from the very thread that run loop belongs to, would deadlock. `outputs` is left
+    /// untouched; `clearOutputs()` is a separate call.
+    func stop() {
+        guard thread != nil, let stopped else { return }
+        let (runLoop, link) = lock.withLock { (self.runLoop, self.link) }
+        if let runLoop {
+            CFRunLoopPerformBlock(runLoop, CFRunLoopMode.commonModes.rawValue) {
+                link?.invalidate()
+                CFRunLoopStop(runLoop)
+            }
+            CFRunLoopWakeUp(runLoop)
+        }
+        stopped.wait()
+        thread = nil
+        self.stopped = nil
+        self.link = nil
+        self.runLoop = nil
     }
 
-    /// Stops the run loop and waits for the thread to have left it, so no tick runs after this
-    /// returns.
-    func stop() {
-        guard let thread, let stopped else { return }
-        perform(#selector(invalidateAndStopRunLoop), on: thread, with: nil, waitUntilDone: true)
-        stopped.wait()
-        self.thread = nil
-        self.stopped = nil
-        self.runLoop = nil
+    func clearOutputs() {
         lock.withLock { outputs.removeAll() }
     }
 
@@ -138,6 +152,13 @@ public final class DisplayPacer {
     private let linkThread = DisplayLinkThread()
 
     public init() {}
+
+    /// A safety net for a `DisplayPacer` dropped without `stop()`: otherwise the link thread's
+    /// run loop keeps ticking forever. `linkThread` has no reference back to this instance, so
+    /// this never runs on the link thread itself, which `DisplayLinkThread.stop()` requires.
+    isolated deinit {
+        linkThread.stop()
+    }
 
     public func attach(pacer: FramePacer<CMSampleBuffer>, layer: AVSampleBufferDisplayLayer) {
         let presenter = FramePresenter(renderer: layer.sampleBufferRenderer)
@@ -170,6 +191,7 @@ public final class DisplayPacer {
 
     public func stop() {
         linkThread.stop()
+        linkThread.clearOutputs()
         for output in outputs { output.pacer.setPresenter(nil) }
         outputs.removeAll()
     }
