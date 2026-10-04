@@ -7,7 +7,7 @@ import SwiftUI
 /// in the solo overlay, `.caption` in the split overlay columns and in `FullStatsPanel`).
 /// `columns` lays the three groups out for whatever space the caller actually has: 1 (default)
 /// stacks them (`FullStatsPanel`), 3 puts Video | Latency | Quality side by side (the solo Menu
-/// overlay), 2 puts Video above Quality in one column next to Latency (each split overlay column).
+/// overlay), 2 puts Video above Latency in one column next to Quality (each split overlay column).
 /// Used by the solo overlay, every split overlay column and `FullStatsPanel`. Refreshed once per
 /// second by `StreamController`.
 struct OverlayStats: View {
@@ -30,14 +30,14 @@ struct OverlayStats: View {
                 qualityGroup
             }
         case 2:
-            // Video and Quality carry the long values; the shorter Latency column wraps instead.
+            // Video and Latency carry the long values; Quality is all short counts.
             HStack(alignment: .top, spacing: 28) {
                 VStack(alignment: .leading, spacing: 20) {
                     videoGroup
-                    qualityGroup
+                    latencyGroup
                 }
                 .layoutPriority(1)
-                latencyGroup
+                qualityGroup
             }
         default:
             VStack(alignment: .leading, spacing: 20) {
@@ -109,8 +109,16 @@ struct OverlayStats: View {
                 Text("\(StatsFormat.milliseconds(stats.jitterMilliseconds)) ms")
             }
             GridRow {
-                Text("Dropped frames")
-                Text("\(stats.networkDrops) network, \(stats.queueDrops) queue, \(stats.pacerDrops) pacer")
+                Text("Network drops")
+                Text(verbatim: "\(stats.networkDrops)")
+            }
+            GridRow {
+                Text("Queue drops")
+                Text(verbatim: "\(stats.queueDrops)")
+            }
+            GridRow {
+                Text("Pacer drops")
+                Text(verbatim: "\(stats.pacerDrops)")
             }
             GridRow {
                 Text("Unrecoverable frames")
@@ -171,7 +179,7 @@ struct OverlayStats: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(heading)
                 .fontWeight(.semibold)
-            Grid(alignment: .leading, horizontalSpacing: 40, verticalSpacing: 8) {
+            Grid(alignment: .leading, horizontalSpacing: 28, verticalSpacing: 8) {
                 rows()
             }
         }

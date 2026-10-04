@@ -67,9 +67,6 @@
     "%lld ms" : {
 
     },
-    "%lld network, %lld queue, %lld pacer" : {
-
-    },
     "Add host" : {
 
     },
@@ -232,6 +229,9 @@
     "n/a" : {
 
     },
+    "Network drops" : {
+
+    },
     "Network receive" : {
 
     },
@@ -263,6 +263,9 @@
 
     },
     "Own stream settings" : {
+
+    },
+    "Pacer drops" : {
 
     },
     "Pair again" : {
@@ -332,6 +335,9 @@
 
     },
     "Quality" : {
+
+    },
+    "Queue drops" : {
 
     },
     "Quit %@ on %@? Unsaved progress may be lost." : {
