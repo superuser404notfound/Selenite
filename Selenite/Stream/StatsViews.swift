@@ -30,11 +30,13 @@ struct OverlayStats: View {
                 qualityGroup
             }
         case 2:
-            HStack(alignment: .top, spacing: 40) {
+            // Video and Quality carry the long values; the shorter Latency column wraps instead.
+            HStack(alignment: .top, spacing: 28) {
                 VStack(alignment: .leading, spacing: 20) {
                     videoGroup
                     qualityGroup
                 }
+                .layoutPriority(1)
                 latencyGroup
             }
         default:
