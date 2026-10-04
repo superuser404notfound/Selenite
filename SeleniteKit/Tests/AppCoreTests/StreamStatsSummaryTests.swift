@@ -109,6 +109,13 @@ private let settings = StreamSettings(width: 1920, height: 1080, fps: 60, bitrat
     #expect(abs((summary.streamFps ?? -1) - 60.00) < 0.01)
 }
 
+@Test func missedTicksIsTheRunningPacerTotal() {
+    var pacer = PacerStats()
+    pacer.missedTicks = 7
+    let summary = StreamStatsSummary(current: StreamStats(pacer: pacer), previous: nil, settings: settings)
+    #expect(summary.missedTicks == 7)
+}
+
 @Test func noPacerMeansNoRates() {
     let summary = StreamStatsSummary(current: StreamStats(), previous: nil, settings: settings)
     #expect(summary.displayHz == nil)

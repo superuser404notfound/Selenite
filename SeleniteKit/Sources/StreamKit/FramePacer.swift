@@ -27,6 +27,9 @@ public struct PacerStats: Sendable, Equatable {
     public var arrivalIntervalMilliseconds: Double = 0
     public var vsyncIntervalMilliseconds: Double = 0
     public var vsyncs = 0
+    /// Extra refresh intervals a vsync callback skipped over (a missed CADisplayLink tick), counted
+    /// from the gap between consecutive `vsync` timestamps against the reported duration.
+    public var missedTicks = 0
     /// Sum of (shown time - arrival) over every frame actually shown, milliseconds. Dropped frames
     /// (overflow, catch-up) add nothing.
     public var displayWaitTotalMilliseconds: Double = 0
@@ -186,7 +189,13 @@ public final class FramePacer<Frame>: @unchecked Sendable {
         lock.withLock {
             if lastVsync > 0, timestamp > lastVsync {
                 vsyncIntervalSum += (timestamp - lastVsync) * 1000
-                counters.vsyncs += 1
+                if duration > 0 {
+                    let intervals = max(1, Int(((timestamp - lastVsync) / duration).rounded()))
+                    counters.vsyncs += intervals
+                    counters.missedTicks += intervals - 1
+                } else {
+                    counters.vsyncs += 1
+                }
             }
             lastVsync = timestamp
             lastTick = tickTime ?? timestamp

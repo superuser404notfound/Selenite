@@ -293,6 +293,30 @@ private func arrivals30(count: Int, startMs: Double = 1000, offset: (Int) -> Dou
     #expect(stalls <= 2)
 }
 
+@Test func aMissedTickCountsAsTwoIntervals() {
+    let pacer = FramePacer<Int>()
+    let duration = 1.0 / 60
+    pacer.vsync(timestamp: 0, duration: duration)
+    pacer.vsync(timestamp: 1.0 / 60, duration: duration)
+    // The callback for 2/60 never ran: this one reports 3/60, two intervals late.
+    pacer.vsync(timestamp: 3.0 / 60, duration: duration)
+    pacer.vsync(timestamp: 4.0 / 60, duration: duration)
+    let stats = pacer.stats
+    #expect(stats.missedTicks == 1)
+    #expect(abs(stats.vsyncIntervalMilliseconds - 1000.0 / 60) < 1e-6)
+}
+
+@Test func steadyVsyncsMissNothing() {
+    let pacer = FramePacer<Int>()
+    let duration = 1.0 / 60
+    for tick in 0...4 {
+        pacer.vsync(timestamp: Double(tick) * duration, duration: duration)
+    }
+    let stats = pacer.stats
+    #expect(stats.missedTicks == 0)
+    #expect(abs(stats.vsyncIntervalMilliseconds - 1000.0 / 60) < 1e-6)
+}
+
 @Test func arrivalPhaseIsMeasuredAgainstTheTickNotTheRefresh() {
     let pacer = FramePacer<Int>()
     let duration = 1.0 / 60

@@ -119,6 +119,10 @@ struct OverlayStats: View {
                 Text(verbatim: "\(stats.stalls)")
             }
             GridRow {
+                Text("Missed ticks")
+                Text(verbatim: "\(stats.missedTicks)")
+            }
+            GridRow {
                 Text("Audio underruns")
                 Text(verbatim: "\(stats.audioUnderruns)")
             }

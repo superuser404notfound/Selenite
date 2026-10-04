@@ -33,6 +33,7 @@ public struct StreamStatsSummary: Equatable, Sendable {
     public var unrecoverableFrames: Int
     public var pacerDrops: Int
     public var stalls: Int
+    public var missedTicks: Int
     public var audioUnderruns: Int
     public var hostLatency: HostLatency?
     public var networkMilliseconds: Double?
@@ -57,6 +58,7 @@ public struct StreamStatsSummary: Equatable, Sendable {
         unrecoverableFrames = current.unrecoverableFrames
         pacerDrops = current.pacer.overflowDrops + current.pacer.catchUpDrops
         stalls = current.pacer.stalls
+        missedTicks = current.pacer.missedTicks
         audioUnderruns = current.audio?.underruns ?? 0
         hostLatency = Self.hostLatency(current: current, previous: previous)
         networkMilliseconds = Self.networkMilliseconds(current: current, previous: previous)
