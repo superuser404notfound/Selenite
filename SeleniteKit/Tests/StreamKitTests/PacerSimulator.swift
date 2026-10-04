@@ -293,6 +293,23 @@ enum PacerSimulator {
         }
     }
 
+    /// A clean wired stream close to the tick (jitter stat about 1.3 ms) with rare large outliers
+    /// (8 to 30 ms, 0.04 % of frames): the case where keeping the lag (round 1) is cleaner and
+    /// cutting it (round 2) is faster. Host processing adds about 2.8 ms to the capture phase, so
+    /// "tick-3ms" arrives just before the tick and "tick" about 3 ms after it.
+    static func wiredScenarios(seconds: Double = 600, seed: UInt64 = 1) -> [PacerScenario] {
+        let interval = 1000 / 60.0
+        var link = LinkProfile()
+        link.hostExtraMeanMs = 0.6
+        link.networkSigmaMs = 0.6
+        link.outlierChance = 0.0004
+        return [("tick-3ms", 1 - 3 / interval), ("tick-2ms", 1 - 2 / interval), ("tick", 0.0)].map { name, phase in
+            var scenario = PacerScenario(name: "wired \(name)", phase: phase, seconds: seconds, seed: seed)
+            scenario.link = link
+            return scenario
+        }
+    }
+
     /// The scenario set the pacer is judged on: phase mid-interval, at the tick (just before,
     /// on, just after), and drifting through every phase (stream faster and slower than the
     /// display), each with 2 ms jitter and with Wi-Fi bursts.

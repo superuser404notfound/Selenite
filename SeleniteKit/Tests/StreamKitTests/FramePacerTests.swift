@@ -610,7 +610,7 @@ private final class ManualClock: @unchecked Sendable {
     var now = 0.0
 }
 
-@Test func displayWaitIsArrivalToTick() {
+@Test func displayWaitWithoutAVsyncRunsToTheEnqueue() {
     let clock = ManualClock()
     let pacer = FramePacer<Int>(mode: .lowLatency, clock: { clock.now })
     pacer.put(1, arrival: 1.000)
@@ -622,6 +622,36 @@ private final class ManualClock: @unchecked Sendable {
     let stats = pacer.stats
     #expect(stats.displayWaitSamples == 2)
     #expect(abs(stats.displayWaitTotalMilliseconds - 14) < 1e-6)
+}
+
+@Test func displayWaitOfATickPresentRunsToTheNextVsync() {
+    let clock = ManualClock()
+    let pacer = FramePacer<Int>(mode: .lowLatency, clock: { clock.now })
+    let d = 1.0 / 60
+    clock.now = 0.995
+    pacer.put(1, arrival: 0.995)
+    clock.now = 1.001
+    pacer.vsync(timestamp: 1.0, duration: d, tickTime: 1.001)
+    #expect(pacer.tick() == 1)
+    // Enqueued by the tick after the vsync at 1.0: shown at 1.0 + d, not at the enqueue.
+    let wait: Double = pacer.stats.displayWaitTotalMilliseconds
+    #expect(abs(wait - (1.0 + d - 0.995) * 1000) < 1e-6)
+}
+
+@Test func aLateTickCallbackNeverGivesANegativeDisplayWait() {
+    let clock = ManualClock()
+    let pacer = FramePacer<Int>(mode: .lowLatency, clock: { clock.now })
+    let d = 1.0 / 60
+    // The callback for the vsync at 1.0 runs after the next vsync (1.0 + d) and finds a frame that
+    // arrived after that one too: the vsync showing it is 1.0 + 2d.
+    let arrival = 1.0 + 1.1 * d
+    clock.now = arrival
+    pacer.put(1, arrival: arrival)
+    clock.now = 1.0 + 1.2 * d
+    pacer.vsync(timestamp: 1.0, duration: d, tickTime: clock.now)
+    #expect(pacer.tick() == 1)
+    let wait: Double = pacer.stats.displayWaitTotalMilliseconds
+    #expect(abs(wait - (1.0 + 2 * d - arrival) * 1000) < 1e-6)
 }
 
 @Test func droppedFramesAddNoDisplayWait() {
@@ -728,6 +758,19 @@ private func lagAfterOneLateFrame(seed: UInt64, lose: Bool = false, pause: Bool 
     let (records, _, _) = simulateDirect(arrivals: times, numbers: passNumbers ? numbers : nil, ticks: 7200)
     let catchUp: Int = increase(records, from: 0, \.catchUpDrops)
     return (records[5400..<6000].compactMap(\.shown).count, catchUp)
+}
+
+@Test func theLatenessGateWaitsForEnoughSamples() {
+    // A startup lag 1 ms after the tick: lateness is measured from the 61st interval on and
+    // decided a frame later, so the near-tick cut cannot come before the histogram holds
+    // `latenessMinimumSamples` of them (an empty one used to read as no lateness at all).
+    var noise = Noise(seed: 50)
+    let times = [1000 - 0.6 * vsyncMs, 1000 - 0.4 * vsyncMs]
+        + arrivals(count: 700) { _ in 1 / vsyncMs + 0.3 / vsyncMs * noise.next() }
+    let (records, _, _) = simulateDirect(arrivals: times, ticks: 600)
+    let firstCut = records.firstIndex { $0.catchUpDrops > 0 } ?? -1
+    #expect(firstCut >= 60 + FramePacer<Int>.latenessMinimumSamples)
+    #expect(firstCut < 120)
 }
 
 @Test func aSingleLateFrameNoLongerHoldsTheLagForMinutes() {
@@ -855,7 +898,8 @@ private let previousRuleHitches: [String: Int] = [
 /// Hitches per repeater scenario summed over seeds 1 to 3 with the rule this replaced (largest
 /// lateness over 120 s as the only gate, frame gaps counted as lateness, no check of the slack the
 /// tick-away rule leaves). Two hitches of slack: the tick-1ms runs differ by two events in six
-/// simulated minutes.
+/// simulated minutes. The one scenario family where round two is knowingly worse is not in this
+/// table but in `wiredException` below.
 private let roundOneHitches: [String: Int] = [
     "dyn mid": 134, "dyn tick-1ms": 47, "dyn tick": 64, "dyn tick+1ms": 66, "dyn tick+3ms": 74,
     "dyn drift 60.02": 119, "static mid": 162, "static tick-1ms": 70, "static tick": 86,
@@ -873,6 +917,34 @@ private let roundOneHitches: [String: Int] = [
         }
         let previous = roundOneHitches[scenario.name] ?? -1
         #expect(hitches <= previous + 2, "\(scenario.name): \(hitches) hitches, round one \(previous)")
+    }
+}
+
+/// The stated exception to "no more hitches than round one" (owner ruling: lowLatency takes the
+/// latency). A clean wired stream just before the tick with rare 8 to 30 ms outliers, 10 minutes
+/// per seed, seeds 1 to 3: round one held the lag after the first outlier for good (hitches
+/// summed over the seeds, mean latency), round two cuts it again once the outliers are rare enough
+/// to ignore and pays a repeat plus a drop per outlier instead.
+private let wiredException: [String: (roundOneHitches: Int, roundOneLatency: Double, acceptedHitches: Int)] = [
+    "wired tick-3ms": (12, 28.3, 60),
+    "wired tick-2ms": (10, 27.3, 60),
+]
+
+@Test func wiredNearTheTickTradesRareHitchesForLatency() {
+    for scenario in PacerSimulator.wiredScenarios(seconds: 600) {
+        guard let exception = wiredException[scenario.name] else { continue }
+        var hitches = 0
+        var latency = 0.0
+        for seed in UInt64(1)...3 {
+            var seeded = scenario
+            seeded.seed = seed
+            let result = PacerSimulator.run(seeded, mode: .lowLatency)
+            hitches += result.repeats + result.drops
+            latency += result.meanLatencyMs / 3
+        }
+        // Accepted: at most 2 hitches per minute (round one: 0.3 to 0.4) for 10 ms less latency.
+        #expect(hitches <= exception.acceptedHitches, "\(scenario.name): \(hitches), round one \(exception.roundOneHitches)")
+        #expect(latency < exception.roundOneLatency - 8, "\(scenario.name): \(latency) ms")
     }
 }
 

@@ -110,6 +110,11 @@ public final class FramePacer<Frame>: @unchecked Sendable {
     static var slackMargin: Double { 0.001 }
     /// A gap of at least this many frame periods followed by regular spacing is a pause.
     static var pauseGap: Double { 2.5 }
+    /// The smoothed arrival clock moves 1 / `arrivalSmoothing` of the way to each arrival.
+    static var arrivalSmoothing: Double { 16 }
+    /// Below this many lateness samples in the window the quantiles say nothing yet (right after
+    /// the start, or after a pause longer than the window): the catch-up uses the tick rule alone.
+    static var latenessMinimumSamples: Int { 30 }
     /// Presents whose display wait estimates the standing lag.
     static var waitWindow: Int { 16 }
     /// Inter-arrival samples before the arrival estimate is trusted.
@@ -154,6 +159,9 @@ public final class FramePacer<Frame>: @unchecked Sendable {
     /// Smoothed arrival time of the latest frame and that frame's number, if the caller knows it.
     private var smoothedArrival: Double?
     private var lastFrameNumber: Int?
+    /// Running mean of the frame period, seconds, leaving out lost frames and pauses.
+    private var periodMean = 0.0
+    private var periodSamples = 0
     /// The latest frame's lateness, gap since the frame before (frame periods) and arrival: decided
     /// on at the next arrival, since only that shows whether the gap was a pause.
     private var pendingLateness: (lateness: Double, gap: Double, time: Double)?
@@ -211,9 +219,17 @@ public final class FramePacer<Frame>: @unchecked Sendable {
     }
 
     /// Arrival to the vsync that shows the frame: every present (direct or tick) is enqueued inside
-    /// the current interval, so that is the vsync ending it. Before any vsync, the enqueue itself.
+    /// the current interval, so that is the vsync ending it, or the first vsync after the arrival
+    /// when a late tick callback hands over a frame that came after that vsync (only direct present
+    /// opens intervals on arrival). Before any vsync, the enqueue itself.
     private func recordDisplayWait(_ arrival: Double) {
-        let shown = intervalStart > 0 && vsyncDuration > 0 ? intervalStart + vsyncDuration : clock()
+        var shown = clock()
+        if intervalStart > 0, vsyncDuration > 0 {
+            shown = intervalStart + vsyncDuration
+            if arrival >= shown {
+                shown += vsyncDuration * (((arrival - shown) / vsyncDuration).rounded(.down) + 1)
+            }
+        }
         counters.displayWaitTotalMilliseconds += (shown - arrival) * 1000
         counters.displayWaitSamples += 1
         if arrival < intervalStart { counters.laggingPresents += 1 }
@@ -446,8 +462,8 @@ public final class FramePacer<Frame>: @unchecked Sendable {
 
     /// Seconds between frames: the measured mean once it has settled, the nominal rate before.
     private var framePeriod: Double {
-        if intervalCount <= Self.arrivalWarmup, frameRate > 0 { return 1 / Double(frameRate) }
-        return intervalMean / 1000
+        if periodSamples <= Self.arrivalWarmup, frameRate > 0 { return 1 / Double(frameRate) }
+        return periodSamples > 0 ? periodMean : intervalMean / 1000
     }
 
     /// Tracks a smoothed arrival clock and, once warmed up, the lateness against it. A frame's
@@ -465,9 +481,14 @@ public final class FramePacer<Frame>: @unchecked Sendable {
             steps = Double(frameNumber - lastFrameNumber)
         }
         let gap = (arrival - last) / period
+        if gap / steps < Self.pauseGap {
+            periodSamples += 1
+            periodMean += ((arrival - last) / steps - periodMean) / Double(periodSamples)
+        }
         if let pending = pendingLateness {
             if pending.gap >= Self.pauseGap, abs(gap - steps) <= 0.25 * steps {
-                anchor += (pending.gap - 1).rounded() * period * 15 / 16
+                // The clock had moved 1 / arrivalSmoothing of that gap already; move it the rest.
+                anchor += (pending.gap - 1).rounded() * period * (1 - 1 / Self.arrivalSmoothing)
             } else {
                 commitLateness(pending.lateness, at: pending.time)
             }
@@ -475,7 +496,7 @@ public final class FramePacer<Frame>: @unchecked Sendable {
         }
         let expected = anchor + steps * period
         let lateness = arrival - expected
-        smoothedArrival = expected + lateness / 16
+        smoothedArrival = expected + lateness / Self.arrivalSmoothing
         if intervalCount > Self.arrivalWarmup {
             pendingLateness = (lateness, gap - (steps - 1), arrival)
         }
@@ -501,10 +522,10 @@ public final class FramePacer<Frame>: @unchecked Sendable {
     }
 
     /// The `typicalLateness` and `rareLateness` quantiles of the lateness in the window, seconds;
-    /// 0 before any was measured.
-    private var latenessQuantiles: (typical: Double, rare: Double) {
+    /// nil below `latenessMinimumSamples`.
+    private var latenessQuantiles: (typical: Double, rare: Double)? {
+        guard latenessTotal >= Self.latenessMinimumSamples else { return nil }
         let total = Double(latenessTotal)
-        guard total > 0 else { return (0, 0) }
         func quantile(_ q: Double) -> Double {
             var seen = 0
             for (bin, count) in latenessCounts.enumerated() {
@@ -525,8 +546,7 @@ public final class FramePacer<Frame>: @unchecked Sendable {
 
     /// Direct present: cutting the standing lag leaves the stream clean (see the type comment).
     private var catchUpIsClean: Bool {
-        guard let after = waitAfterCut else { return arrivalsAreAwayFromTheTick }
-        let lateness = latenessQuantiles
+        guard let after = waitAfterCut, let lateness = latenessQuantiles else { return arrivalsAreAwayFromTheTick }
         return (arrivalsAreAwayFromTheTick && after > lateness.typical + Self.slackMargin)
             || after > lateness.rare + Self.slackMargin
     }
