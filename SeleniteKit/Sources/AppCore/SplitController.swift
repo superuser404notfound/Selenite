@@ -85,6 +85,8 @@ public final class SplitController: Identifiable {
     public private(set) var seatPrompt: PadID?
     public private(set) var cursor = OverlayCursor()
     public private(set) var quitArmed: SplitSide?
+    /// "End split" in the overlay asks first, like Quit game: it disconnects both games at once.
+    public private(set) var endSplitArmed = false
     public private(set) var isChoosingGame = false
 
     @ObservationIgnored private let dependencies: SplitDependencies
@@ -124,15 +126,17 @@ public final class SplitController: Identifiable {
         } else if seatPrompt != nil {
             seatPrompt = nil
         } else if isOverlayOpen {
-            // Like solo: Menu backs out of an armed quit, then closes the overlay.
-            if quitArmed != nil {
+            // Like solo: Menu backs out of an armed quit or end, then closes the overlay.
+            if quitArmed != nil || endSplitArmed {
                 quitArmed = nil
+                endSplitArmed = false
             } else {
                 closeOverlay()
             }
         } else if !isEnding {
             cursor = OverlayCursor()
             quitArmed = nil
+            endSplitArmed = false
             isOverlayOpen = true
         }
     }
@@ -141,6 +145,7 @@ public final class SplitController: Identifiable {
         guard isOverlayOpen else { return }
         cursor.move(direction)
         quitArmed = nil
+        endSplitArmed = false
     }
 
     public func overlaySelect() {
@@ -156,7 +161,8 @@ public final class SplitController: Identifiable {
         case .secondary(let position): secondaryAction(realSide(position))
         case .swap: swapSides()
         case .reassign: reassignControllers()
-        case .endSplit: endSplit()
+        case .endSplit:
+            if endSplitArmed { endSplit() } else { endSplitArmed = true }
         case .resume: closeOverlay()
         }
     }
@@ -170,6 +176,7 @@ public final class SplitController: Identifiable {
     public func closeOverlay() {
         isOverlayOpen = false
         quitArmed = nil
+        endSplitArmed = false
     }
 
     // MARK: Side actions
@@ -235,7 +242,7 @@ public final class SplitController: Identifiable {
         isSwapped.toggle()
     }
 
-    /// The join screen over running streams; Start on a seated pad with both sides filled finishes it.
+    /// The join screen over running streams; Start on a seated pad finishes it.
     public func reassignControllers() {
         guard stage == .running, !isEnding else { return }
         closeOverlay()

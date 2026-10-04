@@ -33,7 +33,8 @@ struct StreamOverlayView: View {
                     .foregroundStyle(.secondary)
             }
             if let stats = controller.liveStats {
-                OverlayStats(stats: stats, pacing: controller.settings.pacing)
+                OverlayStats(stats: stats, pacing: controller.settings.pacing, columns: 3)
+                    .font(.callout)
             }
             if controller.isConfirmingQuit {
                 Text("Quit \(controller.app.title) on \(controller.host.name)? Unsaved progress may be lost.")
@@ -60,7 +61,7 @@ struct StreamOverlayView: View {
             }
         }
         .padding(48)
-        .frame(width: 960)
+        .frame(width: 1500)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 32))
         .overlay(RoundedRectangle(cornerRadius: 32).strokeBorder(Color.Theme.panelEdge, lineWidth: 1))
         .defaultFocus($focused, .resume)
@@ -68,58 +69,5 @@ struct StreamOverlayView: View {
         .onChange(of: controller.isConfirmingQuit) { _, confirming in
             focused = confirming ? .cancelQuit : .resume
         }
-    }
-}
-
-/// The overlay's stats, refreshed once per second by `StreamController`.
-struct OverlayStats: View {
-    let stats: StreamStatsSummary
-    let pacing: FramePacingMode
-
-    var body: some View {
-        Grid(alignment: .leading, horizontalSpacing: 40, verticalSpacing: 8) {
-            GridRow {
-                Text("Resolution")
-                Text(verbatim: "\(stats.width)x\(stats.height)")
-            }
-            GridRow {
-                Text("Frame rate")
-                Text("\(stats.fps) fps")
-            }
-            GridRow {
-                Text("Frame pacing")
-                Text(pacing.label)
-            }
-            GridRow {
-                Text("Bitrate")
-                Text("\(stats.bitrateMbps) Mbps")
-            }
-            GridRow {
-                Text("Round trip")
-                if let rtt = stats.rttMilliseconds {
-                    Text("\(rtt) ms")
-                } else {
-                    Text("n/a")
-                }
-            }
-            GridRow {
-                Text("Decode time")
-                Text("\(StatsFormat.milliseconds(stats.decodeMilliseconds)) ms")
-            }
-            GridRow {
-                Text("Dropped frames")
-                Text("\(stats.networkDrops) network, \(stats.pacerDrops) pacer")
-            }
-            GridRow {
-                Text("Stalls")
-                Text(verbatim: "\(stats.stalls)")
-            }
-            GridRow {
-                Text("Audio underruns")
-                Text(verbatim: "\(stats.audioUnderruns)")
-            }
-        }
-        .font(.callout.monospacedDigit())
-        .foregroundStyle(.secondary)
     }
 }

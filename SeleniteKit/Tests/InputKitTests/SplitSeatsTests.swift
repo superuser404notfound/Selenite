@@ -3,11 +3,12 @@ import Testing
 
 private final class Pad {}
 
-@Test func seatingCountsPerSideAndIsReadyWithBoth() {
+@Test func seatingCountsPerSideAndIsReadyWithOnePad() {
     let a = Pad(), b = Pad(), c = Pad()
     var seats = SeatMap()
-    seats.seat(ObjectIdentifier(a), on: .first)
     #expect(!seats.isReady)
+    seats.seat(ObjectIdentifier(a), on: .first)
+    #expect(seats.isReady)
     seats.seat(ObjectIdentifier(b), on: .second)
     seats.seat(ObjectIdentifier(c), on: .second)
     #expect(seats.isReady)

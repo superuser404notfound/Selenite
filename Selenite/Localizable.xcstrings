@@ -22,6 +22,9 @@
     "1440p" : {
 
     },
+    "%@ / %@ Hz" : {
+
+    },
     "%@ + %@" : {
 
     },
@@ -34,10 +37,22 @@
     "%@ is running on %@. Starting %@ quits it." : {
 
     },
+    "%@ Mbps" : {
+
+    },
     "%@ ms" : {
 
     },
+    "%@ ms (%@ to %@)" : {
+
+    },
     "%@ ms decode" : {
+
+    },
+    "%@ of %lld Mbps" : {
+
+    },
+    "%lld ± %lld ms" : {
 
     },
     "%lld drops" : {
@@ -50,9 +65,6 @@
 
     },
     "%lld ms" : {
-
-    },
-    "%lld network, %lld pacer" : {
 
     },
     "Add host" : {
@@ -124,7 +136,7 @@
     "Continue" : {
 
     },
-    "Decode time" : {
+    "Decode" : {
 
     },
     "Developer" : {
@@ -139,7 +151,16 @@
     "Disconnecting…" : {
 
     },
+    "Display / stream" : {
+
+    },
+    "Display wait" : {
+
+    },
     "Dropped frames" : {
+
+    },
+    "Each host can override resolution, frame rate, bitrate, codec and audio." : {
 
     },
     "End split" : {
@@ -163,10 +184,16 @@
     "Free software under the GNU GPLv3. Streaming is built on moonlight-common-c by the Moonlight Game Streaming Project, also GPLv3." : {
 
     },
+    "Full" : {
+
+    },
     "Game did not quit" : {
 
     },
     "Game quit. Press A to restart." : {
+
+    },
+    "Global" : {
 
     },
     "H.264" : {
@@ -176,6 +203,21 @@
 
     },
     "Host did not wake up" : {
+
+    },
+    "Host processing" : {
+
+    },
+    "Hosts" : {
+
+    },
+    "In split screen only the codec applies; the bitrate there is half the global one." : {
+
+    },
+    "Jitter" : {
+
+    },
+    "Latency" : {
 
     },
     "Layout" : {
@@ -190,7 +232,16 @@
     "Match display" : {
 
     },
+    "Missed ticks" : {
+
+    },
     "n/a" : {
+
+    },
+    "Network drops" : {
+
+    },
+    "Network receive" : {
 
     },
     "New" : {
@@ -218,6 +269,15 @@
 
     },
     "Online" : {
+
+    },
+    "Own settings" : {
+
+    },
+    "Own stream settings" : {
+
+    },
+    "Pacer drops" : {
 
     },
     "Pair again" : {
@@ -274,6 +334,9 @@
     "Press A to restart" : {
 
     },
+    "Press again to end split" : {
+
+    },
     "Press again to quit" : {
 
     },
@@ -281,6 +344,12 @@
 
     },
     "Press Start to play" : {
+
+    },
+    "Quality" : {
+
+    },
+    "Queue drops" : {
 
     },
     "Quit %@ on %@? Unsaved progress may be lost." : {
@@ -317,6 +386,9 @@
 
     },
     "Remove from list" : {
+
+    },
+    "Reset to global" : {
 
     },
     "Resolution" : {
@@ -388,6 +460,12 @@
     "Stream ended" : {
 
     },
+    "Stream settings" : {
+
+    },
+    "Stream settings for %@" : {
+
+    },
     "Stream stats" : {
 
     },
@@ -452,6 +530,15 @@
 
     },
     "Try again" : {
+
+    },
+    "Unrecoverable frames" : {
+
+    },
+    "Use global (%@)" : {
+
+    },
+    "Video" : {
 
     },
     "Waiting for picture…" : {

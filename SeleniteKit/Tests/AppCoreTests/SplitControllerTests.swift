@@ -250,24 +250,36 @@ private func host(_ id: String) -> PairedHost {
     #expect(rig.controller.seats.side(of: one.id) == .first)
 }
 
-@MainActor @Test func startNeedsBothSidesAndASeatedPad() async {
+@MainActor @Test func startNeedsASeatedPad() async {
     let rig = Rig()
     let one = Pad(), two = Pad()
-    rig.send(one, .a(.center))
-    rig.send(one, .start)
-    #expect(rig.controller.stage == .joining)
     rig.send(two, .start)
     #expect(rig.controller.stage == .joining)
-    rig.send(two, .a(.center))
-    rig.send(Pad(), .start)
+    rig.send(one, .a(.center))
+    rig.send(two, .start)
     #expect(rig.controller.stage == .joining)
     #expect(rig.made.isEmpty)
     #expect(rig.store.plan == nil)
-    rig.send(two, .start)
+    rig.send(one, .start)
     #expect(rig.controller.stage == .running)
     #expect(rig.store.plan == rig.plan)
     let streaming = await rig.bothStreaming()
     #expect(streaming)
+}
+
+@MainActor @Test func oneControllerStartsBothSidesAndTheEmptySideCanBeJoinedLater() async {
+    let rig = Rig()
+    let one = Pad(), two = Pad()
+    rig.send(one, .a(.left))
+    rig.send(one, .start)
+    #expect(rig.controller.stage == .running)
+    let streaming = await rig.bothStreaming()
+    #expect(streaming)
+    #expect(rig.controller.seats.count(on: .second) == 0)
+    rig.send(two, .a(.center))
+    #expect(rig.controller.seatPrompt == ObjectIdentifier(two))
+    rig.send(two, .a(.right))
+    #expect(rig.controller.seats.count(on: .second) == 1)
 }
 
 @MainActor @Test func bothSidesStreamOnTheirOwnInput() async throws {
@@ -490,6 +502,28 @@ private func host(_ id: String) -> PairedHost {
     #expect(rig.state(.second) == .ended(.disconnected))
 }
 
+@MainActor @Test func endSplitFromTheOverlayAsksFirst() async {
+    let (rig, _, _) = await runningRig()
+    rig.controller.menuPressed(now: 10)
+    rig.controller.overlayMove(.left)
+    #expect(rig.controller.cursor.item == .endSplit)
+    rig.controller.overlaySelect()
+    #expect(rig.controller.endSplitArmed)
+    #expect(rig.controller.isOverlayOpen)
+    #expect(rig.controller.streams.count == 2)
+    rig.controller.overlayMove(.left)
+    #expect(!rig.controller.endSplitArmed)
+    rig.controller.overlayMove(.right)
+    rig.controller.overlaySelect()
+    rig.controller.menuPressed(now: 11)
+    #expect(!rig.controller.endSplitArmed)
+    #expect(rig.controller.isOverlayOpen)
+    rig.controller.overlaySelect()
+    rig.controller.overlaySelect()
+    let finished = await eventually { rig.finished == [.ended] }
+    #expect(finished)
+}
+
 @MainActor @Test func endSplitWhileWakingFinishesOnce() async {
     let rig = Rig()
     rig.wakeHosts = ["B"]
@@ -584,10 +618,10 @@ private func host(_ id: String) -> PairedHost {
     rig.send(one, .a(.right))
     #expect(rig.controller.seats.side(of: one.id) == .second)
     #expect(rig.input.applied.count == applied + 1)
-    rig.send(one, .start)
-    #expect(rig.controller.isReassigning)
     rig.send(two, .a(.left))
     #expect(rig.controller.seats.side(of: two.id) == .first)
+    rig.send(Pad(), .start)
+    #expect(rig.controller.isReassigning)
     rig.send(two, .start)
     #expect(!rig.controller.isReassigning)
     #expect(rig.input.reassigning == [true, false])

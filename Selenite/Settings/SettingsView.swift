@@ -36,6 +36,18 @@ struct SettingsView: View {
                 ValuePickerRow(icon: "chart.bar", title: "Stream stats",
                                options: StatsPreference.allCases, selection: preferences.stats,
                                label: \.label) { model.settings.set(\.stats, $0) }
+                if !model.directory.hosts.isEmpty {
+                    Text("Hosts")
+                        .font(.headline)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 28)
+                    ForEach(model.directory.hosts, id: \.host.id) { snapshot in
+                        HostSettingsRow(host: snapshot.host)
+                    }
+                    Text("Each host can override resolution, frame rate, bitrate, codec and audio.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 about
                 // Visually quiet, at the very bottom: experimental switches for the real streams.
                 Button("Developer") { showsDeveloper = true }
@@ -80,6 +92,16 @@ extension ResolutionPreference {
         case .matchDisplay: "Match display"
         }
     }
+
+    var text: String {
+        switch self {
+        case .p720: String(localized: "720p")
+        case .p1080: String(localized: "1080p")
+        case .p1440: String(localized: "1440p")
+        case .p2160: String(localized: "4K")
+        case .matchDisplay: String(localized: "Match display")
+        }
+    }
 }
 
 extension FrameRatePreference {
@@ -88,6 +110,14 @@ extension FrameRatePreference {
         case .fps30: "30 fps"
         case .fps60: "60 fps"
         case .matchDisplay: "Match display"
+        }
+    }
+
+    var text: String {
+        switch self {
+        case .fps30: String(localized: "30 fps")
+        case .fps60: String(localized: "60 fps")
+        case .matchDisplay: String(localized: "Match display")
         }
     }
 }
@@ -109,6 +139,14 @@ extension CodecPreference {
         case .h264: "H.264"
         }
     }
+
+    var text: String {
+        switch self {
+        case .automatic: String(localized: "Automatic")
+        case .hevc: String(localized: "HEVC")
+        case .h264: String(localized: "H.264")
+        }
+    }
 }
 
 extension AudioPreference {
@@ -118,6 +156,13 @@ extension AudioPreference {
         case .stereo: "Stereo"
         }
     }
+
+    var text: String {
+        switch self {
+        case .automatic: String(localized: "Automatic (5.1 when available)")
+        case .stereo: String(localized: "Stereo")
+        }
+    }
 }
 
 extension StatsPreference {
@@ -125,6 +170,7 @@ extension StatsPreference {
         switch self {
         case .off: "Off"
         case .compact: "Compact"
+        case .full: "Full"
         }
     }
 }

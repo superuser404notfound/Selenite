@@ -293,6 +293,31 @@ private func arrivals30(count: Int, startMs: Double = 1000, offset: (Int) -> Dou
     #expect(stalls <= 2)
 }
 
+@Test func aMissedTickCountsAsTwoIntervals() {
+    let pacer = FramePacer<Int>()
+    let duration = 1.0 / 60
+    // Starts at 1.0, not 0, so this does not depend on lastVsync's 0.0 initial value.
+    pacer.vsync(timestamp: 1.0, duration: duration)
+    pacer.vsync(timestamp: 1.0 + 1.0 / 60, duration: duration)
+    // The callback for 1.0 + 2/60 never ran: this one reports 1.0 + 3/60, two intervals late.
+    pacer.vsync(timestamp: 1.0 + 3.0 / 60, duration: duration)
+    pacer.vsync(timestamp: 1.0 + 4.0 / 60, duration: duration)
+    let stats = pacer.stats
+    #expect(stats.missedTicks == 1)
+    #expect(abs(stats.vsyncIntervalMilliseconds - 1000.0 / 60) < 1e-6)
+}
+
+@Test func steadyVsyncsMissNothing() {
+    let pacer = FramePacer<Int>()
+    let duration = 1.0 / 60
+    for tick in 0...4 {
+        pacer.vsync(timestamp: Double(tick) * duration, duration: duration)
+    }
+    let stats = pacer.stats
+    #expect(stats.missedTicks == 0)
+    #expect(abs(stats.vsyncIntervalMilliseconds - 1000.0 / 60) < 1e-6)
+}
+
 @Test func arrivalPhaseIsMeasuredAgainstTheTickNotTheRefresh() {
     let pacer = FramePacer<Int>()
     let duration = 1.0 / 60
@@ -577,4 +602,61 @@ private func simulateDirect(_ mode: FramePacingMode = .lowLatency, directPresent
     let direct: Int = pacer.stats.directPresents
     #expect(shown == 0)
     #expect(direct == 0)
+}
+
+// MARK: - Display wait
+
+private final class ManualClock: @unchecked Sendable {
+    var now = 0.0
+}
+
+@Test func displayWaitIsArrivalToTick() {
+    let clock = ManualClock()
+    let pacer = FramePacer<Int>(mode: .lowLatency, clock: { clock.now })
+    pacer.put(1, arrival: 1.000)
+    clock.now = 1.004
+    #expect(pacer.tick() == 1)
+    pacer.put(2, arrival: 1.010)
+    clock.now = 1.020
+    #expect(pacer.tick() == 2)
+    let stats = pacer.stats
+    #expect(stats.displayWaitSamples == 2)
+    #expect(abs(stats.displayWaitTotalMilliseconds - 14) < 1e-6)
+}
+
+@Test func droppedFramesAddNoDisplayWait() {
+    let clock = ManualClock()
+    let pacer = FramePacer<Int>(mode: .lowLatency, clock: { clock.now })
+    pacer.put(1, arrival: 0)
+    pacer.put(2, arrival: 0)
+    pacer.put(3, arrival: 0)
+    clock.now = 0.002
+    #expect(pacer.tick() == 2)
+    #expect(pacer.stats.overflowDrops == 1)
+    #expect(pacer.stats.displayWaitSamples == 1)
+}
+
+@Test func directPresentRecordsDisplayWait() {
+    let clock = ManualClock()
+    let pacer = FramePacer<Int>(mode: .lowLatency, frameRate: 60, directPresent: true, clock: { clock.now })
+    let sink = PresentSink()
+    pacer.setPresenter { sink.present($0) }
+    let d = 1.0 / 60
+    // The first vsync plus tick is the warmup every direct-present test starts from: it leaves
+    // intervalServed false and primes vsyncDuration so the next put presents directly.
+    pacer.vsync(timestamp: 1.0, duration: d)
+    _ = pacer.tick()
+    let arrival = 1.0 + 0.4 * d
+    clock.now = arrival + 0.001
+    pacer.put(0, arrival: arrival)
+    #expect(sink.presented == [0])
+    let stats = pacer.stats
+    #expect(stats.displayWaitSamples == 1)
+    #expect(abs(stats.displayWaitTotalMilliseconds - 1) < 1e-6)
+}
+
+@Test func catchUpDropsAddNoDisplayWait() {
+    let (_, stats) = run([2] + Array(repeating: 1, count: 39))
+    #expect(stats.catchUpDrops == 1)
+    #expect(stats.displayWaitSamples == stats.presented)
 }

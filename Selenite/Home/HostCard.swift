@@ -3,7 +3,8 @@ import HostKit
 import SwiftUI
 
 /// One saved host: name and live status. Focus only highlights it; a click selects it and wakes it
-/// when it sleeps; a long press offers Pair again and Remove. The selected host carries a check.
+/// when it sleeps; a long press offers Stream settings, Pair again and Remove. The selected host
+/// carries a check.
 struct HostCard: View {
     let snapshot: HostSnapshot
     let isSelected: Bool
@@ -11,6 +12,8 @@ struct HostCard: View {
     let onRemove: () -> Void
     let onPairAgain: () -> Void
     let onToggleWakeOnLAN: () -> Void
+    let hasOverrides: Bool
+    let onStreamSettings: () -> Void
 
     var body: some View {
         FocusableCard(action: onClick, longPressOpensMenu: true) { focused in
@@ -27,6 +30,12 @@ struct HostCard: View {
                     Text(snapshot.statusText)
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    if hasOverrides {
+                        Image(systemName: "slider.horizontal.3")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .accessibilityLabel("Own stream settings")
+                    }
                 }
             }
             .padding(24)
@@ -44,6 +53,7 @@ struct HostCard: View {
         }
         .accessibilityAddTraits(isSelected ? .isSelected : [])
         .contextMenu {
+            Button("Stream settings", systemImage: "slider.horizontal.3") { onStreamSettings() }
             Button("Pair again", systemImage: "key") { onPairAgain() }
             if snapshot.host.macAddress.flatMap(MACAddress.init) != nil {
                 Button(snapshot.host.wakesOnLAN ? "Wake-on-LAN: On" : "Wake-on-LAN: Off", systemImage: "power") {

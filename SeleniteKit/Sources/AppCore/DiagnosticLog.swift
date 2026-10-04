@@ -1,5 +1,6 @@
 import Foundation
 import MoonlightCore
+import StreamKit
 
 /// Device diagnostics: tvOS drops stdout without a debugger, so app lines and moonlight-common-c
 /// lines also go to Library/Caches/selenite-log.txt, which `devicectl device copy from` can pull.
@@ -45,7 +46,9 @@ public final class DiagnosticLog: @unchecked Sendable {
 /// context would inherit that isolation and trap on its first off-main call, hence a free function.
 private nonisolated func moonlightLogSink(_ slot: Int32, _ line: UnsafePointer<CChar>?) {
     guard let line else { return }
-    let text = "[slot \(slot)] \(String(cString: line))"
+    let rawLine = String(cString: line)
+    let text = "[slot \(slot)] \(rawLine)"
     print(text, terminator: "")
     DiagnosticLog.shared.append(text)
+    SlotLogCounters.shared.observe(slot: slot, line: rawLine)
 }

@@ -35,7 +35,8 @@ public struct SeatMap: Equatable, Sendable {
     public func side(of pad: PadID) -> SplitSide? { sides[pad] }
     public func pads(on side: SplitSide) -> [PadID] { order.filter { sides[$0] == side } }
     public func count(on side: SplitSide) -> Int { pads(on: side).count }
-    public var isReady: Bool { count(on: .first) > 0 && count(on: .second) > 0 }
+    /// One seated pad is enough: an empty side streams too and can be joined later.
+    public var isReady: Bool { !order.isEmpty }
     public var seatedPads: Set<PadID> { Set(order) }
 
     /// A pad keeps its join position when it changes sides.

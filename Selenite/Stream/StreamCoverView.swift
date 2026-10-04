@@ -1,5 +1,6 @@
 import AppCore
 import QuartzCore
+import StreamKit
 import SwiftUI
 
 /// The full-screen stream (spec 4.4): the surface, the loading view until the first frame, the
@@ -18,7 +19,7 @@ struct StreamCoverView: View {
                     .transition(.opacity)
             }
             if controller.phase == .running, controller.ending == nil {
-                StreamIndicators(controller: controller, showsStats: model.settings.preferences.stats == .compact)
+                StreamIndicators(controller: controller, level: model.settings.preferences.stats)
             }
             if controller.isOverlayOpen {
                 StreamOverlayView(controller: controller)
@@ -41,56 +42,29 @@ struct StreamCoverView: View {
     }
 }
 
-/// Top right while running: the poor-connection symbol while it lasts, and the compact stats pill.
+/// Top right while running: the poor-connection symbol while it lasts, and the stats HUD. The HUD
+/// yields to the Menu overlay while it is open (same stats, no point behind it); the poor-connection
+/// symbol stays, it means something different.
 private struct StreamIndicators: View {
     let controller: StreamController
-    let showsStats: Bool
+    let level: StatsPreference
 
     var body: some View {
-        VStack {
-            HStack(spacing: 16) {
-                Spacer()
-                if controller.isPoorConnection {
-                    Image(systemName: "wifi.exclamationmark")
-                        .font(.title3)
-                        .foregroundStyle(Color.Theme.warning)
-                        .padding(14)
-                        .background(.ultraThinMaterial, in: Circle())
-                }
-                if showsStats, let stats = controller.liveStats {
-                    CompactStatsPill(stats: stats)
-                }
+        // A frame, not a Spacer: the HUD must be offered the full height, or Full falls back to the pill.
+        HStack(alignment: .top, spacing: 16) {
+            if controller.isPoorConnection {
+                Image(systemName: "wifi.exclamationmark")
+                    .font(.title3)
+                    .foregroundStyle(Color.Theme.warning)
+                    .padding(14)
+                    .background(.ultraThinMaterial, in: Circle())
             }
-            Spacer()
+            if !controller.isOverlayOpen {
+                StatsHUD(level: level, stats: controller.liveStats, pacing: controller.settings.pacing)
+            }
         }
         .padding(48)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
         .allowsHitTesting(false)
-    }
-}
-
-struct CompactStatsPill: View {
-    let stats: StreamStatsSummary
-
-    var body: some View {
-        HStack(spacing: 20) {
-            Text("\(stats.fps) fps")
-            Text("\(StatsFormat.milliseconds(stats.decodeMilliseconds)) ms decode")
-            if let rtt = stats.rttMilliseconds {
-                Text("RTT \(rtt) ms")
-            } else {
-                Text("RTT n/a")
-            }
-            Text("\(stats.networkDrops + stats.pacerDrops) drops")
-        }
-        .font(.caption.monospacedDigit())
-        .padding(.horizontal, 20)
-        .padding(.vertical, 10)
-        .background(.ultraThinMaterial, in: Capsule())
-    }
-}
-
-enum StatsFormat {
-    static func milliseconds(_ value: Double) -> String {
-        String(format: "%.1f", value)
     }
 }

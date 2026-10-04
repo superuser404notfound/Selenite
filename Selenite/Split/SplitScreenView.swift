@@ -54,6 +54,7 @@ struct SplitScreenView: View {
 }
 
 private struct SplitHalfView: View {
+    @Environment(AppModel.self) private var model
     let split: SplitController
     let side: SplitSide
     let hostName: String
@@ -116,16 +117,23 @@ private struct SplitHalfView: View {
         }
     }
 
+    /// The stats HUD yields to the split overlay while it is open (it covers both halves at once);
+    /// the poor-connection symbol stays, it means something different.
     private func running(_ stream: StreamController) -> some View {
         ZStack {
-            if stream.isPoorConnection {
-                Image(systemName: "wifi.exclamationmark")
-                    .font(.title3)
-                    .foregroundStyle(Color.Theme.warning)
-                    .padding(14)
-                    .background(.ultraThinMaterial, in: Circle())
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+            HStack(spacing: 16) {
+                if stream.isPoorConnection {
+                    Image(systemName: "wifi.exclamationmark")
+                        .font(.title3)
+                        .foregroundStyle(Color.Theme.warning)
+                        .padding(14)
+                        .background(.ultraThinMaterial, in: Circle())
+                }
+                if !split.isOverlayOpen {
+                    StatsHUD(level: model.settings.preferences.stats, stats: stream.liveStats, pacing: stream.settings.pacing)
+                }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
             if seated == 0 {
                 bottom { capsule(progress: false) { Text("Press A to join") } }
             }

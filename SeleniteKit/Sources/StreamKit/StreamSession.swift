@@ -2,6 +2,7 @@ import CoreMedia
 import Foundation
 import HostKit
 import MoonlightCore
+import QuartzCore
 
 public struct StreamSettings: Sendable, Equatable {
     public var width: Int
@@ -56,15 +57,39 @@ public struct StreamStats: Sendable {
     public var averageDecodeMilliseconds: Double
     public var rttMilliseconds: UInt32?
     public var audio: AudioRingStats?
+    public var sampledAt: Double
+    public var receivedBytes: Int
+    public var queueDroppedFrames: Int
+    public var unrecoverableFrames: Int
+    public var hostLatencyTotalTenths: Int
+    public var hostLatencySamples: Int
+    public var hostLatencyRange: ClosedRange<Double>?
+    public var networkReceiveTotalMicroseconds: UInt64
+    public var networkReceiveSamples: Int
+    public var rttVarianceMilliseconds: UInt32?
 
     public init(decodedFrames: Int = 0, networkDroppedFrames: Int = 0, pacer: PacerStats = PacerStats(),
-                averageDecodeMilliseconds: Double = 0, rttMilliseconds: UInt32? = nil, audio: AudioRingStats? = nil) {
+                averageDecodeMilliseconds: Double = 0, rttMilliseconds: UInt32? = nil, audio: AudioRingStats? = nil,
+                sampledAt: Double = 0, receivedBytes: Int = 0, queueDroppedFrames: Int = 0,
+                unrecoverableFrames: Int = 0, hostLatencyTotalTenths: Int = 0, hostLatencySamples: Int = 0,
+                hostLatencyRange: ClosedRange<Double>? = nil, networkReceiveTotalMicroseconds: UInt64 = 0,
+                networkReceiveSamples: Int = 0, rttVarianceMilliseconds: UInt32? = nil) {
         self.decodedFrames = decodedFrames
         self.networkDroppedFrames = networkDroppedFrames
         self.pacer = pacer
         self.averageDecodeMilliseconds = averageDecodeMilliseconds
         self.rttMilliseconds = rttMilliseconds
         self.audio = audio
+        self.sampledAt = sampledAt
+        self.receivedBytes = receivedBytes
+        self.queueDroppedFrames = queueDroppedFrames
+        self.unrecoverableFrames = unrecoverableFrames
+        self.hostLatencyTotalTenths = hostLatencyTotalTenths
+        self.hostLatencySamples = hostLatencySamples
+        self.hostLatencyRange = hostLatencyRange
+        self.networkReceiveTotalMicroseconds = networkReceiveTotalMicroseconds
+        self.networkReceiveSamples = networkReceiveSamples
+        self.rttVarianceMilliseconds = rttVarianceMilliseconds
     }
 }
 
@@ -300,12 +325,23 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
         var rtt: UInt32 = 0
         var variance: UInt32 = 0
         let hasRTT = slot.api.getEstimatedRttInfo!(&rtt, &variance)
+        let intake = pipeline?.intakeSnapshot()
         return StreamStats(decodedFrames: pipeline?.decodedFrames ?? 0,
                            networkDroppedFrames: pipeline?.networkDroppedFrames ?? 0,
                            pacer: pacer.stats,
                            averageDecodeMilliseconds: pipeline?.averageDecodeMilliseconds ?? 0,
                            rttMilliseconds: hasRTT ? rtt : nil,
-                           audio: audio?.stats)
+                           audio: audio?.stats,
+                           sampledAt: CACurrentMediaTime(),
+                           receivedBytes: intake?.bytes ?? 0,
+                           queueDroppedFrames: intake?.queueDrops ?? 0,
+                           unrecoverableFrames: intake?.unrecoverable ?? 0,
+                           hostLatencyTotalTenths: intake?.hostLatencyTotalTenths ?? 0,
+                           hostLatencySamples: intake?.hostLatencySamples ?? 0,
+                           hostLatencyRange: intake?.hostLatencyRange,
+                           networkReceiveTotalMicroseconds: intake?.receiveTotalMicroseconds ?? 0,
+                           networkReceiveSamples: intake?.receiveSamples ?? 0,
+                           rttVarianceMilliseconds: hasRTT ? variance : nil)
     }
 
     /// This session's level in the shared mixer, 0...1; kept for an audio stream that starts later.
