@@ -38,9 +38,9 @@ public struct PacerStats: Sendable, Equatable {
     public var displayWaitTotalMilliseconds: Double = 0
     public var displayWaitSamples = 0
     /// Presented frames that had already arrived before the vsync preceding their enqueue, so they
-    /// reached the screen one refresh later than they could have. In smooth and in lowLatency
+    /// reached the screen one refresh later than they could have. In smoothPlus and in lowLatency
     /// without direct present that is every presented frame except those that arrived between a
-    /// vsync and its tick.
+    /// vsync and its tick; in smooth it is the standing refresh of buffer.
     public var laggingPresents = 0
 
     public init() {}
@@ -67,9 +67,13 @@ public struct PacerStats: Sendable, Equatable {
 /// and missing stretches it one refresh, as does a late frame found due together with the next
 /// one, up to `smoothStretch` refreshes beyond the base, so a late frame is shown instead of
 /// skipped and the frames behind it follow at the cadence. After `smoothCalm` seconds without a
-/// stretch the delay steps back one refresh every `smoothStepDown` seconds, each step skipping one
-/// frame. Measured against device traces (2026-10-05) this matches the old one-frame jitter buffer
-/// in stutter on a quiet network at less than half its latency.
+/// stretch the delay steps back one refresh every `smoothStepDown` seconds, skipping a frame when
+/// one is due early. One frame is presented per refresh, so a refresh of lag can stand after a
+/// late frame for as long as frames keep arriving after their interval was served; that standing
+/// frame is the jitter buffer and is kept on purpose (removing it after a calm spell made smooth
+/// replay like lowLatency: 14 ms and 15 judder events a minute solo instead of 21 ms and 6).
+/// Measured against device traces (2026-10-05) smooth beats the former one-frame jitter buffer
+/// in stutter on a quiet network at about half its latency.
 ///
 /// `smoothPlus` keeps two frames standing as a jitter buffer: it holds up to four, primes to three
 /// before presenting (after the start and after every stall), shows each frame for the stream's
@@ -78,9 +82,9 @@ public struct PacerStats: Sendable, Equatable {
 ///
 /// Cadence: a stream slower than the display (30 fps on 60 Hz) leaves ticks empty by design, and
 /// such an empty tick is no stall. refresh / fps is fractional (30 on 50 is 1.67, shown 2-2-1).
-/// smooth follows the frame period by construction. smoothPlus runs a cadence accumulator: each presented frame is owed refresh / fps refreshes, every
-/// tick takes one off, and while a frame is still owed the current one is held and an empty tick
-/// neither stalls nor re-primes. lowLatency shows frames as they come, so its holds follow the
+/// smooth follows the frame period by construction. smoothPlus runs a cadence accumulator: each
+/// presented frame is owed refresh / fps refreshes, every tick takes one off, and while a frame is
+/// still owed the current one is held and an empty tick neither stalls nor re-primes. lowLatency shows frames as they come, so its holds follow the
 /// arrivals, not an accumulator phase; an empty tick is a stall there once the current frame has
 /// been up for the longest normal hold, ceil(refresh / fps). A stream at or above the refresh
 /// never waits in any mode.
@@ -326,6 +330,7 @@ public final class FramePacer<Frame>: @unchecked Sendable {
     private func openIntervalIfVsyncPassed(_ arrival: Double) {
         guard intervalStart > 0, vsyncDuration > 0, arrival >= intervalStart + vsyncDuration else { return }
         let intervals = ((arrival - intervalStart) / vsyncDuration).rounded(.down)
+        if mode == .smooth { playoutIntervalEnded(at: intervalStart + vsyncDuration, served: intervalServed) }
         endedIntervalServed = intervals == 1 && intervalServed
         intervalServed = false
         intervalStart += intervals * vsyncDuration
@@ -359,6 +364,7 @@ public final class FramePacer<Frame>: @unchecked Sendable {
             trace?.record(.vsync(timestamp: timestamp, duration: duration, tickTime: tickTime ?? timestamp))
             // Unless an arrival already opened this interval (see `openIntervalIfVsyncPassed`).
             if timestamp >= intervalStart + vsyncDuration / 2 {
+                if mode == .smooth { playoutIntervalEnded(at: timestamp, served: intervalServed) }
                 endedIntervalServed = intervalServed
                 intervalServed = false
             }
@@ -492,19 +498,26 @@ public final class FramePacer<Frame>: @unchecked Sendable {
 
     /// smooth (see the type comment). Runs after the vsync that opened the current interval;
     /// presents for the vsync that ends it.
+    /// smooth: the interval ending at `vsync` closes, with or without a present. When the vsync
+    /// showed nothing new although the next frame was due there and had not arrived, that is a
+    /// stall, and the delay stretches so the frame is shown when it comes. Checked where the
+    /// interval rolls over (a vsync report, or an arrival after the vsync and before its tick), so
+    /// a late frame presented right after the vsync still counts. A lost frame (a gap in the frame
+    /// numbers) cannot be told from a late one here and stretches the same way.
+    private func playoutIntervalEnded(at vsync: Double, served: Bool) {
+        guard !served, intervalStart > 0, vsyncDuration > 0, let presented = lastPresentedExpected,
+              presented + framePeriod + playoutDelay <= vsync + 1e-9, !arrivals.contains(where: { $0 < vsync })
+        else { return }
+        counters.stalls += 1
+        if stretch < Self.smoothStretch {
+            stretch += 1
+            lastStretch = vsync
+        }
+    }
+
     private func playoutTick() -> Frame? {
         guard intervalStart > 0, vsyncDuration > 0 else { return nil }
         let passed = intervalStart
-        // The vsync that just passed showed nothing new although the next frame was due there and
-        // had not arrived: a stall, and the delay stretches so that frame is shown when it comes.
-        if !endedIntervalServed, let presented = lastPresentedExpected,
-           presented + framePeriod + playoutDelay <= passed + 1e-9, !arrivals.contains(where: { $0 < passed }) {
-            counters.stalls += 1
-            if stretch < Self.smoothStretch {
-                stretch += 1
-                lastStretch = passed
-            }
-        }
         if stretch > 0, passed - lastStretch > Self.smoothCalm, passed - lastStepDown > Self.smoothStepDown {
             stretch -= 1
             lastStepDown = passed
@@ -532,10 +545,11 @@ public final class FramePacer<Frame>: @unchecked Sendable {
         let delay = playoutDelay
         guard let newest = expectedTimes.lastIndex(where: { $0 + delay <= target + 1e-9 }) else { return nil }
         var pick = newest
-        if newest > 0, mayStretch, expectedTimes[0] + delay <= intervalStart + 1e-9 {
+        if newest > 0, mayStretch, lastPresentedExpected != nil, expectedTimes[0] + delay <= intervalStart + 1e-9,
+           arrivals[0] > expectedTimes[0] + delay {
             pick = 0
             stretch += 1
-            lastStretch = target
+            lastStretch = intervalStart
         }
         for _ in 0..<pick {
             removeOldest()

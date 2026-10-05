@@ -437,7 +437,8 @@ private func directPacer(mode: FramePacingMode = .lowLatency, frameRate: Int = 6
 /// and the order of every frame that reached the renderer (direct or tick).
 private func simulateDirect(_ mode: FramePacingMode = .lowLatency, directPresent: Bool = true, arrivals: [Double],
                             numbers: [Int]? = nil, ticks: Int, startMs: Double = 1000, frameRate: Int = 60,
-                            refreshMs: Double = vsyncMs) -> (records: [TickRecord], rendered: [Int], stats: PacerStats) {
+                            refreshMs: Double = vsyncMs,
+                            tickLagMs: Double = 0) -> (records: [TickRecord], rendered: [Int], stats: PacerStats) {
     let pacer = FramePacer<Int>(mode: mode, frameRate: frameRate, directPresent: directPresent)
     let sink = PresentSink()
     pacer.setPresenter { sink.present($0) }
@@ -449,7 +450,12 @@ private func simulateDirect(_ mode: FramePacingMode = .lowLatency, directPresent
             pacer.put(next, arrival: arrivals[next] / 1000, frameNumber: numbers?[next])
             next += 1
         }
-        pacer.vsync(timestamp: now / 1000, duration: refreshMs / 1000, tickTime: now / 1000)
+        pacer.vsync(timestamp: now / 1000, duration: refreshMs / 1000, tickTime: (now + tickLagMs) / 1000)
+        // Frames decoded between the vsync and its late tick callback.
+        while next < arrivals.count, arrivals[next] < now + tickLagMs {
+            pacer.put(next, arrival: arrivals[next] / 1000, frameNumber: numbers?[next])
+            next += 1
+        }
         let frame = pacer.tick()
         if let frame { sink.present(frame) }
         let stats = pacer.stats
@@ -1064,4 +1070,26 @@ private func meanWait(_ records: [TickRecord], _ range: Range<Int>) -> Double {
     #expect(drops == 0)
     #expect(rendered == Array(0..<rendered.count))
     #expect(rendered.count >= 345)
+}
+
+@Test func smoothCountsALateFrameThatArrivesBetweenTheVsyncAndItsTick() {
+    // Ticks run 3 ms after their vsync; frame 300 arrives 1 ms after the vsync it was due at.
+    let times = arrivals(count: 700) { $0 == 300 ? 1.06 + 0.5 : 0.5 }
+    let (_, rendered, stats) = simulateDirect(.smooth, arrivals: times, numbers: Array(0..<700), ticks: 600,
+                                              tickLagMs: 3)
+    let stalls: Int = stats.stalls
+    #expect(stalls == 1)
+    #expect(rendered.contains(300))
+}
+
+@Test func smoothDoesNotStretchForABacklogBeforeTheFirstVsync() {
+    // 300 ms of frames are decoded before the display link reports its first vsync.
+    var noise = Noise(seed: 55)
+    let times = arrivals(count: 700, startMs: 700) { _ in 0.5 + 0.1 * noise.next() }
+    let (records, _, stats) = simulateDirect(.smooth, arrivals: times, numbers: Array(0..<700), ticks: 500)
+    let stalls: Int = stats.stalls
+    let wait: Double = meanWait(records, 30..<500)
+    // At most the standing refresh of buffer, not the six-refresh stretch a late frame would get.
+    #expect(stalls == 0)
+    #expect(wait < 2 * vsyncMs)
 }
