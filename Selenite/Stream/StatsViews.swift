@@ -122,8 +122,12 @@ struct OverlayStats: View {
                 Text(verbatim: "\(stats.queueDrops)")
             }
             GridRow {
-                Text("Pacer drops")
-                Text(verbatim: "\(stats.pacerDrops)")
+                Text("Overflow drops")
+                Text(verbatim: "\(stats.overflowDrops)")
+            }
+            GridRow {
+                Text("Catch-up drops")
+                Text(verbatim: "\(stats.catchUpDrops)")
             }
             GridRow {
                 Text("Unrecoverable frames")

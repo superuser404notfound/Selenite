@@ -31,7 +31,11 @@ public struct StreamStatsSummary: Equatable, Sendable {
     public var networkDrops: Int
     public var queueDrops: Int
     public var unrecoverableFrames: Int
-    public var pacerDrops: Int
+    /// The pacer's two kinds of drop: a frame arriving while the queue was full, and a standing lag
+    /// cut on purpose. `pacerDrops` is their sum.
+    public var overflowDrops: Int
+    public var catchUpDrops: Int
+    public var pacerDrops: Int { overflowDrops + catchUpDrops }
     public var stalls: Int
     public var missedTicks: Int
     public var audioUnderruns: Int
@@ -59,7 +63,8 @@ public struct StreamStatsSummary: Equatable, Sendable {
         networkDrops = current.networkDroppedFrames
         queueDrops = current.queueDroppedFrames
         unrecoverableFrames = current.unrecoverableFrames
-        pacerDrops = current.pacer.overflowDrops + current.pacer.catchUpDrops
+        overflowDrops = current.pacer.overflowDrops
+        catchUpDrops = current.pacer.catchUpDrops
         stalls = current.pacer.stalls
         missedTicks = current.pacer.missedTicks
         audioUnderruns = current.audio?.underruns ?? 0

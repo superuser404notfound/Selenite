@@ -57,6 +57,8 @@ import Testing
     #expect(summary.rttMilliseconds == 12)
     #expect(summary.decodeMilliseconds == 2.5)
     #expect(summary.networkDrops == 3)
+    #expect(summary.overflowDrops == 2)
+    #expect(summary.catchUpDrops == 1)
     #expect(summary.pacerDrops == 3)
     #expect(summary.stalls == 4)
     #expect(summary.audioUnderruns == 5)
