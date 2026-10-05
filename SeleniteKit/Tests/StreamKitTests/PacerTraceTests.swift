@@ -111,6 +111,9 @@ private let metadata = PacerTrace.Metadata(mode: "lowLatency", directPresent: tr
     let recorder = PacerTraceRecorder(metadata: metadata, directory: directory,
                                       startedAt: Calendar.current.date(from: components)!)
     recorder.record(.tick)
+    // The recorder creates its file on its own queue; listing before that finished sees no file
+    // or the temporary one the atomic create writes first.
+    recorder.waitForPendingWrites()
     for index in 0..<3 {
         let name = String(format: "pacer-trace-20261005-1200%02d-slot0.bin", index)
         FileManager.default.createFile(atPath: directory.appendingPathComponent(name).path, contents: Data(count: 100))

@@ -229,6 +229,11 @@ public final class PacerTraceRecorder: @unchecked Sendable {
         }
     }
 
+    /// Returns once the file work queued so far (creating the file, flushes) is done.
+    func waitForPendingWrites() {
+        queue.sync {}
+    }
+
     /// Writes what is buffered and closes the file; later events are ignored. Blocks until the
     /// file is complete, so a reader right after sees every event.
     public func close() {
