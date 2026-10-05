@@ -80,7 +80,7 @@ let package = Package(
             .product(name: "X509", package: "swift-certificates"),
         ], resources: [.copy("Fixtures")]),
         .testTarget(name: "MoonlightCoreTests", dependencies: ["MbedCrypto", "MoonlightCore", "MoonlightSlotA", "MoonlightSlotB"]),
-        .testTarget(name: "StreamKitTests", dependencies: ["StreamKit"]),
+        .testTarget(name: "StreamKitTests", dependencies: ["StreamKit"], resources: [.copy("Fixtures")]),
         .testTarget(name: "InputKitTests", dependencies: ["InputKit", "MoonlightCore"]),
         .testTarget(name: "AppCoreTests", dependencies: ["AppCore", "HostKit", "StreamKit", "InputKit"]),
     ]

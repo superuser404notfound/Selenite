@@ -15,10 +15,10 @@ public struct HostLatency: Equatable, Sendable {
 
 /// One overlay refresh: `current` against the sample one second earlier. Counters are totals since
 /// the stream started, frames per second is the delta of presented frames over the real elapsed
-/// interval. The window fields (`networkMilliseconds`, `displayMilliseconds`, `hostLatency`) average
-/// just the samples that arrived since `previous`, falling back to the running totals of `current`
-/// when there is none. `displayHz` and `streamFps` read the pacer's running means directly, so they
-/// need no `previous` sample.
+/// interval. The window fields (`networkMilliseconds`, `displayMilliseconds`, `laggingPercent`,
+/// `hostLatency`) average just the samples that arrived since `previous`, falling back to the
+/// running totals of `current` when there is none. `displayHz` and `streamFps` read the pacer's
+/// running means directly, so they need no `previous` sample.
 public struct StreamStatsSummary: Equatable, Sendable {
     public var width: Int
     public var height: Int
@@ -31,13 +31,20 @@ public struct StreamStatsSummary: Equatable, Sendable {
     public var networkDrops: Int
     public var queueDrops: Int
     public var unrecoverableFrames: Int
-    public var pacerDrops: Int
+    /// The pacer's two kinds of drop: a frame arriving while the queue was full, and a standing lag
+    /// cut on purpose. `pacerDrops` is their sum.
+    public var overflowDrops: Int
+    public var catchUpDrops: Int
+    public var pacerDrops: Int { overflowDrops + catchUpDrops }
     public var stalls: Int
     public var missedTicks: Int
     public var audioUnderruns: Int
     public var hostLatency: HostLatency?
     public var networkMilliseconds: Double?
+    /// Arrival to the vsync that shows the frame, so a frame of lag shows here as a full interval.
     public var displayMilliseconds: Double?
+    /// Share of presented frames that reached the screen a refresh late (`PacerStats.laggingPresents`).
+    public var laggingPercent: Int?
     public var rttVarianceMilliseconds: Int?
     public var jitterMilliseconds: Double
     public var displayHz: Double?
@@ -56,13 +63,15 @@ public struct StreamStatsSummary: Equatable, Sendable {
         networkDrops = current.networkDroppedFrames
         queueDrops = current.queueDroppedFrames
         unrecoverableFrames = current.unrecoverableFrames
-        pacerDrops = current.pacer.overflowDrops + current.pacer.catchUpDrops
+        overflowDrops = current.pacer.overflowDrops
+        catchUpDrops = current.pacer.catchUpDrops
         stalls = current.pacer.stalls
         missedTicks = current.pacer.missedTicks
         audioUnderruns = current.audio?.underruns ?? 0
         hostLatency = Self.hostLatency(current: current, previous: previous)
         networkMilliseconds = Self.networkMilliseconds(current: current, previous: previous)
         displayMilliseconds = Self.displayMilliseconds(current: current, previous: previous)
+        laggingPercent = Self.laggingPercent(current: current, previous: previous)
         rttVarianceMilliseconds = current.rttVarianceMilliseconds.map { Int($0) }
         jitterMilliseconds = current.pacer.jitterMilliseconds
         displayHz = Self.rate(fromIntervalMilliseconds: current.pacer.vsyncIntervalMilliseconds)
@@ -129,6 +138,13 @@ public struct StreamStatsSummary: Equatable, Sendable {
         }
         guard deltaTotal >= 0, deltaSamples > 0 else { return nil }
         return deltaTotal / Double(deltaSamples) / 1000
+    }
+
+    private static func laggingPercent(current: StreamStats, previous: StreamStats?) -> Int? {
+        let lagging = current.pacer.laggingPresents - (previous?.pacer.laggingPresents ?? 0)
+        let presented = current.pacer.presented - (previous?.pacer.presented ?? 0)
+        guard lagging >= 0, presented > 0 else { return nil }
+        return Int((Double(lagging) / Double(presented) * 100).rounded())
     }
 
     private static func displayMilliseconds(current: StreamStats, previous: StreamStats?) -> Double? {

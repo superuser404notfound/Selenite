@@ -433,7 +433,7 @@ private func directPacer(mode: FramePacingMode = .lowLatency, frameRate: Int = 6
 /// `simulate` with a present sink attached: records what each tick returns, stats after each tick,
 /// and the order of every frame that reached the renderer (direct or tick).
 private func simulateDirect(_ mode: FramePacingMode = .lowLatency, directPresent: Bool = true, arrivals: [Double],
-                            ticks: Int, startMs: Double = 1000, frameRate: Int = 60,
+                            numbers: [Int]? = nil, ticks: Int, startMs: Double = 1000, frameRate: Int = 60,
                             refreshMs: Double = vsyncMs) -> (records: [TickRecord], rendered: [Int], stats: PacerStats) {
     let pacer = FramePacer<Int>(mode: mode, frameRate: frameRate, directPresent: directPresent)
     let sink = PresentSink()
@@ -443,7 +443,7 @@ private func simulateDirect(_ mode: FramePacingMode = .lowLatency, directPresent
     for tick in 0..<ticks {
         let now = startMs + Double(tick) * refreshMs
         while next < arrivals.count, arrivals[next] < now {
-            pacer.put(next, arrival: arrivals[next] / 1000)
+            pacer.put(next, arrival: arrivals[next] / 1000, frameNumber: numbers?[next])
             next += 1
         }
         pacer.vsync(timestamp: now / 1000, duration: refreshMs / 1000, tickTime: now / 1000)
@@ -610,7 +610,7 @@ private final class ManualClock: @unchecked Sendable {
     var now = 0.0
 }
 
-@Test func displayWaitIsArrivalToTick() {
+@Test func displayWaitWithoutAVsyncRunsToTheEnqueue() {
     let clock = ManualClock()
     let pacer = FramePacer<Int>(mode: .lowLatency, clock: { clock.now })
     pacer.put(1, arrival: 1.000)
@@ -622,6 +622,36 @@ private final class ManualClock: @unchecked Sendable {
     let stats = pacer.stats
     #expect(stats.displayWaitSamples == 2)
     #expect(abs(stats.displayWaitTotalMilliseconds - 14) < 1e-6)
+}
+
+@Test func displayWaitOfATickPresentRunsToTheNextVsync() {
+    let clock = ManualClock()
+    let pacer = FramePacer<Int>(mode: .lowLatency, clock: { clock.now })
+    let d = 1.0 / 60
+    clock.now = 0.995
+    pacer.put(1, arrival: 0.995)
+    clock.now = 1.001
+    pacer.vsync(timestamp: 1.0, duration: d, tickTime: 1.001)
+    #expect(pacer.tick() == 1)
+    // Enqueued by the tick after the vsync at 1.0: shown at 1.0 + d, not at the enqueue.
+    let wait: Double = pacer.stats.displayWaitTotalMilliseconds
+    #expect(abs(wait - (1.0 + d - 0.995) * 1000) < 1e-6)
+}
+
+@Test func aLateTickCallbackNeverGivesANegativeDisplayWait() {
+    let clock = ManualClock()
+    let pacer = FramePacer<Int>(mode: .lowLatency, clock: { clock.now })
+    let d = 1.0 / 60
+    // The callback for the vsync at 1.0 runs after the next vsync (1.0 + d) and finds a frame that
+    // arrived after that one too: the vsync showing it is 1.0 + 2d.
+    let arrival = 1.0 + 1.1 * d
+    clock.now = arrival
+    pacer.put(1, arrival: arrival)
+    clock.now = 1.0 + 1.2 * d
+    pacer.vsync(timestamp: 1.0, duration: d, tickTime: clock.now)
+    #expect(pacer.tick() == 1)
+    let wait: Double = pacer.stats.displayWaitTotalMilliseconds
+    #expect(abs(wait - (1.0 + 2 * d - arrival) * 1000) < 1e-6)
 }
 
 @Test func droppedFramesAddNoDisplayWait() {
@@ -651,12 +681,296 @@ private final class ManualClock: @unchecked Sendable {
     pacer.put(0, arrival: arrival)
     #expect(sink.presented == [0])
     let stats = pacer.stats
+    // Display wait runs to the vsync that shows the frame (the first after its enqueue, here
+    // 1 + d), not to the enqueue 1 ms after arrival.
     #expect(stats.displayWaitSamples == 1)
-    #expect(abs(stats.displayWaitTotalMilliseconds - 1) < 1e-6)
+    #expect(abs(stats.displayWaitTotalMilliseconds - 0.6 * d * 1000) < 1e-6)
 }
 
 @Test func catchUpDropsAddNoDisplayWait() {
     let (_, stats) = run([2] + Array(repeating: 1, count: 39))
     #expect(stats.catchUpDrops == 1)
     #expect(stats.displayWaitSamples == stats.presented)
+}
+
+// MARK: - Catch-up near the tick (direct present)
+
+@Test func directPresentDoesNotStayAFrameBehindNearTheTick() {
+    // A lag stands from the start and arrivals sit 1 ms after the tick: the old rule kept it for
+    // the whole stream, since every arrival came within 0.1 of the interval of the tick.
+    var noise = Noise(seed: 44)
+    let times = [1000 - 0.6 * vsyncMs, 1000 - 0.4 * vsyncMs]
+        + arrivals(count: 3700) { _ in 1 / vsyncMs + 0.3 / vsyncMs * noise.next() }
+    let (records, rendered, stats) = simulateDirect(arrivals: times, ticks: 3600)
+    let catchUp: Int = increase(records, from: 0, \.catchUpDrops)
+    let stalls: Int = increase(records, from: 1, \.stalls)
+    let lateTickShown: Int = records[120...].compactMap(\.shown).count
+    let inOrder: Bool = rendered == rendered.sorted()
+    let lagging: Int = stats.laggingPresents
+    #expect(catchUp == 1)
+    #expect(stalls == 0)
+    #expect(lateTickShown == 0)
+    #expect(inOrder)
+    #expect(lagging < 120)
+}
+
+@Test func directPresentKeepsTheLagNearTheTickWhileLateFramesRecur() {
+    // Same stream, but from frame 300 every 120th frame arrives 18 ms late. The first misses its
+    // interval (one stall) and leaves a lag. Cutting it would leave 15.7 ms of slack, less than a
+    // lateness that recurs this often (0.8 % of frames), so the lag stands and absorbs the rest.
+    var noise = Noise(seed: 45)
+    let times = [1000 - 0.6 * vsyncMs, 1000 - 0.4 * vsyncMs]
+        + arrivals(count: 3700) { n in
+            let late = n >= 300 && n % 120 == 60 ? 18 / vsyncMs : 0
+            return 1 / vsyncMs + 0.3 / vsyncMs * noise.next() + late
+        }
+    let (records, _, _) = simulateDirect(arrivals: times, ticks: 3600)
+    let catchUp: Int = increase(records, from: 0, \.catchUpDrops)
+    let stalls: Int = increase(records, from: 1, \.stalls)
+    let tickShownAtTheEnd: Int = records[3400...].compactMap(\.shown).count
+    #expect(catchUp == 1)
+    #expect(stalls == 1)
+    // Each late frame finds the queue empty at one tick and the lag forms again behind it.
+    #expect(tickShownAtTheEnd >= 195)
+}
+
+/// Arrivals 1 ms after the tick with a startup lag; frame 600 arrives 18 ms late (a stall and a new
+/// lag), plus five single frames lost between 300 and 340 (`lose`) or a pause of three periods
+/// before frame 300 (`pause`). Returns how many ticks from 90 to 100 s still presented a frame
+/// (the losses leave the 120 s lateness window only after that).
+private func lagAfterOneLateFrame(seed: UInt64, lose: Bool = false, pause: Bool = false,
+                                  passNumbers: Bool = true) -> (tickShownAtTheEnd: Int, catchUp: Int) {
+    var noise = Noise(seed: seed)
+    var times = [1000 - 0.6 * vsyncMs, 1000 - 0.4 * vsyncMs]
+        + arrivals(count: 7300) { n in 1 / vsyncMs + 0.3 / vsyncMs * noise.next() + (n == 600 ? 18 / vsyncMs : 0) }
+    var numbers = Array(0..<times.count)
+    if lose {
+        for index in [334, 326, 318, 310, 302] {
+            times.remove(at: index)
+            numbers.remove(at: index)
+        }
+    }
+    if pause {
+        times = times.enumerated().map { $0.offset >= 302 ? $0.element + 3 * vsyncMs : $0.element }
+        times.removeSubrange(302...304)
+        numbers = Array(0..<times.count)
+    }
+    let (records, _, _) = simulateDirect(arrivals: times, numbers: passNumbers ? numbers : nil, ticks: 7200)
+    let catchUp: Int = increase(records, from: 0, \.catchUpDrops)
+    return (records[5400..<6000].compactMap(\.shown).count, catchUp)
+}
+
+@Test func theLatenessGateWaitsForEnoughSamples() {
+    // A startup lag 1 ms after the tick: lateness is measured from the 61st interval on and
+    // decided a frame later, so the near-tick cut cannot come before the histogram holds
+    // `latenessMinimumSamples` of them (an empty one used to read as no lateness at all).
+    var noise = Noise(seed: 50)
+    let times = [1000 - 0.6 * vsyncMs, 1000 - 0.4 * vsyncMs]
+        + arrivals(count: 700) { _ in 1 / vsyncMs + 0.3 / vsyncMs * noise.next() }
+    let (records, _, _) = simulateDirect(arrivals: times, ticks: 600)
+    let firstCut = records.firstIndex { $0.catchUpDrops > 0 } ?? -1
+    #expect(firstCut >= 60 + FramePacer<Int>.latenessMinimumSamples)
+    #expect(firstCut < 120)
+}
+
+@Test func aSingleLateFrameNoLongerHoldsTheLagForMinutes() {
+    let result = lagAfterOneLateFrame(seed: 47)
+    #expect(result.catchUp == 2)
+    #expect(result.tickShownAtTheEnd == 0)
+}
+
+@Test func lostFramesDoNotCountAsLateness() {
+    // With frame numbers each lost frame is a gap, not lateness. Without them each looks like a
+    // frame one period late, five of them are too common to ignore, and the lag stays.
+    let known = lagAfterOneLateFrame(seed: 48, lose: true)
+    let unknown = lagAfterOneLateFrame(seed: 48, lose: true, passNumbers: false)
+    #expect(known.tickShownAtTheEnd == 0)
+    #expect(unknown.tickShownAtTheEnd == 600)
+}
+
+@Test func aPauseDoesNotCountAsLateness() {
+    // Nothing new to send for a few frames: the frame numbers run on without a gap, the stream
+    // resumes at its old spacing, and the arrival clock moves on instead of counting lateness.
+    let result = lagAfterOneLateFrame(seed: 49, pause: true)
+    #expect(result.tickShownAtTheEnd == 0)
+}
+
+@Test func anArrivalAfterTheVsyncOpensTheNextIntervalBeforeItsTick() {
+    let (pacer, sink) = directPacer()
+    let d = 1.0 / 60
+    pacer.vsync(timestamp: 1.0, duration: d, tickTime: 1.001)
+    _ = pacer.tick()
+    pacer.put(0, arrival: 1.0 + 0.5 * d)
+    // After the vsync at 1 + d, before the tick that reports it: the renderer counts this frame
+    // for the next refresh, so it goes out directly instead of waiting for that tick.
+    pacer.put(1, arrival: 1.0 + d + 0.0005)
+    let direct: [Int] = sink.presented
+    #expect(direct == [0, 1])
+    pacer.vsync(timestamp: 1.0 + d, duration: d, tickTime: 1.0 + d + 0.001)
+    let tick: Int? = pacer.tick()
+    #expect(tick == nil)
+    // The interval the early arrival opened is served: the next frame waits for the next tick.
+    pacer.put(2, arrival: 1.0 + 1.5 * d)
+    #expect(sink.presented == [0, 1])
+    pacer.vsync(timestamp: 1.0 + 2 * d, duration: d, tickTime: 1.0 + 2 * d + 0.001)
+    let next: Int? = pacer.tick()
+    let stalls: Int = pacer.stats.stalls
+    #expect(next == 2)
+    #expect(stalls == 1)
+}
+
+@Test func aLateVsyncCallbackNeverPresentsTwoFramesForOneVsync() {
+    let (pacer, sink) = directPacer()
+    let d = 1.0 / 60
+    pacer.vsync(timestamp: 1.0, duration: d, tickTime: 1.001)
+    _ = pacer.tick()
+    pacer.put(0, arrival: 1.0 + 0.5 * d)
+    // The callbacks for 1 + d and 1 + 2d run late: an arrival after 1 + 2d opens that interval
+    // first, then the callback for 1 + d reports the older vsync.
+    pacer.put(1, arrival: 1.0 + 2 * d + 0.001)
+    pacer.vsync(timestamp: 1.0 + d, duration: d, tickTime: 1.0 + 2 * d + 0.002)
+    let tick: Int? = pacer.tick()
+    // Same display interval as frame 1: it waits instead of going out directly.
+    pacer.put(2, arrival: 1.0 + 2 * d + 0.003)
+    let rendered: [Int] = sink.presented
+    #expect(tick == nil)
+    #expect(rendered == [0, 1])
+    pacer.vsync(timestamp: 1.0 + 3 * d, duration: d, tickTime: 1.0 + 3 * d + 0.001)
+    let next: Int? = pacer.tick()
+    #expect(next == 2)
+}
+
+@Test func laggingPresentsCountFramesThatWaitedThroughAVsync() {
+    var noise = Noise(seed: 46)
+    let times = arrivals(count: 700) { _ in 0.5 + 0.2 * noise.next() }
+    let direct = simulateDirect(arrivals: times, ticks: 600).stats
+    let tickOnly = simulateDirect(directPresent: false, arrivals: times, ticks: 600).stats
+    let directLagging: Int = direct.laggingPresents
+    let tickLagging: Int = tickOnly.laggingPresents
+    let tickPresented: Int = tickOnly.presented
+    #expect(directLagging == 0)
+    #expect(tickLagging == tickPresented)
+}
+
+// MARK: - Simulator regression (PacerSimulator, 2 minutes per scenario, seeds 1 to 3)
+
+/// Hitches (repeats + drops) per scenario summed over seeds 1 to 3, measured with the rule this
+/// replaced (catch-up only when 16 arrivals in a row stayed 0.1 of an interval from the tick,
+/// interval boundary at the tick). One hitch of slack: in the near-tick burst runs both rules keep
+/// the lag almost throughout and absorb the bursts, so the counts are a handful of single events
+/// that can land one either way (tick+1ms burst is 5 against 4 here).
+private let previousRuleHitches: [String: Int] = [
+    "mid 2ms": 0, "mid burst": 80, "tick-1ms 2ms": 0, "tick-1ms burst": 3, "tick 2ms": 0, "tick burst": 3,
+    "tick+1ms 2ms": 0, "tick+1ms burst": 4, "drift 60.05 2ms": 74, "drift 60.05 burst": 114,
+    "drift 59.95 2ms": 160, "drift 59.95 burst": 260,
+]
+
+@Test func lowLatencyHitchesDoNotIncreaseOverThePreviousRule() {
+    for scenario in PacerSimulator.scenarios(seconds: 120) {
+        var hitches = 0
+        for seed in UInt64(1)...3 {
+            var seeded = scenario
+            seeded.seed = seed
+            let result = PacerSimulator.run(seeded, mode: .lowLatency)
+            hitches += result.repeats + result.drops
+        }
+        let previous = previousRuleHitches[scenario.name] ?? -1
+        #expect(hitches <= previous + 1, "\(scenario.name): \(hitches) hitches, previous rule \(previous)")
+    }
+}
+
+@Test func lowLatencyNearTheTickNoLongerLocksAFrameBehind() {
+    // Seeds 3, 5 and 8 are the ones where the previous rule kept the startup lag for the whole
+    // minute (31 to 32 ms mean latency, every frame a refresh late).
+    for seed: UInt64 in [3, 5, 8] {
+        for (name, phase) in [("tick", 0.0), ("tick+1ms", 1 / vsyncMs)] {
+            let scenario = PacerScenario(name: name, phase: phase, seconds: 60, seed: seed)
+            let result = PacerSimulator.run(scenario, mode: .lowLatency)
+            #expect(result.meanLatencyMs < 17, "\(name) seed \(seed): \(result.meanLatencyMs) ms")
+            #expect(result.laggingShare < 0.3, "\(name) seed \(seed): \(result.laggingShare)")
+            #expect(result.repeats + result.drops == 0, "\(name) seed \(seed)")
+        }
+    }
+}
+
+// MARK: - Wi-Fi repeater profile (PacerSimulator.repeaterScenarios, 2 minutes, seeds 1 to 3)
+
+/// Hitches per repeater scenario summed over seeds 1 to 3 with the rule this replaced (largest
+/// lateness over 120 s as the only gate, frame gaps counted as lateness, no check of the slack the
+/// tick-away rule leaves). Two hitches of slack: the tick-1ms runs differ by two events in six
+/// simulated minutes. The one scenario family where round two is knowingly worse is not in this
+/// table but in `wiredException` below.
+private let roundOneHitches: [String: Int] = [
+    "dyn mid": 134, "dyn tick-1ms": 47, "dyn tick": 64, "dyn tick+1ms": 66, "dyn tick+3ms": 74,
+    "dyn drift 60.02": 119, "static mid": 162, "static tick-1ms": 70, "static tick": 86,
+    "static tick+1ms": 90, "static tick+3ms": 100, "static drift 60.01": 189,
+]
+
+@Test func repeaterHitchesDoNotIncreaseOverTheRoundOneRule() {
+    for scenario in PacerSimulator.repeaterScenarios(seconds: 120) {
+        var hitches = 0
+        for seed in UInt64(1)...3 {
+            var seeded = scenario
+            seeded.seed = seed
+            let result = PacerSimulator.run(seeded, mode: .lowLatency)
+            hitches += result.repeats + result.drops
+        }
+        let previous = roundOneHitches[scenario.name] ?? -1
+        #expect(hitches <= previous + 2, "\(scenario.name): \(hitches) hitches, round one \(previous)")
+    }
+}
+
+/// The stated exception to "no more hitches than round one" (owner ruling: lowLatency takes the
+/// latency). A clean wired stream just before the tick with rare 8 to 30 ms outliers, 10 minutes
+/// per seed, seeds 1 to 3: round one held the lag after the first outlier for good (hitches
+/// summed over the seeds, mean latency), round two cuts it again once the outliers are rare enough
+/// to ignore and pays a repeat plus a drop per outlier instead.
+private let wiredException: [String: (roundOneHitches: Int, roundOneLatency: Double, acceptedHitches: Int)] = [
+    "wired tick-3ms": (12, 28.3, 60),
+    "wired tick-2ms": (10, 27.3, 60),
+]
+
+@Test func wiredNearTheTickTradesRareHitchesForLatency() {
+    for scenario in PacerSimulator.wiredScenarios(seconds: 600) {
+        guard let exception = wiredException[scenario.name] else { continue }
+        var hitches = 0
+        var latency = 0.0
+        for seed in UInt64(1)...3 {
+            var seeded = scenario
+            seeded.seed = seed
+            let result = PacerSimulator.run(seeded, mode: .lowLatency)
+            hitches += result.repeats + result.drops
+            latency += result.meanLatencyMs / 3
+        }
+        // Accepted: at most 2 hitches per minute (round one: 0.3 to 0.4) for 10 ms less latency.
+        #expect(hitches <= exception.acceptedHitches, "\(scenario.name): \(hitches), round one \(exception.roundOneHitches)")
+        #expect(latency < exception.roundOneLatency - 8, "\(scenario.name): \(latency) ms")
+    }
+}
+
+@Test func aStreamArrivingAroundTheVsyncStandsOneFrameBehindWithoutCutting() {
+    // Arrivals about 3 ms before the vsync with a 2 to 10 ms host tail: a quarter of them land
+    // after it, so a frame of lag is what keeps the stream clean. The tick-away rule used to cut it
+    // anyway (134 hitches in six minutes); holding a second frame instead would add 16.7 ms.
+    for name in ["dyn mid", "static mid"] {
+        var hitches = 0
+        var latency = 0.0
+        for seed in UInt64(1)...3 {
+            var scenario = PacerSimulator.repeaterScenarios(seconds: 120).first { $0.name == name }!
+            scenario.seed = seed
+            let result = PacerSimulator.run(scenario, mode: .lowLatency)
+            hitches += result.repeats + result.drops
+            latency += result.meanLatencyMs / 3
+        }
+        #expect(latency < 21.5, "\(name): \(latency) ms")
+        #expect(hitches <= (name == "dyn mid" ? 40 : 75), "\(name): \(hitches)")
+    }
+}
+
+@Test func displayWaitAndLaggingMatchWhatTheSimulatedScreenShows() {
+    var scenario = PacerSimulator.repeaterScenarios(seconds: 60).first { $0.name == "dyn drift 60.02" }!
+    scenario.seed = 2
+    let result = PacerSimulator.run(scenario, mode: .lowLatency)
+    #expect(abs(result.displayWaitMs - result.meanLatencyMs) < 0.2)
+    #expect(abs(result.laggingStatPercent - result.laggingShare * 100) < 1)
 }
