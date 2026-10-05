@@ -14,14 +14,14 @@ private let metadata = PacerTrace.Metadata(mode: "lowLatency", directPresent: tr
 @Test func aRecordedTraceReadsBackEventForEvent() throws {
     let directory = try temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: directory) }
-    // Durations and tick delays that Float32 holds exactly, so the round trip compares equal.
+    // Every time value round-trips bit for bit, so a replay decides exactly as the device did.
     let events: [PacerTrace.Event] = [
         .presenter(attached: true),
-        .vsync(timestamp: 100.0, duration: 0.015625, tickTime: 100.0009765625),
+        .vsync(timestamp: 100.0, duration: 1.0 / 60, tickTime: 100.000_812_345),
         .tick,
         .put(arrival: 100.0071234567, frameNumber: 41),
         .put(arrival: 100.0123, frameNumber: nil),
-        .vsync(timestamp: 100.015625, duration: 0.015625, tickTime: 100.015625),
+        .vsync(timestamp: 100.0 + 1.0 / 60, duration: 1.0 / 59.94, tickTime: 100.0 + 1.0 / 60 + 0.000_7),
         .tick,
         .presenter(attached: false),
     ]
@@ -81,7 +81,47 @@ private let metadata = PacerTrace.Metadata(mode: "lowLatency", directPresent: tr
 
 @Test func somethingElseIsNotATrace() {
     #expect(throws: PacerTrace.DecodeError.notATrace) { try PacerTrace.decode(Data("hello world".utf8)) }
+    let header = PacerTrace.header(metadata)
+    #expect(throws: PacerTrace.DecodeError.truncated) { try PacerTrace.decode(header.dropLast(2)) }
+}
+
+@Test func onlyThisFormatVersionIsRead() {
+    var older = PacerTrace.header(metadata)
+    older[3] = UInt8(ascii: "1")
+    #expect(throws: PacerTrace.DecodeError.unsupportedVersion("SPT1")) { try PacerTrace.decode(older) }
+}
+
+@Test func aTruncatedTailReadsUpToTheLastWholeRecord() throws {
+    // The app killed mid-write: the last record is cut off, everything before it still counts.
     var data = PacerTrace.header(metadata)
     PacerTrace.append(.put(arrival: 1, frameNumber: 1), to: &data)
-    #expect(throws: PacerTrace.DecodeError.truncated) { try PacerTrace.decode(data.dropLast(2)) }
+    PacerTrace.append(.tick, to: &data)
+    PacerTrace.append(.vsync(timestamp: 2, duration: 1.0 / 60, tickTime: 2.001), to: &data)
+    let trace = try PacerTrace.decode(data.dropLast(5))
+    #expect(trace.events == [.put(arrival: 1, frameNumber: 1), .tick])
+    #expect(trace.endsTruncated)
+    #expect(try !PacerTrace.decode(data).endsTruncated)
+}
+
+@Test func pruningNeverDeletesATraceThatIsStillOpen() throws {
+    let directory = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    var components = DateComponents()
+    components.year = 2026; components.month = 10; components.day = 5; components.hour = 11
+    let recorder = PacerTraceRecorder(metadata: metadata, directory: directory,
+                                      startedAt: Calendar.current.date(from: components)!)
+    recorder.record(.tick)
+    for index in 0..<3 {
+        let name = String(format: "pacer-trace-20261005-1200%02d-slot0.bin", index)
+        FileManager.default.createFile(atPath: directory.appendingPathComponent(name).path, contents: Data(count: 100))
+    }
+    // The open trace sorts first (11:00), so it is the oldest; a cap of one file keeps it anyway.
+    PacerTraceRecorder.prune(directory: directory, reserving: 0, keepFiles: 1, keepBytes: 1)
+    let left: [String] = try FileManager.default.contentsOfDirectory(atPath: directory.path).sorted()
+    #expect(left == [recorder.fileURL.lastPathComponent])
+    recorder.close()
+    #expect(!PacerTraceRecorder.isOpen(recorder.fileURL))
+    PacerTraceRecorder.prune(directory: directory, reserving: 0, keepFiles: 1, keepBytes: 1)
+    let after: [String] = try FileManager.default.contentsOfDirectory(atPath: directory.path)
+    #expect(after.isEmpty)
 }

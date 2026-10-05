@@ -1,15 +1,19 @@
 import Foundation
+import MoonlightCore
 
 /// What one pacer saw, recorded on device and replayed offline through every candidate rule
 /// (`PacerTraceRecorder` writes it, `PacerTrace.decode` reads it back).
 ///
-/// File layout, little-endian: the magic `SPT1`, a UInt32 byte count and that many bytes of JSON
-/// metadata, then one record per event, each a tag byte and its payload:
+/// File layout, little-endian: the magic `SPT2` (the format version is its last character; the
+/// reader takes only this one), a UInt32 byte count and that many bytes of JSON metadata, then one
+/// record per event, each a tag byte and its payload, every time value the exact Float64 the pacer
+/// got so a replay decides bit for bit as the device did:
 /// - 1 put: arrival Float64 (seconds, the pacer's clock), frame number Int32 (-1 when unknown)
-/// - 2 vsync: timestamp Float64, duration Float32, tick time minus timestamp Float32
+/// - 2 vsync: timestamp, duration and tick time, Float64 each
 /// - 3 tick
 /// - 4 presenter attached, 5 presenter detached
-/// About 1.9 KB per second at 60 fps, so ten minutes stay near 1.1 MB.
+/// About 2.4 KB per second at 60 fps, so ten minutes stay near 1.5 MB. A file whose last record
+/// was cut off (the app was killed mid-write) reads up to that record.
 public struct PacerTrace: Equatable, Sendable {
     public struct Metadata: Codable, Equatable, Sendable {
         public var mode: String
@@ -37,19 +41,24 @@ public struct PacerTrace: Equatable, Sendable {
 
     public enum DecodeError: Error, Equatable {
         case notATrace
+        /// A trace in another format version than this build reads.
+        case unsupportedVersion(String)
         case truncated
         case unknownTag(UInt8)
     }
 
     public var metadata: Metadata
     public var events: [Event]
+    /// The file ended inside a record; `events` holds everything before it.
+    public var endsTruncated: Bool
 
-    public init(metadata: Metadata, events: [Event]) {
+    public init(metadata: Metadata, events: [Event], endsTruncated: Bool = false) {
         self.metadata = metadata
         self.events = events
+        self.endsTruncated = endsTruncated
     }
 
-    static let magic: [UInt8] = Array("SPT1".utf8)
+    static let magic: [UInt8] = Array("SPT2".utf8)
 
     static func header(_ metadata: Metadata) -> Data {
         var data = Data(magic)
@@ -68,8 +77,8 @@ public struct PacerTrace: Equatable, Sendable {
         case let .vsync(timestamp, duration, tickTime):
             data.append(2)
             append(timestamp.bitPattern, to: &data)
-            append(Float32(duration).bitPattern, to: &data)
-            append(Float32(tickTime - timestamp).bitPattern, to: &data)
+            append(duration.bitPattern, to: &data)
+            append(tickTime.bitPattern, to: &data)
         case .tick:
             data.append(3)
         case let .presenter(attached):
@@ -83,29 +92,35 @@ public struct PacerTrace: Equatable, Sendable {
 
     public static func decode(_ data: Data) throws -> PacerTrace {
         var reader = Reader(bytes: [UInt8](data))
-        guard try reader.bytes(4) == magic else { throw DecodeError.notATrace }
+        let found = try reader.bytes(4)
+        guard found.prefix(3) == magic.prefix(3) else { throw DecodeError.notATrace }
+        guard found == magic else { throw DecodeError.unsupportedVersion(String(decoding: found, as: UTF8.self)) }
         let length = Int(try reader.integer(UInt32.self))
         let json = Data(try reader.bytes(length))
         guard let metadata = try? JSONDecoder().decode(Metadata.self, from: json) else { throw DecodeError.notATrace }
         var events: [Event] = []
         events.reserveCapacity(data.count / 12)
-        while !reader.atEnd {
-            let tag = try reader.integer(UInt8.self)
-            switch tag {
-            case 1:
-                let arrival = Double(bitPattern: try reader.integer(UInt64.self))
-                let number = Int32(bitPattern: try reader.integer(UInt32.self))
-                events.append(.put(arrival: arrival, frameNumber: number < 0 ? nil : Int(number)))
-            case 2:
-                let timestamp = Double(bitPattern: try reader.integer(UInt64.self))
-                let duration = Double(Float32(bitPattern: try reader.integer(UInt32.self)))
-                let tickDelay = Double(Float32(bitPattern: try reader.integer(UInt32.self)))
-                events.append(.vsync(timestamp: timestamp, duration: duration, tickTime: timestamp + tickDelay))
-            case 3: events.append(.tick)
-            case 4: events.append(.presenter(attached: true))
-            case 5: events.append(.presenter(attached: false))
-            default: throw DecodeError.unknownTag(tag)
+        do {
+            while !reader.atEnd {
+                let tag = try reader.integer(UInt8.self)
+                switch tag {
+                case 1:
+                    let arrival = Double(bitPattern: try reader.integer(UInt64.self))
+                    let number = Int32(bitPattern: try reader.integer(UInt32.self))
+                    events.append(.put(arrival: arrival, frameNumber: number < 0 ? nil : Int(number)))
+                case 2:
+                    let timestamp = Double(bitPattern: try reader.integer(UInt64.self))
+                    let duration = Double(bitPattern: try reader.integer(UInt64.self))
+                    let tickTime = Double(bitPattern: try reader.integer(UInt64.self))
+                    events.append(.vsync(timestamp: timestamp, duration: duration, tickTime: tickTime))
+                case 3: events.append(.tick)
+                case 4: events.append(.presenter(attached: true))
+                case 5: events.append(.presenter(attached: false))
+                default: throw DecodeError.unknownTag(tag)
+                }
             }
+        } catch DecodeError.truncated {
+            return PacerTrace(metadata: metadata, events: events, endsTruncated: true)
         }
         return PacerTrace(metadata: metadata, events: events)
     }
@@ -137,7 +152,9 @@ public struct PacerTrace: Equatable, Sendable {
 /// pacer appends events to a memory buffer under its own lock; a timer on this recorder's serial
 /// queue moves the buffer to the file once a second, so no file I/O runs on the decode thread, the
 /// display link or under the pacer's lock. Older traces are pruned at start to the newest
-/// `keepFiles` within `keepBytes`, and one file stops growing at `maxFileBytes`.
+/// `keepFiles` within `keepBytes` (never one a recorder still has open), and one file stops
+/// growing at `maxFileBytes`. After a failed write nothing more is appended, so the file ends
+/// at most one torn record late.
 public final class PacerTraceRecorder: @unchecked Sendable {
     public static let filePrefix = "pacer-trace-"
     public static let keepFiles = 20
@@ -152,6 +169,14 @@ public final class PacerTraceRecorder: @unchecked Sendable {
     private var closed = false
     private var handle: FileHandle?
     private var timer: DispatchSourceTimer?
+
+    /// Paths every recorder in this process still has open: pruning leaves them alone.
+    private static let openLock = NSLock()
+    nonisolated(unsafe) private static var openPaths: Set<String> = []
+
+    static func isOpen(_ url: URL) -> Bool {
+        openLock.withLock { openPaths.contains(url.standardizedFileURL.path) }
+    }
 
     public static var defaultDirectory: URL {
         FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
@@ -170,11 +195,16 @@ public final class PacerTraceRecorder: @unchecked Sendable {
         buffer.reserveCapacity(64 * 1024)
         let header = PacerTrace.header(metadata)
         let fileURL = self.fileURL
+        Self.openLock.withLock { _ = Self.openPaths.insert(fileURL.standardizedFileURL.path) }
         queue.async { [self] in
             Self.prune(directory: directory, reserving: header.count)
-            FileManager.default.createFile(atPath: fileURL.path, contents: header)
-            handle = try? FileHandle(forWritingTo: fileURL)
-            _ = try? handle?.seekToEnd()
+            guard FileManager.default.createFile(atPath: fileURL.path, contents: header),
+                  let opened = try? FileHandle(forWritingTo: fileURL) else {
+                traceDiagnostic("pacer trace: cannot create \(fileURL.lastPathComponent), not recording")
+                return
+            }
+            handle = opened
+            _ = try? opened.seekToEnd()
         }
         let timer = DispatchSource.makeTimerSource(queue: queue)
         timer.schedule(deadline: .now() + 1, repeating: 1)
@@ -185,6 +215,8 @@ public final class PacerTraceRecorder: @unchecked Sendable {
 
     deinit {
         timer?.cancel()
+        let path = fileURL.standardizedFileURL.path
+        Self.openLock.withLock { _ = Self.openPaths.remove(path) }
     }
 
     /// Appends one event to the buffer; cheap enough to call under the pacer's lock.
@@ -208,18 +240,28 @@ public final class PacerTraceRecorder: @unchecked Sendable {
             try? handle?.close()
             handle = nil
         }
+        let path = fileURL.standardizedFileURL.path
+        Self.openLock.withLock { _ = Self.openPaths.remove(path) }
     }
 
     /// On `queue`: moves the buffer to the file.
     private func flush() {
+        var fresh = Data()
+        fresh.reserveCapacity(64 * 1024)
         let pending: Data = lock.withLock {
-            let taken = buffer
-            buffer = Data()
-            buffer.reserveCapacity(64 * 1024)
-            return taken
+            swap(&buffer, &fresh)
+            return fresh
         }
-        guard !pending.isEmpty else { return }
-        try? handle?.write(contentsOf: pending)
+        guard !pending.isEmpty, let handle else { return }
+        do {
+            try handle.write(contentsOf: pending)
+        } catch {
+            // A partial write may have left a torn record: appending after it would misalign every
+            // record that follows, so the file ends here.
+            try? handle.close()
+            self.handle = nil
+            traceDiagnostic("pacer trace: write to \(fileURL.lastPathComponent) failed (\(error)), stopped")
+        }
     }
 
     /// Deletes the oldest traces until at most `keepFiles - 1` remain within `keepBytes` minus
@@ -233,10 +275,23 @@ public final class PacerTraceRecorder: @unchecked Sendable {
             return (attributes?[.size] as? Int) ?? 0
         }
         var remaining = traces
-        while !remaining.isEmpty,
+        var index = 0
+        while index < remaining.count,
               remaining.count >= keepFiles || sizes.reduce(0, +) + reserving > keepBytes {
-            try? manager.removeItem(at: directory.appendingPathComponent(remaining.removeFirst()))
-            sizes.removeFirst()
+            let url = directory.appendingPathComponent(remaining[index])
+            if isOpen(url) {
+                index += 1
+                continue
+            }
+            try? manager.removeItem(at: url)
+            remaining.remove(at: index)
+            sizes.remove(at: index)
         }
     }
+}
+
+/// Routes a diagnostic line through the moonlight log sink, so it lands wherever the app logs.
+private func traceDiagnostic(_ text: String) {
+    guard let sink = MLGetLogSink() else { return }
+    text.withCString { sink(-1, $0) }
 }
