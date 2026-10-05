@@ -13,6 +13,9 @@ struct DeveloperView: View {
             ValuePickerRow(icon: "bolt", title: "Present on arrival (experimental)",
                            options: [false, true], selection: settings.preferences.directPresent,
                            label: { $0 ? "On" : "Off" }) { settings.set(\.directPresent, $0) }
+            ValuePickerRow(icon: "waveform.path.ecg", title: "Record pacer traces",
+                           options: [false, true], selection: settings.preferences.recordPacerTraces,
+                           label: { $0 ? "On" : "Off" }) { settings.set(\.recordPacerTraces, $0) }
             Button("Send Wake-on-LAN to saved hosts") {
                 Task {
                     let report = await Task.detached { () -> String in

@@ -16,15 +16,18 @@ public struct StreamSettings: Sendable, Equatable {
     /// Experimental, lowLatency only: a decoded frame goes to the renderer on arrival when its
     /// refresh interval has not been served yet (see FramePacer).
     public var directPresent: Bool
+    /// Developer setting: record the pacer's inputs to a trace file (see PacerTraceRecorder).
+    public var recordPacerTrace: Bool
 
     public init(width: Int, height: Int, fps: Int, bitrateKbps: Int, hdr: Bool,
                 audio: AudioChannels = .stereo, codec: VideoCodec = .hevc, pacing: FramePacingMode = .lowLatency,
-                directPresent: Bool = false) {
+                directPresent: Bool = false, recordPacerTrace: Bool = false) {
         self.width = width; self.height = height; self.fps = fps; self.bitrateKbps = bitrateKbps; self.hdr = hdr
         self.audio = audio
         self.codec = codec
         self.pacing = pacing
         self.directPresent = directPresent
+        self.recordPacerTrace = recordPacerTrace
     }
 
     /// moonlight-common-c's `supportedVideoFormats`. H.264 is always offered, so a host without
@@ -146,7 +149,13 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
         self.host = host
         self.appID = appID
         self.settings = settings
-        self.pacer = FramePacer(mode: settings.pacing, frameRate: settings.fps, directPresent: settings.directPresent)
+        let trace = settings.recordPacerTrace ? PacerTraceRecorder(metadata: PacerTrace.Metadata(
+            mode: settings.pacing.rawValue, directPresent: settings.directPresent, frameRate: settings.fps,
+            slot: slot.rawValue, width: settings.width, height: settings.height,
+            startedAt: ISO8601DateFormatter.string(from: Date(), timeZone: .current, formatOptions: .withInternetDateTime)))
+            : nil
+        self.pacer = FramePacer(mode: settings.pacing, frameRate: settings.fps, directPresent: settings.directPresent,
+                                trace: trace)
         self.endpoints = NvEndpoints(address: host.address, httpsPort: host.httpsPort, uniqueID: identity.uniqueID)
         self.client = NvHTTPClient(pinnedCertificate: host.serverCertificateDER, clientIdentity: clientIdentity)
         self.clientIdentity = clientIdentity
@@ -282,6 +291,7 @@ public final class StreamSession: SlotEventSink, @unchecked Sendable {
         freeCStrings()
         eventSink.finish()
         client.invalidate()
+        pacer.finishTrace()
     }
 
     /// Best-effort, fire-and-forget /cancel for a session that stopped before (or racing) connect:

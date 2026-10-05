@@ -19,6 +19,7 @@ public final class SettingsStore {
         static let stats = "settings.stats"
         static let pacing = "settings.pacing"
         static let directPresent = "settings.directPresent"
+        static let recordPacerTraces = "settings.recordPacerTraces"
         static let selectedHost = "home.selectedHostID"
     }
 
@@ -65,6 +66,9 @@ public final class SettingsStore {
         if let value = defaults.object(forKey: Key.directPresent) as? Bool {
             preferences.directPresent = value
         }
+        if let value = defaults.object(forKey: Key.recordPacerTraces) as? Bool {
+            preferences.recordPacerTraces = value
+        }
         return preferences
     }
 
@@ -77,5 +81,6 @@ public final class SettingsStore {
         defaults.set(preferences.stats.rawValue, forKey: Key.stats)
         defaults.set(preferences.pacing.rawValue, forKey: Key.pacing)
         defaults.set(preferences.directPresent, forKey: Key.directPresent)
+        defaults.set(preferences.recordPacerTraces, forKey: Key.recordPacerTraces)
     }
 }

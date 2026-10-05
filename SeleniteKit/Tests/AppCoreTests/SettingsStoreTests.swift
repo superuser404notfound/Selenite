@@ -25,6 +25,7 @@ private func freshDefaults() -> UserDefaults {
     store.set(\.stats, .compact)
     store.set(\.pacing, .smooth)
     store.set(\.directPresent, false)
+    store.set(\.recordPacerTraces, true)
     store.setSelectedHostID("HOST-1")
     var expected = StreamPreferences()
     expected.resolution = .p1440
@@ -35,6 +36,7 @@ private func freshDefaults() -> UserDefaults {
     expected.stats = .compact
     expected.pacing = .smooth
     expected.directPresent = false
+    expected.recordPacerTraces = true
     let reloaded = SettingsStore(defaults: defaults)
     let preferences: StreamPreferences = reloaded.preferences
     #expect(preferences == expected)
@@ -47,6 +49,7 @@ private func freshDefaults() -> UserDefaults {
     defaults.set(123, forKey: "settings.bitrateMbps")
     defaults.set("vsync", forKey: "settings.pacing")
     defaults.set("yes", forKey: "settings.directPresent")
+    defaults.set("yes", forKey: "settings.recordPacerTraces")
     let preferences: StreamPreferences = SettingsStore(defaults: defaults).preferences
     #expect(preferences == StreamPreferences())
 }
