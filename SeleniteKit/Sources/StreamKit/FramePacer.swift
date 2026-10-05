@@ -176,9 +176,12 @@ public final class FramePacer<Frame>: @unchecked Sendable {
 
     public let directPresent: Bool
     private var present: ((Frame) -> Void)?
+    /// Records every input (puts, vsyncs, ticks, presenter changes) for offline replay, if set.
+    private var trace: PacerTraceRecorder?
 
     public init(mode: FramePacingMode = .lowLatency, frameRate: Int = 0, directPresent: Bool = false,
-                clock: @escaping @Sendable () -> Double = { CACurrentMediaTime() }) {
+                trace: PacerTraceRecorder? = nil, clock: @escaping @Sendable () -> Double = { CACurrentMediaTime() }) {
+        self.trace = trace
         self.mode = mode
         self.frameRate = frameRate
         self.directPresent = directPresent
@@ -191,13 +194,26 @@ public final class FramePacer<Frame>: @unchecked Sendable {
     }
 
     public func setPresenter(_ present: (@Sendable (Frame) -> Void)?) {
-        lock.withLock { self.present = present }
+        lock.withLock {
+            self.present = present
+            trace?.record(.presenter(attached: present != nil))
+        }
+    }
+
+    /// Stops recording and completes the trace file; a no-op without one.
+    public func finishTrace() {
+        let finished: PacerTraceRecorder? = lock.withLock {
+            defer { trace = nil }
+            return trace
+        }
+        finished?.close()
     }
 
     /// `frameNumber` is the stream's number for this frame, when known: a gap means frames were
     /// lost, which then do not count as lateness.
     public func put(_ frame: Frame, arrival: Double, frameNumber: Int? = nil) {
         lock.withLock {
+            trace?.record(.put(arrival: arrival, frameNumber: frameNumber))
             record(arrival: arrival, frameNumber: frameNumber)
             if isDirect { openIntervalIfVsyncPassed(arrival) }
             if queue.count >= capacity {
@@ -272,6 +288,7 @@ public final class FramePacer<Frame>: @unchecked Sendable {
     /// arrival phase is measured against the tick, since that is where a late frame misses.
     public func vsync(timestamp: Double, duration: Double, tickTime: Double? = nil) {
         lock.withLock {
+            trace?.record(.vsync(timestamp: timestamp, duration: duration, tickTime: tickTime ?? timestamp))
             // Unless an arrival already opened this interval (see `openIntervalIfVsyncPassed`).
             if timestamp >= intervalStart + vsyncDuration / 2 {
                 endedIntervalServed = intervalServed
@@ -297,7 +314,8 @@ public final class FramePacer<Frame>: @unchecked Sendable {
 
     public func tick() -> Frame? {
         lock.withLock {
-            switch mode {
+            trace?.record(.tick)
+            return switch mode {
             case .lowLatency: isDirect ? directTick() : lowLatencyTick()
             case .smooth: smoothTick()
             }
