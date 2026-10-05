@@ -90,6 +90,23 @@ public struct PacerStats: Sendable, Equatable {
 /// SDK, but frames still cross from the decode thread to the vsync tick and must be treated as
 /// immutable once put.
 public final class FramePacer<Frame>: @unchecked Sendable {
+    /// Which catch-up rule direct present uses. Only the replay harness changes it, to run a
+    /// recorded trace through earlier and candidate rules; the app always uses `.roundTwo`.
+    enum CatchUpRule: String, CaseIterable, Sendable {
+        /// Before 2026-10-04: the tick-away rule alone, and intervals start at the tick.
+        case tickAway
+        /// b0433f4: the tick-away rule, or the next expected arrival leaves more slack before its
+        /// vsync than the largest lateness of `latenessWindow`; no frame numbers, no pause test.
+        case roundOne
+        /// Shipped (see the type comment).
+        case roundTwo
+        /// `roundTwo` with the rare lateness at the 99.9th percentile instead of the 99.95th.
+        case roundTwoP999
+    }
+
+    /// Set right after init, before any input; never changed by the app.
+    var catchUpRule = CatchUpRule.roundTwo
+
     static var lowLatencyCatchUpTicks: Int { 30 }
     static var smoothCatchUpFrames: Int { 120 }
     static var smoothPrimeFrames: Int { 2 }
@@ -215,7 +232,7 @@ public final class FramePacer<Frame>: @unchecked Sendable {
         lock.withLock {
             trace?.record(.put(arrival: arrival, frameNumber: frameNumber))
             record(arrival: arrival, frameNumber: frameNumber)
-            if isDirect { openIntervalIfVsyncPassed(arrival) }
+            if isDirect, catchUpRule != .tickAway { openIntervalIfVsyncPassed(arrival) }
             if queue.count >= capacity {
                 queue.removeFirst()
                 arrivals.removeFirst()
@@ -493,6 +510,14 @@ public final class FramePacer<Frame>: @unchecked Sendable {
             smoothedArrival = arrival
             return
         }
+        let legacy = catchUpRule == .tickAway || catchUpRule == .roundOne
+        if legacy {
+            let period = intervalCount <= Self.arrivalWarmup && frameRate > 0 ? 1 / Double(frameRate) : intervalMean / 1000
+            let expected = anchor + period
+            smoothedArrival = expected + (arrival - expected) / Self.arrivalSmoothing
+            if intervalCount > Self.arrivalWarmup { commitLateness(arrival - expected, at: arrival) }
+            return
+        }
         let period = framePeriod
         var steps = 1.0
         if let frameNumber, let lastFrameNumber, frameNumber > lastFrameNumber {
@@ -543,16 +568,16 @@ public final class FramePacer<Frame>: @unchecked Sendable {
     /// nil below `latenessMinimumSamples`.
     private var latenessQuantiles: (typical: Double, rare: Double)? {
         guard latenessTotal >= Self.latenessMinimumSamples else { return nil }
-        let total = Double(latenessTotal)
-        func quantile(_ q: Double) -> Double {
-            var seen = 0
-            for (bin, count) in latenessCounts.enumerated() {
-                seen += count
-                if Double(seen) >= total * q { return Double(bin) * Self.latenessBin }
-            }
-            return Double(Self.latenessBins - 1) * Self.latenessBin
+        return (latenessQuantile(Self.typicalLateness), latenessQuantile(Self.rareLateness))
+    }
+
+    private func latenessQuantile(_ quantile: Double) -> Double {
+        var seen = 0
+        for (bin, count) in latenessCounts.enumerated() {
+            seen += count
+            if Double(seen) >= Double(latenessTotal) * quantile { return Double(bin) * Self.latenessBin }
         }
-        return (quantile(Self.typicalLateness), quantile(Self.rareLateness))
+        return Double(Self.latenessBins - 1) * Self.latenessBin
     }
 
     /// Direct present: what a typical frame would have left before its vsync with one frame less
@@ -564,9 +589,26 @@ public final class FramePacer<Frame>: @unchecked Sendable {
 
     /// Direct present: cutting the standing lag leaves the stream clean (see the type comment).
     private var catchUpIsClean: Bool {
+        switch catchUpRule {
+        case .tickAway: return arrivalsAreAwayFromTheTick
+        case .roundOne: return arrivalsAreAwayFromTheTick || nextArrivalClearsLargestLateness
+        case .roundTwo, .roundTwoP999: break
+        }
         guard let after = waitAfterCut, let lateness = latenessQuantiles else { return arrivalsAreAwayFromTheTick }
+        let rare = catchUpRule == .roundTwoP999 ? latenessQuantile(0.999) : lateness.rare
         return (arrivalsAreAwayFromTheTick && after > lateness.typical + Self.slackMargin)
-            || after > lateness.rare + Self.slackMargin
+            || after > rare + Self.slackMargin
+    }
+
+    /// `roundOne`: the next expected arrival leaves more slack before its vsync than the largest
+    /// lateness in the window.
+    private var nextArrivalClearsLargestLateness: Bool {
+        guard let smoothedArrival, intervalCount > Self.arrivalWarmup, vsyncDuration > 0 else { return false }
+        let period = intervalMean / 1000
+        var slack = (lastVsync + vsyncDuration - (smoothedArrival + period)).truncatingRemainder(dividingBy: vsyncDuration)
+        if slack < 0 { slack += vsyncDuration }
+        let largest = (latenessCounts.lastIndex { $0 > 0 }).map { Double($0) * Self.latenessBin } ?? 0
+        return slack > largest + Self.slackMargin
     }
 
     public var stats: PacerStats {

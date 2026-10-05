@@ -180,10 +180,11 @@ enum PacerSimulator {
     /// ticks `tickDelayMs` later. A frame the renderer has `latchMs` before vsync k is shown at
     /// vsync k; of several, only the newest. The first `warmupSeconds` are not measured.
     static func run(_ scenario: PacerScenario, mode: FramePacingMode, directPresent: Bool = true,
-                    warmupSeconds: Double = 2, configure: (FramePacer<Int>) -> Void = { _ in }) -> PacerSimResult {
+                    warmupSeconds: Double = 2, trace: PacerTraceRecorder? = nil,
+                    configure: (FramePacer<Int>) -> Void = { _ in }) -> PacerSimResult {
         let clock = SimClock()
         let pacer = FramePacer<Int>(mode: mode, frameRate: Int(scenario.fps.rounded()),
-                                    directPresent: directPresent, clock: { clock.now })
+                                    directPresent: directPresent, trace: trace, clock: { clock.now })
         configure(pacer)
         let renderer = SimRenderer()
         if directPresent {
@@ -252,6 +253,7 @@ enum PacerSimulator {
         result.meanLatencyMs = result.shown > 0 ? latencySum / Double(result.shown) * 1000 : 0
         result.laggingShare = result.shown > 0 ? Double(lagging) / Double(result.shown) : 0
         result.stats = span(pacer.stats, since: atMeasureStart ?? PacerStats())
+        pacer.finishTrace()
         return result
     }
 

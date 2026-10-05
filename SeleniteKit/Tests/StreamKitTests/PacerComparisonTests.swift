@@ -7,14 +7,15 @@ import Testing
 /// pacer's own counters next to the measured ones. Takes about 20 seconds, so it only runs on
 /// request:
 /// `PACER_COMPARISON=1 swift test --package-path SeleniteKit --filter pacerComparison`
-/// (`PACER_SECONDS`, `PACER_TICKDELAY` and `PACER_LATCH` override the model, `PACER_OUT` names a
-/// file for the table).
+/// (`PACER_SECONDS`, `PACER_TICKDELAY` and `PACER_LATCH` override the model, `PACER_RULE` picks a
+/// `FramePacer.CatchUpRule` other than the shipped one, `PACER_OUT` names a file for the table).
 @Test(.enabled(if: ProcessInfo.processInfo.environment["PACER_COMPARISON"] != nil))
 func pacerComparison() {
     let env = ProcessInfo.processInfo.environment
     let seconds = env["PACER_SECONDS"].flatMap(Double.init) ?? 600
     let tickDelay = env["PACER_TICKDELAY"].flatMap(Double.init) ?? 1
     let latch = env["PACER_LATCH"].flatMap(Double.init) ?? 0
+    let rule = env["PACER_RULE"].flatMap(FramePacer<Int>.CatchUpRule.init(rawValue:)) ?? .roundTwo
     let modes: [(String, FramePacingMode, Bool)] = [
         ("lowLatency direct", .lowLatency, true),
         ("lowLatency tick", .lowLatency, false),
@@ -32,7 +33,7 @@ func pacerComparison() {
             let results = seeds.map { seed -> PacerSimResult in
                 var seeded = scenario
                 seeded.seed = seed
-                return PacerSimulator.run(seeded, mode: mode, directPresent: direct)
+                return PacerSimulator.run(seeded, mode: mode, directPresent: direct) { $0.catchUpRule = rule }
             }
             func mean(_ value: (PacerSimResult) -> Double) -> String {
                 String(format: "%.2f", results.map(value).reduce(0, +) / Double(results.count))
