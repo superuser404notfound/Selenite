@@ -31,12 +31,6 @@ public struct StreamPreferences: Equatable, Sendable {
     public var audio: AudioPreference = .automatic
     public var stats: StatsPreference = .off
     public var pacing: FramePacingMode = .lowLatency
-    /// Developer setting, experimental: present frames on arrival in lowLatency pacing.
-    /// On by default since the 2026-09-28 device round: most frames skip one refresh of waiting.
-    public var directPresent = true
-    /// Developer setting: every stream records its pacer's inputs to Library/Caches for offline
-    /// replay (`PacerTraceRecorder`).
-    public var recordPacerTraces = false
 
     public init() {}
 }
@@ -72,8 +66,7 @@ public enum StreamSettingsResolver {
             audio: audio,
             codec: codec(for: preferences.codec, hostCodecModeSupport: hostCodecModeSupport),
             pacing: preferences.pacing,
-            directPresent: preferences.directPresent,
-            recordPacerTrace: preferences.recordPacerTraces)
+            directPresent: true)
     }
 
     static func size(for resolution: ResolutionPreference, display: DisplayMode) -> (Int, Int) {
@@ -123,8 +116,7 @@ public enum StreamSettingsResolver {
             audio: .stereo,
             codec: codec(for: preferences.codec, hostCodecModeSupport: hostCodecModeSupport),
             pacing: preferences.pacing,
-            directPresent: preferences.directPresent,
-            recordPacerTrace: preferences.recordPacerTraces)
+            directPresent: true)
     }
 
     static func splitSize(layout: SplitLayout, format: SplitFormat, display: DisplayMode) -> (Int, Int) {

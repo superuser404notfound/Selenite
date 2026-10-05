@@ -18,13 +18,15 @@ public final class SettingsStore {
         static let audio = "settings.audio"
         static let stats = "settings.stats"
         static let pacing = "settings.pacing"
-        static let directPresent = "settings.directPresent"
-        static let recordPacerTraces = "settings.recordPacerTraces"
+        /// Developer switches that were removed: present on arrival is always on, traces are never
+        /// recorded. Their stored values are cleared at launch.
+        static let removed = ["settings.directPresent", "settings.recordPacerTraces"]
         static let selectedHost = "home.selectedHostID"
     }
 
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        Key.removed.forEach { defaults.removeObject(forKey: $0) }
         self.preferences = Self.load(from: defaults)
         self.selectedHostID = defaults.string(forKey: Key.selectedHost)
     }
@@ -63,12 +65,6 @@ public final class SettingsStore {
         if let value = defaults.string(forKey: Key.pacing).flatMap(FramePacingMode.init(rawValue:)) {
             preferences.pacing = value
         }
-        if let value = defaults.object(forKey: Key.directPresent) as? Bool {
-            preferences.directPresent = value
-        }
-        if let value = defaults.object(forKey: Key.recordPacerTraces) as? Bool {
-            preferences.recordPacerTraces = value
-        }
         return preferences
     }
 
@@ -80,7 +76,5 @@ public final class SettingsStore {
         defaults.set(preferences.audio.rawValue, forKey: Key.audio)
         defaults.set(preferences.stats.rawValue, forKey: Key.stats)
         defaults.set(preferences.pacing.rawValue, forKey: Key.pacing)
-        defaults.set(preferences.directPresent, forKey: Key.directPresent)
-        defaults.set(preferences.recordPacerTraces, forKey: Key.recordPacerTraces)
     }
 }

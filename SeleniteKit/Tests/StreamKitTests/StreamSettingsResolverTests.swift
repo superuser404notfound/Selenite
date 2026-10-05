@@ -22,8 +22,6 @@ private func resolve(_ preferences: StreamPreferences, display: DisplayMode = di
     #expect(preferences.audio == .automatic)
     #expect(preferences.stats == .off)
     #expect(preferences.pacing == .lowLatency)
-    #expect(preferences.directPresent)
-    #expect(!preferences.recordPacerTraces)
 }
 
 @Test func bitrateChoicesMatchTheSpec() {
@@ -141,25 +139,14 @@ private func resolve(_ preferences: StreamPreferences, display: DisplayMode = di
     }
 }
 
-@Test func directPresentReachesTheSession() {
-    for value in [false, true] {
-        var preferences = StreamPreferences()
-        preferences.directPresent = value
-        let directPresent: Bool = resolve(preferences).directPresent
-        #expect(directPresent == value)
-    }
-}
-
-@Test func recordingPacerTracesReachesSoloAndSplitSessions() {
-    for value in [false, true] {
-        var preferences = StreamPreferences()
-        preferences.recordPacerTraces = value
-        let solo: Bool = resolve(preferences).recordPacerTrace
-        let split: Bool = StreamSettingsResolver.resolveSplit(preferences, layout: .sideBySide, format: .fillHalf,
-                                                              display: display4K, hostCodecModeSupport: 0).recordPacerTrace
-        #expect(solo == value)
-        #expect(split == value)
-    }
+@Test func soloAndSplitAlwaysPresentDirectlyAndNeverRecordATrace() {
+    let solo = resolve(StreamPreferences())
+    let split = StreamSettingsResolver.resolveSplit(StreamPreferences(), layout: .sideBySide, format: .fillHalf,
+                                                    display: display4K, hostCodecModeSupport: 0)
+    #expect(solo.directPresent)
+    #expect(split.directPresent)
+    #expect(!solo.recordPacerTrace)
+    #expect(!split.recordPacerTrace)
 }
 
 private let panel4K = DisplayMode(width: 3840, height: 2160, refreshRate: 60)
