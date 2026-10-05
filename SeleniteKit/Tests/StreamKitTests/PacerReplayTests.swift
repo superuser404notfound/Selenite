@@ -83,7 +83,8 @@ func writePacerTraceFixture() throws {
 }
 
 /// Replays real traces: `PACER_TRACE=<file or directory> swift test --package-path SeleniteKit
-/// --filter pacerTraceReplay` prints one row per trace and rule (`PACER_OUT` also writes it).
+/// --filter pacerTraceReplay` prints one row per trace and rule (`PACER_OUT` also writes it);
+/// with `PACER_MODES=lowLatency,smooth,smoothPlus` one row per trace and mode instead.
 @Test(.enabled(if: ProcessInfo.processInfo.environment["PACER_TRACE"] != nil))
 func pacerTraceReplay() throws {
     let env = ProcessInfo.processInfo.environment
@@ -95,7 +96,9 @@ func pacerTraceReplay() throws {
             .map { URL(fileURLWithPath: path).appendingPathComponent($0) }
         : [URL(fileURLWithPath: path)]
     let traces = try files.map { ($0.lastPathComponent, try PacerTrace.decode(Data(contentsOf: $0))) }
-    let table = PacerReplay.table(traces)
+    let table = env["PACER_MODES"] == nil ? PacerReplay.table(traces)
+        : PacerReplay.modeTable(traces, modes: env["PACER_MODES"]!.split(separator: ",").compactMap {
+            FramePacingMode(rawValue: String($0)) })
     if let out = env["PACER_OUT"] { try table.write(toFile: out, atomically: true, encoding: .utf8) }
     print(table)
 }

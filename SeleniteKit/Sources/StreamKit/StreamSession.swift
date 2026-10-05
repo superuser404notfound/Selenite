@@ -13,8 +13,8 @@ public struct StreamSettings: Sendable, Equatable {
     public var audio: AudioChannels
     public var codec: VideoCodec
     public var pacing: FramePacingMode
-    /// Experimental, lowLatency only: a decoded frame goes to the renderer on arrival when its
-    /// refresh interval has not been served yet (see FramePacer).
+    /// lowLatency and smooth: a decoded frame goes to the renderer on arrival when its
+    /// refresh interval has not been served yet (see FramePacer). The resolver always sets it.
     public var directPresent: Bool
     /// Developer setting: record the pacer's inputs to a trace file (see PacerTraceRecorder).
     public var recordPacerTrace: Bool
