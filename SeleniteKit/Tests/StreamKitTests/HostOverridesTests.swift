@@ -29,13 +29,11 @@ import Testing
 @Test func deviceValuesAreNeverOverridden() {
     var global = StreamPreferences()
     global.pacing = .smooth
-    global.directPresent = false
     global.stats = .compact
     var overrides = HostOverrides()
     overrides.resolution = .p720
     let effective = global.applying(overrides)
     #expect(effective.pacing == .smooth)
-    #expect(effective.directPresent == false)
     #expect(effective.stats == .compact)
 }
 

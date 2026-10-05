@@ -24,8 +24,6 @@ private func freshDefaults() -> UserDefaults {
     store.set(\.audio, .stereo)
     store.set(\.stats, .compact)
     store.set(\.pacing, .smooth)
-    store.set(\.directPresent, false)
-    store.set(\.recordPacerTraces, true)
     store.setSelectedHostID("HOST-1")
     var expected = StreamPreferences()
     expected.resolution = .p1440
@@ -35,8 +33,6 @@ private func freshDefaults() -> UserDefaults {
     expected.audio = .stereo
     expected.stats = .compact
     expected.pacing = .smooth
-    expected.directPresent = false
-    expected.recordPacerTraces = true
     let reloaded = SettingsStore(defaults: defaults)
     let preferences: StreamPreferences = reloaded.preferences
     #expect(preferences == expected)
@@ -48,10 +44,17 @@ private func freshDefaults() -> UserDefaults {
     defaults.set("8K", forKey: "settings.resolution")
     defaults.set(123, forKey: "settings.bitrateMbps")
     defaults.set("vsync", forKey: "settings.pacing")
-    defaults.set("yes", forKey: "settings.directPresent")
-    defaults.set("yes", forKey: "settings.recordPacerTraces")
     let preferences: StreamPreferences = SettingsStore(defaults: defaults).preferences
     #expect(preferences == StreamPreferences())
+}
+
+@MainActor @Test func theRemovedDeveloperSwitchesAreClearedFromStorage() {
+    let defaults = freshDefaults()
+    defaults.set(false, forKey: "settings.directPresent")
+    defaults.set(true, forKey: "settings.recordPacerTraces")
+    _ = SettingsStore(defaults: defaults)
+    #expect(defaults.object(forKey: "settings.directPresent") == nil)
+    #expect(defaults.object(forKey: "settings.recordPacerTraces") == nil)
 }
 
 @MainActor @Test func clearingTheSelectedHostPersists() {

@@ -62,7 +62,7 @@ struct SettingsView: View {
         .frame(width: 1300)
         // A host paired in the harness is saved to the same store; reload so Home shows it now.
         .fullScreenCover(isPresented: $showsDeveloper, onDismiss: { model.directory.reload() }) {
-            DeveloperView(settings: model.settings)
+            DeveloperView()
         }
     }
 
