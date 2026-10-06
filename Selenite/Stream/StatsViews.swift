@@ -199,6 +199,10 @@ struct OverlayStats: View {
             Grid(alignment: .leading, horizontalSpacing: 28, verticalSpacing: 8) {
                 rows()
             }
+            // Some languages run labels to twice the English length: shrink a little rather than
+            // wrap, so the panel keeps its height (the split overlay has none to spare).
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
         }
     }
 }
@@ -267,17 +271,23 @@ struct StatsHUD: View {
     }
 }
 
+/// Stats values in the viewer's locale (decimal comma where that is the norm), fixed fraction
+/// digits so the panel does not jitter, no grouping.
 enum StatsFormat {
     static func milliseconds(_ value: Double) -> String {
-        String(format: "%.1f", value)
+        fixed(value, digits: 1)
     }
 
     static func megabits(_ value: Double) -> String {
-        String(format: "%.1f", value)
+        fixed(value, digits: 1)
     }
 
     static func hertz(_ value: Double) -> String {
-        String(format: "%.2f", value)
+        fixed(value, digits: 2)
+    }
+
+    private static func fixed(_ value: Double, digits: Int) -> String {
+        value.formatted(.number.precision(.fractionLength(digits)).grouping(.never))
     }
 }
 

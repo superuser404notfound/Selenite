@@ -1,0 +1,168 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "NSLocalNetworkUsageDescription" : {
+      "comment" : "Privacy - Local Network Usage Description",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "cs" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selenite se připojuje k hostitelům Sunshine ve tvé místní síti."
+          }
+        },
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selenite opretter forbindelse til Sunshine-værter på dit lokale netværk."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selenite verbindet sich mit Sunshine-Hosts in deinem lokalen Netzwerk."
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Το Selenite συνδέεται με hosts Sunshine στο τοπικό σας δίκτυο."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selenite connects to Sunshine hosts on your local network."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selenite se conecta a hosts Sunshine en tu red local."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selenite muodostaa yhteyden Sunshine-isäntiin paikallisverkossasi."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selenite se connecte aux hôtes Sunshine sur votre réseau local."
+          }
+        },
+        "hr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selenite se povezuje s Sunshine hostovima u vašoj lokalnoj mreži."
+          }
+        },
+        "hu" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A Selenite csatlakozik a helyi hálózaton található Sunshine hostokhoz."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selenite si connette agli host Sunshine sulla tua rete locale."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seleniteはローカルネットワーク上のSunshineホストに接続します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selenite는 로컬 네트워크에서 Sunshine 호스트에 연결합니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selenite kobler til Sunshine-verter på det lokale nettverket ditt."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selenite maakt verbinding met Sunshine-hosts op je lokale netwerk."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selenite łączy się z hostami Sunshine w Twojej sieci lokalnej."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Selenite se conecta a hosts do Sunshine na sua rede local."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Selenite liga-se a hosts do Sunshine na tua rede local."
+          }
+        },
+        "ro" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selenite se conectează la host-uri Sunshine din rețeaua ta locală."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selenite подключается к хостам Sunshine в вашей локальной сети."
+          }
+        },
+        "sk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selenite sa pripája k hostiteľom Sunshine v tvojej miestnej sieti."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selenite ansluter till Sunshine-värdar på ditt lokala nätverk."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selenite, yerel ağınızdaki Sunshine hostlarına bağlanır."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selenite підключається до хостів Sunshine у вашій локальній мережі."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selenite 会连接到您本地网络中的 Sunshine 主机。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selenite 會連線到您本地網路中的 Sunshine 主機。"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

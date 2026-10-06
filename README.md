@@ -9,6 +9,7 @@ A native tvOS client for [Sunshine](https://github.com/LizardByte/Sunshine) host
 - Hosts running Sunshine are found automatically on the network and pair with a PIN; a sleeping PC wakes on selection.
 - Stream stats: Off, Compact (a top-right pill) or Full (resolution, frame rate, display and stream rate, codec, frame pacing and bitrate; host, network, decode and display latency, round trip; jitter, dropped frames split into network loss versus client queue drops, unrecoverable frames, stalls, missed display ticks and audio underruns). The Menu overlay always shows the full list, solo and in both split columns.
 - Recently played: the last games across all hosts, one tap away from Home.
+- 26 languages: English, German, French, Spanish, Italian, Dutch, Portuguese (Brazil and Portugal), Danish, Swedish, Norwegian, Finnish, Polish, Czech, Slovak, Hungarian, Croatian, Romanian, Greek, Russian, Ukrainian, Turkish, Japanese, Korean and Chinese (Simplified and Traditional).
 
 Status: early development. Solo streaming and split screen both work from the app.
 
