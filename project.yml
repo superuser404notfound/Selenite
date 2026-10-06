@@ -49,6 +49,8 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: de.superuser404.Selenite
         PRODUCT_NAME: Selenite
         TARGETED_DEVICE_FAMILY: "3"
+        ASSETCATALOG_COMPILER_APPICON_NAME: "App Icon & Top Shelf Image"
+        ASSETCATALOG_COMPILER_BRAND_ASSETS_NAME: "App Icon & Top Shelf Image"
 schemes:
   Selenite-tvOS:
     build:
