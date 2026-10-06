@@ -127,6 +127,7 @@ extension FramePacingMode {
         switch self {
         case .lowLatency: "Lowest latency"
         case .smooth: "Smooth"
+        case .smoothPlus: "Smooth+"
         }
     }
 }

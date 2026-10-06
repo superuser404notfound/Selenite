@@ -82,6 +82,9 @@ private struct TickRecord {
     var stalls: Int
     var catchUpDrops: Int
     var overflowDrops: Int
+    /// Running display wait total (ms) and sample count; filled by `simulateDirect` only.
+    var waitTotalMs = 0.0
+    var waitSamples = 0
 }
 
 /// Drives a pacer the way DisplayPacer does: frames that arrive between two refreshes are put
@@ -173,11 +176,11 @@ private func increase(_ records: [TickRecord], from start: Int, _ value: (TickRe
     #expect(shown == [1, 2, nil])
 }
 
-@Test func smoothAbsorbsJitterAtEveryPhase() {
+@Test func smoothPlusAbsorbsJitterAtEveryPhase() {
     for (index, phase) in [0.0, 0.1, 0.3, 0.5, 0.7, 0.9].enumerated() {
         var noise = Noise(seed: UInt64(10 + index))
         let times = arrivals(count: 1300) { _ in phase + 0.45 * noise.next() }
-        let records = simulate(.smooth, arrivals: times, ticks: 1200)
+        let records = simulate(.smoothPlus, arrivals: times, ticks: 1200)
         // Priming holds the first ticks; count stalls only once the first frame was shown.
         let firstShown = records.firstIndex { $0.shown != nil } ?? 0
         let stalls: Int = increase(records, from: firstShown, \.stalls)
@@ -189,18 +192,18 @@ private func increase(_ records: [TickRecord], from start: Int, _ value: (TickRe
     }
 }
 
-@Test func smoothPrimesBeforeTheFirstFrame() {
-    let (shown, stats) = run([1, 1, 1, 1], mode: .smooth)
+@Test func smoothPlusPrimesBeforeTheFirstFrame() {
+    let (shown, stats) = run([1, 1, 1, 1, 1], mode: .smoothPlus)
     let stalls: Int = stats.stalls
-    #expect(shown == [nil, 0, 1, 2])
-    #expect(stalls == 1)
+    #expect(shown == [nil, nil, 0, 1, 2])
+    #expect(stalls == 2)
 }
 
-@Test func smoothCutsClockDriftCreepWithIsolatedDrops() {
+@Test func smoothPlusCutsClockDriftCreepWithIsolatedDrops() {
     // Host clock runs fast: a frame every 16.60 ms against a 16.666 ms refresh.
     var noise = Noise(seed: 4)
     let times = (0..<5000).map { n in 1000 + 8 + Double(n) * 16.60 + 1.5 * noise.next() }
-    let records = simulate(.smooth, arrivals: times, ticks: 4800)
+    let records = simulate(.smoothPlus, arrivals: times, ticks: 4800)
     let firstShown = records.firstIndex { $0.shown != nil } ?? 0
     let stalls: Int = increase(records, from: firstShown, \.stalls)
     #expect(stalls == 0)
@@ -219,10 +222,10 @@ private func increase(_ records: [TickRecord], from start: Int, _ value: (TickRe
     }
 }
 
-@Test func smoothStallsThroughAGapThenReprimes() {
+@Test func smoothPlusStallsThroughAGapThenReprimes() {
     // Frames 200, 201 and 202 never arrive.
     let times = arrivals(count: 700) { _ in 0.5 }.enumerated().filter { !(200...202).contains($0.offset) }.map(\.element)
-    let records = simulate(.smooth, arrivals: times, ticks: 600)
+    let records = simulate(.smoothPlus, arrivals: times, ticks: 600)
     let firstShown = records.firstIndex { $0.shown != nil } ?? 0
     let before: Int = increase(Array(records[..<195]), from: firstShown, \.stalls)
     let gap: Int = records[215].stalls - records[195].stalls
@@ -241,10 +244,10 @@ private func arrivals30(count: Int, startMs: Double = 1000, offset: (Int) -> Dou
     (0..<count).map { n in startMs + (Double(2 * n) + offset(n)) * vsyncMs }
 }
 
-@Test func smoothAt30FpsOn60HzHoldsEveryFrameForTwoTicks() {
+@Test func smoothPlusAt30FpsOn60HzHoldsEveryFrameForTwoTicks() {
     var noise = Noise(seed: 20)
     let times = arrivals30(count: 700) { _ in 1 + 0.8 * noise.next() }
-    let records = simulate(.smooth, arrivals: times, ticks: 1200, frameRate: 30)
+    let records = simulate(.smoothPlus, arrivals: times, ticks: 1200, frameRate: 30)
     let shownTicks = records.enumerated().compactMap { $0.element.shown == nil ? nil : $0.offset }
     let firstShown = shownTicks.first ?? 0
     let stalls: Int = increase(records, from: firstShown, \.stalls)
@@ -257,11 +260,11 @@ private func arrivals30(count: Int, startMs: Double = 1000, offset: (Int) -> Dou
     }
 }
 
-@Test func smoothAt30FpsReprimesOnlyWhenAFrameIsMissing() {
-    // Frames 100 and 101 never arrive: more than the standing frame can cover (one missing frame
-    // is absorbed by it), the rest is on time.
-    let times = arrivals30(count: 400) { _ in 1.5 }.enumerated().filter { ![100, 101].contains($0.offset) }.map(\.element)
-    let records = simulate(.smooth, arrivals: times, ticks: 700, frameRate: 30)
+@Test func smoothPlusAt30FpsReprimesOnlyWhenAFrameIsMissing() {
+    // Frames 100 to 102 never arrive: more than the two standing frames can cover (two missing
+    // frames are absorbed by them), the rest is on time.
+    let times = arrivals30(count: 400) { _ in 1.5 }.enumerated().filter { !(100...102).contains($0.offset) }.map(\.element)
+    let records = simulate(.smoothPlus, arrivals: times, ticks: 700, frameRate: 30)
     let firstShown = records.firstIndex { $0.shown != nil } ?? 0
     let before: Int = increase(Array(records[..<190]), from: firstShown, \.stalls)
     let gap: Int = records[215].stalls - records[190].stalls
@@ -362,10 +365,10 @@ private func streamArrivals(count: Int, fps: Double, startMs: Double = 1000, off
     (0..<count).map { n in startMs + offsetMs + Double(n) * 1000 / fps + jitter(n) }
 }
 
-@Test func smoothAt30FpsOn50HzShowsAllThirtyFrames() {
+@Test func smoothPlusAt30FpsOn50HzShowsAllThirtyFrames() {
     var noise = Noise(seed: 30)
     let times = streamArrivals(count: 1000, fps: 30, offsetMs: 7) { _ in 4 * noise.next() }
-    let records = simulate(.smooth, arrivals: times, ticks: 1500, frameRate: 30, refreshMs: refresh50Ms)
+    let records = simulate(.smoothPlus, arrivals: times, ticks: 1500, frameRate: 30, refreshMs: refresh50Ms)
     let firstShown = records.firstIndex { $0.shown != nil } ?? 0
     let stalls: Int = increase(records, from: firstShown, \.stalls)
     let overflow: Int = increase(records, from: 0, \.overflowDrops)
@@ -378,9 +381,9 @@ private func streamArrivals(count: Int, fps: Double, startMs: Double = 1000, off
     #expect(shown >= 895)
 }
 
-@Test func smoothAt30FpsOn50HzHoldsTwoTwoOne() {
+@Test func smoothPlusAt30FpsOn50HzHoldsTwoTwoOne() {
     let times = streamArrivals(count: 400, fps: 30, offsetMs: 7)
-    let records = simulate(.smooth, arrivals: times, ticks: 500, frameRate: 30, refreshMs: refresh50Ms)
+    let records = simulate(.smoothPlus, arrivals: times, ticks: 500, frameRate: 30, refreshMs: refresh50Ms)
     let shownTicks = records.enumerated().compactMap { $0.element.shown == nil ? nil : $0.offset }
     for (earlier, later) in zip(shownTicks, shownTicks.dropFirst()) {
         let spacing: Int = later - earlier
@@ -403,10 +406,10 @@ private func streamArrivals(count: Int, fps: Double, startMs: Double = 1000, off
     #expect(shown >= 895)
 }
 
-@Test func smoothAt60FpsOn50HzNeverWaits() {
+@Test func smoothPlusAt60FpsOn50HzNeverWaits() {
     // More frames than refreshes: every tick after priming shows one, the surplus overflows.
     let times = streamArrivals(count: 700, fps: 60, offsetMs: 3)
-    let records = simulate(.smooth, arrivals: times, ticks: 500, frameRate: 60, refreshMs: refresh50Ms)
+    let records = simulate(.smoothPlus, arrivals: times, ticks: 500, frameRate: 60, refreshMs: refresh50Ms)
     let firstShown = records.firstIndex { $0.shown != nil } ?? 0
     let empty: Int = records[firstShown...].filter { $0.shown == nil }.count
     #expect(empty == 0)
@@ -434,7 +437,8 @@ private func directPacer(mode: FramePacingMode = .lowLatency, frameRate: Int = 6
 /// and the order of every frame that reached the renderer (direct or tick).
 private func simulateDirect(_ mode: FramePacingMode = .lowLatency, directPresent: Bool = true, arrivals: [Double],
                             numbers: [Int]? = nil, ticks: Int, startMs: Double = 1000, frameRate: Int = 60,
-                            refreshMs: Double = vsyncMs) -> (records: [TickRecord], rendered: [Int], stats: PacerStats) {
+                            refreshMs: Double = vsyncMs,
+                            tickLagMs: Double = 0) -> (records: [TickRecord], rendered: [Int], stats: PacerStats) {
     let pacer = FramePacer<Int>(mode: mode, frameRate: frameRate, directPresent: directPresent)
     let sink = PresentSink()
     pacer.setPresenter { sink.present($0) }
@@ -446,12 +450,18 @@ private func simulateDirect(_ mode: FramePacingMode = .lowLatency, directPresent
             pacer.put(next, arrival: arrivals[next] / 1000, frameNumber: numbers?[next])
             next += 1
         }
-        pacer.vsync(timestamp: now / 1000, duration: refreshMs / 1000, tickTime: now / 1000)
+        pacer.vsync(timestamp: now / 1000, duration: refreshMs / 1000, tickTime: (now + tickLagMs) / 1000)
+        // Frames decoded between the vsync and its late tick callback.
+        while next < arrivals.count, arrivals[next] < now + tickLagMs {
+            pacer.put(next, arrival: arrivals[next] / 1000, frameNumber: numbers?[next])
+            next += 1
+        }
         let frame = pacer.tick()
         if let frame { sink.present(frame) }
         let stats = pacer.stats
         records.append(TickRecord(shown: frame, stalls: stats.stalls, catchUpDrops: stats.catchUpDrops,
-                                  overflowDrops: stats.overflowDrops))
+                                  overflowDrops: stats.overflowDrops, waitTotalMs: stats.displayWaitTotalMilliseconds,
+                                  waitSamples: stats.displayWaitSamples))
     }
     return (records, sink.presented, pacer.stats)
 }
@@ -578,11 +588,11 @@ private func simulateDirect(_ mode: FramePacingMode = .lowLatency, directPresent
     #expect(renderedCount == tickCount)
 }
 
-@Test func smoothIgnoresDirectPresent() {
+@Test func smoothPlusIgnoresDirectPresent() {
     var noise = Noise(seed: 43)
     let times = arrivals(count: 700) { _ in 0.5 + 0.25 * noise.next() }
-    let (records, _, stats) = simulateDirect(.smooth, arrivals: times, ticks: 600)
-    let reference = simulate(.smooth, arrivals: times, ticks: 600)
+    let (records, _, stats) = simulateDirect(.smoothPlus, arrivals: times, ticks: 600)
+    let reference = simulate(.smoothPlus, arrivals: times, ticks: 600)
     let shown: [Int?] = records.map(\.shown)
     let expected: [Int?] = reference.map(\.shown)
     let direct: Int = stats.directPresents
@@ -973,4 +983,113 @@ private let wiredException: [String: (roundOneHitches: Int, roundOneLatency: Dou
     let result = PacerSimulator.run(scenario, mode: .lowLatency)
     #expect(abs(result.displayWaitMs - result.meanLatencyMs) < 0.2)
     #expect(abs(result.laggingStatPercent - result.laggingShare * 100) < 1)
+}
+
+// MARK: - Smooth: elastic playout
+
+private enum PlayoutClockCap { static let ms = PlayoutClock.baseCap * 1000 }
+
+/// Mean display wait of the frames presented in ticks `range`, milliseconds.
+private func meanWait(_ records: [TickRecord], _ range: Range<Int>) -> Double {
+    let first = records[range.lowerBound - 1], last = records[range.upperBound - 1]
+    let samples = last.waitSamples - first.waitSamples
+    return samples > 0 ? (last.waitTotalMs - first.waitTotalMs) / Double(samples) : 0
+}
+
+@Test func smoothShowsEveryFrameOfACleanStreamWithinARefresh() {
+    var noise = Noise(seed: 50)
+    let times = arrivals(count: 700) { _ in 0.5 + 0.2 * noise.next() }
+    let (records, rendered, stats) = simulateDirect(.smooth, arrivals: times, numbers: Array(0..<700), ticks: 600)
+    let stalls: Int = stats.stalls
+    let drops: Int = stats.catchUpDrops + stats.overflowDrops
+    let wait: Double = meanWait(records, 60..<600)
+    #expect(stalls == 0)
+    #expect(drops == 0)
+    #expect(rendered == Array(0..<rendered.count))
+    #expect(rendered.count >= 595)
+    #expect(wait < vsyncMs)
+}
+
+@Test func smoothShowsALateFrameInsteadOfSkippingItThenStepsBack() {
+    // Frame 300 comes 30 ms late and 301 14 ms late, the rest on time.
+    var noise = Noise(seed: 51)
+    let delays: [Int: Double] = [300: 30, 301: 14]
+    let times = arrivals(count: 900) { _ in 0.5 + 0.05 * noise.next() }.enumerated().map { $0.element + (delays[$0.offset] ?? 0) }
+    let (records, rendered, stats) = simulateDirect(.smooth, arrivals: times, numbers: Array(0..<900), ticks: 800)
+    let stalls: Int = stats.stalls
+    let catchUp: Int = stats.catchUpDrops
+    let skipped = Set(0..<(rendered.last ?? 0)).subtracting(rendered)
+    let before: Double = meanWait(records, 100..<290)
+    let after: Double = meanWait(records, 700..<800)
+    #expect(rendered.contains(300) && rendered.contains(301))
+    #expect(stalls >= 1 && stalls <= 3)
+    // Every stretch is stepped back once the stream is calm, each step skipping at most one frame.
+    // The late frames also lift the base delay (at most to its cap) for the lateness window, and a
+    // refresh of lag may stand after the last step (see `presentDue`), nothing more.
+    #expect(catchUp <= stalls)
+    #expect(skipped.count == catchUp)
+    #expect(skipped.allSatisfy { $0 > 400 })
+    #expect(rendered == rendered.sorted())
+    #expect(after - before < vsyncMs + PlayoutClockCap.ms)
+}
+
+@Test func smoothStartsOverAfterAnOutage() {
+    // One second without frames (60 frame numbers lost), then a regular stream again.
+    var noise = Noise(seed: 52)
+    let all = arrivals(count: 900) { _ in 0.5 + 0.1 * noise.next() }
+    let kept = Array(0..<300) + Array(360..<900)
+    let (records, rendered, stats) = simulateDirect(.smooth, arrivals: kept.map { all[$0] }, numbers: kept, ticks: 800)
+    let catchUp: Int = stats.catchUpDrops
+    let after: Double = meanWait(records, 500..<800)
+    #expect(catchUp == 0)
+    #expect(rendered == Array(0..<rendered.count))
+    #expect(after < vsyncMs)
+}
+
+@Test func smoothTakesAFrameNumberJumpWithoutAGapInStride() {
+    // The host's numbering jumps by 174 with no time passing (seen on device after a keyframe).
+    var noise = Noise(seed: 53)
+    let times = arrivals(count: 700) { _ in 0.5 + 0.1 * noise.next() }
+    let numbers = (0..<700).map { $0 < 300 ? $0 : $0 + 174 }
+    let (_, rendered, stats) = simulateDirect(.smooth, arrivals: times, numbers: numbers, ticks: 600)
+    let stalls: Int = stats.stalls
+    let drops: Int = stats.catchUpDrops + stats.overflowDrops
+    #expect(stalls == 0)
+    #expect(drops == 0)
+    #expect(rendered == Array(0..<rendered.count))
+}
+
+@Test func smoothAt30FpsOn60HzShowsEveryFrameWithoutStalls() {
+    var noise = Noise(seed: 54)
+    let times = arrivals30(count: 400) { _ in 1 + 0.2 * noise.next() }
+    let (_, rendered, stats) = simulateDirect(.smooth, arrivals: times, numbers: Array(0..<400), ticks: 700,
+                                              frameRate: 30)
+    let stalls: Int = stats.stalls
+    let drops: Int = stats.catchUpDrops + stats.overflowDrops
+    #expect(stalls == 0)
+    #expect(drops == 0)
+    #expect(rendered == Array(0..<rendered.count))
+    #expect(rendered.count >= 345)
+}
+
+@Test func smoothCountsALateFrameThatArrivesBetweenTheVsyncAndItsTick() {
+    // Ticks run 3 ms after their vsync; frame 300 arrives 1 ms after the vsync it was due at.
+    let times = arrivals(count: 700) { $0 == 300 ? 1.06 + 0.5 : 0.5 }
+    let (_, rendered, stats) = simulateDirect(.smooth, arrivals: times, numbers: Array(0..<700), ticks: 600,
+                                              tickLagMs: 3)
+    let stalls: Int = stats.stalls
+    #expect(stalls == 1)
+    #expect(rendered.contains(300))
+}
+
+@Test func smoothDoesNotStretchForABacklogBeforeTheFirstVsync() {
+    // 300 ms of frames are decoded before the display link reports its first vsync.
+    var noise = Noise(seed: 55)
+    let times = arrivals(count: 700, startMs: 700) { _ in 0.5 + 0.1 * noise.next() }
+    let (records, _, stats) = simulateDirect(.smooth, arrivals: times, numbers: Array(0..<700), ticks: 500)
+    let stalls: Int = stats.stalls
+    let wait: Double = meanWait(records, 30..<500)
+    // At most the standing refresh of buffer, not the six-refresh stretch a late frame would get.
+    #expect(stalls == 0)
+    #expect(wait < 2 * vsyncMs)
 }

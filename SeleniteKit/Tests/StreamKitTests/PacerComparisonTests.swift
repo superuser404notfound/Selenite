@@ -19,7 +19,8 @@ func pacerComparison() {
     let modes: [(String, FramePacingMode, Bool)] = [
         ("lowLatency direct", .lowLatency, true),
         ("lowLatency tick", .lowLatency, false),
-        ("smooth", .smooth, false),
+        ("smooth direct", .smooth, true),
+        ("smoothPlus", .smoothPlus, false),
     ]
     let seeds: [UInt64] = [1, 2, 3]
     var lines = ["mode | scenario | latency ms | lagging % | repeats/min | drops/min | hitches/min | Lagging stat % | "
