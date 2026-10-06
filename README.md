@@ -13,4 +13,6 @@ A native tvOS client for [Sunshine](https://github.com/LizardByte/Sunshine) host
 
 Status: early development. Solo streaming and split screen both work from the app.
 
+Selenite collects no data; see the [privacy policy](PRIVACY.md).
+
 Selenite builds on [moonlight-common-c](https://github.com/moonlight-stream/moonlight-common-c) and is licensed under the GPL-3.0.
