@@ -5224,7 +5224,7 @@
         "hu" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Audio alulcsordulások"
+            "value" : "Hangkiesés"
           }
         },
         "it" : {
@@ -5236,7 +5236,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "オーディオアンダーラン"
+            "value" : "音声途切れ"
           }
         },
         "ko" : {
@@ -5278,7 +5278,7 @@
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Întreruperi audio"
+            "value" : "Pauze audio"
           }
         },
         "ru" : {
@@ -6260,7 +6260,7 @@
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Indhentnings-drops"
+            "value" : "Indhentning"
           }
         },
         "de" : {
@@ -6272,13 +6272,13 @@
         "el" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Drops αναπλήρωσης"
+            "value" : "Αναπληρώσεις"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Drops de recuperación"
+            "value" : "Drops de ajuste"
           }
         },
         "fi" : {
@@ -6290,19 +6290,19 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Drops de rattrapage"
+            "value" : "Drops rattrapage"
           }
         },
         "hr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dropovi sustizanja"
+            "value" : "Sustizanje"
           }
         },
         "hu" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Felzárkózási dropok"
+            "value" : "Felzárkózás"
           }
         },
         "it" : {
@@ -6326,7 +6326,7 @@
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Innhentings-drops"
+            "value" : "Innhenting"
           }
         },
         "nl" : {
@@ -6344,19 +6344,19 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Drops de recuperação"
+            "value" : "Drops de ajuste"
           }
         },
         "pt-PT" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Drops de recuperação"
+            "value" : "Drops de ajuste"
           }
         },
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Drops de recuperare"
+            "value" : "Drops recuperare"
           }
         },
         "ru" : {
@@ -6374,19 +6374,19 @@
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Återhämtnings-drops"
+            "value" : "Ikapp-drops"
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Yakalama Dropları"
+            "value" : "Telafi Dropları"
           }
         },
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Дропи наздоганяння"
+            "value" : "Наздоганяння"
           }
         },
         "zh-Hans" : {
@@ -12154,7 +12154,7 @@
         "hu" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Balra"
+            "value" : "Bal"
           }
         },
         "it" : {
@@ -12610,7 +12610,7 @@
         "hr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Promašeni tickovi"
+            "value" : "Promašaji"
           }
         },
         "hu" : {
@@ -12676,7 +12676,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Пропущенные тики"
+            "value" : "Пропуск тиков"
           }
         },
         "sk" : {
@@ -12936,7 +12936,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ネットワークドロップ"
+            "value" : "通信ドロップ"
           }
         },
         "ko" : {
@@ -14434,25 +14434,25 @@
         "el" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Drops υπερχείλισης"
+            "value" : "Υπερχειλίσεις"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Drops de desbordamiento"
+            "value" : "Drops de exceso"
           }
         },
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ylivuotopudotukset"
+            "value" : "Ylivuodot"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Drops de débordement"
+            "value" : "Drops saturation"
           }
         },
         "hr" : {
@@ -14464,7 +14464,7 @@
         "hu" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Túlcsordulási dropok"
+            "value" : "Túlcsordulás"
           }
         },
         "it" : {
@@ -14476,7 +14476,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "オーバーフロードロップ"
+            "value" : "超過ドロップ"
           }
         },
         "ko" : {
@@ -14500,31 +14500,31 @@
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Drops przepełnienia"
+            "value" : "Przepełnienia"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Drops de overflow"
+            "value" : "Drops de excesso"
           }
         },
         "pt-PT" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Drops de overflow"
+            "value" : "Drops de excesso"
           }
         },
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Drops de overflow"
+            "value" : "Drops overflow"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Дропы переполнения"
+            "value" : "Переполнения"
           }
         },
         "sk" : {
@@ -14548,7 +14548,7 @@
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Дропи переповнення"
+            "value" : "Переповнення"
           }
         },
         "zh-Hans" : {
@@ -17496,61 +17496,61 @@
         "cs" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Stiskni znovu pro ukončení rozdělení"
+            "value" : "Znovu: ukončit dělení"
           }
         },
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tryk igen for at afslutte split"
+            "value" : "Tryk igen: afslut split"
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Erneut drücken, um Split zu beenden"
+            "value" : "Erneut: Split beenden"
           }
         },
         "el" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Πατήστε ξανά για λήξη διαχωρισμού"
+            "value" : "Ξανά: λήξη διαχωρισμού"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pulsa de nuevo para finalizar la división"
+            "value" : "De nuevo: fin de división"
           }
         },
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Paina uudelleen ja lopeta jako"
+            "value" : "Uudelleen: lopeta jako"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Appuyez à nouveau pour terminer le partage"
+            "value" : "Encore : fin du partage"
           }
         },
         "hr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pritisni ponovno za završetak splita"
+            "value" : "Ponovno: završi split"
           }
         },
         "hu" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nyomd meg újra az osztás befejezéséhez"
+            "value" : "Újra: osztás befejezése"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Premi di nuovo per terminare la divisione"
+            "value" : "Ancora: fine divisione"
           }
         },
         "ja" : {
@@ -17568,67 +17568,67 @@
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Trykk igjen for å avslutte split"
+            "value" : "Igjen: avslutt split"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Druk opnieuw om de split te beëindigen"
+            "value" : "Nogmaals: split stoppen"
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Naciśnij ponownie, aby zakończyć podział"
+            "value" : "Znowu: koniec podziału"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pressione novamente para terminar a divisão"
+            "value" : "De novo: fim da divisão"
           }
         },
         "pt-PT" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pressiona novamente para terminar a divisão"
+            "value" : "De novo: fim da divisão"
           }
         },
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Apasă din nou pentru a închide împărțirea"
+            "value" : "Din nou: închide"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Нажмите снова, чтобы завершить сплит"
+            "value" : "Ещё раз: завершить"
           }
         },
         "sk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Stlač znova na ukončenie rozdelenia"
+            "value" : "Znova: ukončiť delenie"
           }
         },
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tryck igen för att avsluta split"
+            "value" : "Igen: avsluta split"
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bölmeyi bitirmek için tekrar bas"
+            "value" : "Tekrar: Bölmeyi Bitir"
           }
         },
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Натисніть ще раз, щоб завершити спліт"
+            "value" : "Ще раз: завершити"
           }
         },
         "zh-Hans" : {
@@ -18314,7 +18314,7 @@
         "hu" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Várakozási dropok"
+            "value" : "Sor-dropok"
           }
         },
         "it" : {
@@ -19386,7 +19386,7 @@
         "hr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ponovno dodijeli kontrolere"
+            "value" : "Dodijeli kontrolere"
           }
         },
         "hu" : {
@@ -19422,13 +19422,13 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Controllers opnieuw toewijzen"
+            "value" : "Controllers toewijzen"
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Przypisz kontrolery ponownie"
+            "value" : "Przypisz kontrolery"
           }
         },
         "pt-BR" : {
@@ -19452,7 +19452,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Переназначить контроллеры"
+            "value" : "Назначить заново"
           }
         },
         "sk" : {
@@ -19476,7 +19476,7 @@
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Перепризначити контролери"
+            "value" : "Призначити знову"
           }
         },
         "zh-Hans" : {
@@ -20932,7 +20932,7 @@
         "hu" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Jobbra"
+            "value" : "Jobb"
           }
         },
         "it" : {
@@ -27814,61 +27814,61 @@
         "cs" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Neopravitelné snímky"
+            "value" : "Vadné snímky"
           }
         },
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Uoprettelige frames"
+            "value" : "Defekte frames"
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nicht reparierbare Frames"
+            "value" : "Defekte Frames"
           }
         },
         "el" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Μη ανακτώμενα καρέ"
+            "value" : "Χαλασμένα καρέ"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Fotogramas irrecuperables"
+            "value" : "Fotogramas rotos"
           }
         },
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Palautumattomat framet"
+            "value" : "Vialliset framet"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Images irrécupérables"
+            "value" : "Images cassées"
           }
         },
         "hr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Neoporavljivi kadrovi"
+            "value" : "Oštećeni kadrovi"
           }
         },
         "hu" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Helyreállíthatatlan képkockák"
+            "value" : "Hibás képkockák"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Frame irrecuperabili"
+            "value" : "Frame corrotti"
           }
         },
         "ja" : {
@@ -27886,67 +27886,67 @@
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ugjenopprettelige frames"
+            "value" : "Defekte frames"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Onherstelbare frames"
+            "value" : "Defecte frames"
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nienaprawialne klatki"
+            "value" : "Błędne klatki"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Quadros irrecuperáveis"
+            "value" : "Quadros com erro"
           }
         },
         "pt-PT" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Fotogramas irrecuperáveis"
+            "value" : "Imagens com erro"
           }
         },
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cadre nerecuperabile"
+            "value" : "Cadre corupte"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Невосстановимые кадры"
+            "value" : "Битые кадры"
           }
         },
         "sk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Neopraviteľné snímky"
+            "value" : "Chybné snímky"
           }
         },
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Oreparerbara frames"
+            "value" : "Trasiga frames"
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Kurtarılamayan Kareler"
+            "value" : "Bozuk Kareler"
           }
         },
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Невідновлювані кадри"
+            "value" : "Биті кадри"
           }
         },
         "zh-Hans" : {
