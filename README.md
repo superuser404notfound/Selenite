@@ -73,7 +73,7 @@ Off, Compact (a pill in the corner) or Full: resolution, frame rate, display and
 
 ### Languages
 
-26 languages, the same set as [Sodalite](https://github.com/superuser404notfound/Sodalite): English, German, French, Spanish, Italian, Dutch, Portuguese (Brazil and Portugal), Danish, Swedish, Norwegian, Finnish, Polish, Czech, Slovak, Hungarian, Croatian, Romanian, Greek, Russian, Ukrainian, Turkish, Japanese, Korean and Chinese (Simplified and Traditional).
+26 languages: English, German, French, Spanish, Italian, Dutch, Portuguese (Brazil and Portugal), Danish, Swedish, Norwegian, Finnish, Polish, Czech, Slovak, Hungarian, Croatian, Romanian, Greek, Russian, Ukrainian, Turkish, Japanese, Korean and Chinese (Simplified and Traditional).
 
 ### Privacy
 
