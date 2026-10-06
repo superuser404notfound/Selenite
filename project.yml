@@ -11,6 +11,8 @@ settings:
     CURRENT_PROJECT_VERSION: "1"
     SWIFT_VERSION: "6.0"
     CODE_SIGN_STYLE: Automatic
+    SWIFT_EMIT_LOC_STRINGS: YES
+    LOCALIZATION_PREFERS_STRING_CATALOGS: YES
 packages:
   SeleniteKit:
     path: SeleniteKit

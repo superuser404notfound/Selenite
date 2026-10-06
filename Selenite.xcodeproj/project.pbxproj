@@ -16,6 +16,7 @@
 		2AE22CE80612451ABCAB7F32 /* WakePanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37C8DEC225845017D34A9385 /* WakePanel.swift */; };
 		2D58FEC6AFD4831CD4B29071 /* InputKit in Frameworks */ = {isa = PBXBuildFile; productRef = 22C051D647308BA6DDCFF816 /* InputKit */; };
 		3444C9834442D162D4AFDEE1 /* StreamCoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10D449D417CA0BAC6F70C675 /* StreamCoverView.swift */; };
+		35BB8915D007AEF4D635A279 /* InfoPlist.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 8A65A84DB00403A334CF0C5C /* InfoPlist.xcstrings */; };
 		37E4DAF36DD2A84FC1F1BFD5 /* StreamLoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA2DB4429BE59BAC3854583B /* StreamLoadingView.swift */; };
 		42F2F727BE695487B17FC82D /* ColorTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29084BD577B639C217599362 /* ColorTheme.swift */; };
 		4722FE1A787E162F5C3448F6 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB1D9C38AA34B31FFCA5FA32 /* RootView.swift */; };
@@ -75,6 +76,7 @@
 		5A08B86762A14C1761374B9D /* HostSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostSettingsView.swift; sourceTree = "<group>"; };
 		68830DDB57D3AA87AD8A38C6 /* FailureText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FailureText.swift; sourceTree = "<group>"; };
 		7BE0886C65B71808D997F30A /* AppTile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTile.swift; sourceTree = "<group>"; };
+		8A65A84DB00403A334CF0C5C /* InfoPlist.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = InfoPlist.xcstrings; sourceTree = "<group>"; };
 		95FB195CF38E94D64367E7C8 /* MenuPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuPresentation.swift; sourceTree = "<group>"; };
 		A81EDC7452537FA8570F814B /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		A94CE08B4C9A3E680A947E22 /* ErrorPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorPanel.swift; sourceTree = "<group>"; };
@@ -127,6 +129,7 @@
 			isa = PBXGroup;
 			children = (
 				B2E3997C9A5DCCC491590535 /* Info.plist */,
+				8A65A84DB00403A334CF0C5C /* InfoPlist.xcstrings */,
 				12D1C745A4359BA90A9D9162 /* Localizable.xcstrings */,
 				C17D93938F3EF35FC7048224 /* SeleniteApp.swift */,
 				C3C1E8BF29C70C40301DA001 /* App */,
@@ -272,7 +275,32 @@
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				Base,
+				cs,
+				da,
+				de,
+				el,
 				en,
+				es,
+				fi,
+				fr,
+				hr,
+				hu,
+				it,
+				ja,
+				ko,
+				nb,
+				nl,
+				pl,
+				"pt-BR",
+				"pt-PT",
+				ro,
+				ru,
+				sk,
+				sv,
+				tr,
+				uk,
+				"zh-Hans",
+				"zh-Hant",
 			);
 			mainGroup = DD117898FE65DFBA59087221;
 			minimizedProjectReferenceProxies = 1;
@@ -294,6 +322,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				35BB8915D007AEF4D635A279 /* InfoPlist.xcstrings in Resources */,
 				81B8795B97796488DA74FFC8 /* Localizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -417,6 +446,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MARKETING_VERSION = 0.1.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -424,6 +454,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = appletvos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 6.0;
 				TVOS_DEPLOYMENT_TARGET = 26.0;
@@ -495,12 +526,14 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MARKETING_VERSION = 0.1.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = appletvos;
 				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 6.0;
 				TVOS_DEPLOYMENT_TARGET = 26.0;
