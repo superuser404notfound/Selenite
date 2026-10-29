@@ -186,17 +186,26 @@ private struct AddHostCard: View {
 private struct AppSection: View {
     @Environment(AppModel.self) private var model
 
-    // Adaptive, not a fixed column count: six fixed-width columns plus their gaps and padding
-    // (1740pt) exceed the width left after the page's own horizontal padding and the tvOS safe
-    // area (about 1580pt), which pushed the whole page's content wider than the screen. The
-    // columns take as many as fit and share the rest; each tile sits centered in its column.
+    // Fixed-width columns with the recents row's 48pt gap, as many as the measured width holds,
+    // left-aligned: adaptive columns shared the leftover width and centered each tile in its
+    // column, so the grid's edge inset and gaps drifted from the recents row above it.
+    @State private var columnCount = 1
+    private static let gap: CGFloat = 48
+    private static let inset: CGFloat = 30
+
     private var columns: [GridItem] {
-        [GridItem(.adaptive(minimum: AppTile.size.width), spacing: 48, alignment: .center)]
+        Array(repeating: GridItem(.fixed(AppTile.size.width), spacing: Self.gap, alignment: .leading),
+              count: columnCount)
     }
 
     var body: some View {
         if let snapshot = model.selectedHost {
             content(for: snapshot)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { width in
+                    let usable = width - 2 * Self.inset + Self.gap
+                    columnCount = max(1, Int(usable / (AppTile.size.width + Self.gap)))
+                }
                 .task(id: "\(snapshot.id)|\(String(describing: snapshot.status))") {
                     await model.loadApps(for: snapshot)
                 }
@@ -207,14 +216,14 @@ private struct AppSection: View {
     private func content(for snapshot: HostSnapshot) -> some View {
         let apps = model.catalog.apps[snapshot.id] ?? []
         if snapshot.status == .offline && HostWaker.canWake(snapshot.host) && !apps.isEmpty {
-            LazyVGrid(columns: columns, alignment: .center, spacing: 56) {
+            LazyVGrid(columns: columns, alignment: .leading, spacing: 56) {
                 ForEach(apps) { app in
                     AppTile(host: snapshot.host, app: app, isRunning: false, isDimmed: true) {
                         model.appSelected(app)
                     }
                 }
             }
-            .padding(30)
+            .padding(Self.inset)
         } else if snapshot.status == .offline {
             notice(systemImage: "wifi.slash", text: Text("\(snapshot.host.name) is offline."))
         } else if apps.isEmpty && model.catalog.failedHosts.contains(snapshot.id) {
@@ -223,7 +232,7 @@ private struct AppSection: View {
             ProgressView()
                 .frame(maxWidth: .infinity, minHeight: 400)
         } else {
-            LazyVGrid(columns: columns, alignment: .center, spacing: 56) {
+            LazyVGrid(columns: columns, alignment: .leading, spacing: 56) {
                 ForEach(apps) { app in
                     let isRunning = app.id == snapshot.currentGame
                     AppTile(host: snapshot.host, app: app, isRunning: isRunning,
@@ -232,7 +241,7 @@ private struct AppSection: View {
                     }
                 }
             }
-            .padding(30)
+            .padding(Self.inset)
         }
     }
 
