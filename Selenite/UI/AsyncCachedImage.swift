@@ -13,6 +13,17 @@ struct AsyncCachedImage<Content: View, Placeholder: View>: View {
 
     @State private var loaded: UIImage?
 
+    init(key: String, load: @escaping @MainActor () async -> Data?,
+         @ViewBuilder content: @escaping (Image) -> Content,
+         @ViewBuilder placeholder: @escaping () -> Placeholder) {
+        self.key = key
+        self.load = load
+        self.content = content
+        self.placeholder = placeholder
+        // A cached image shows on the first frame instead of after a placeholder frame.
+        _loaded = State(initialValue: ImageCache.shared.image(for: key))
+    }
+
     var body: some View {
         ZStack {
             if let loaded {
