@@ -13,8 +13,10 @@ struct RecentsRow: View {
                 Text("Recently played")
                     .font(.title3)
                     .fontWeight(.bold)
+                // Eager stack (at most RecentsStore.limit tiles): a lazy one built tiles only as they
+                // crossed the scroll view's edge, so they popped instead of peeking into the margin.
                 ScrollView(.horizontal) {
-                    LazyHStack(spacing: 48) {
+                    HStack(spacing: 48) {
                         ForEach(entries) { entry in
                             if let snapshot = model.directory.snapshot(id: entry.hostID) {
                                 let isRunning = snapshot.currentGame == entry.app.id

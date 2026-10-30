@@ -67,8 +67,10 @@ private struct HostRow: View {
     @FocusState private var focusedHostID: String?
 
     var body: some View {
+        // Eager like the recents row: a lazy stack left the cards past the edge unbuilt, so they
+        // popped in and out instead of peeking into the page margin.
         ScrollView(.horizontal) {
-            LazyHStack(spacing: 40) {
+            HStack(spacing: 40) {
                 ForEach(model.directory.hosts) { snapshot in
                     let isSelected = snapshot.id == model.selectedHost?.id
                     HostCard(snapshot: snapshot, isSelected: isSelected,
