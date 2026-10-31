@@ -65,6 +65,7 @@ private struct HostRow: View {
     let focusScope: Namespace.ID
     @Binding var hostForSettings: PairedHost?
     @FocusState private var focusedHostID: String?
+    @State private var leading = AppTile.Columns.inset
 
     var body: some View {
         // Eager like the recents row: a lazy stack left the cards past the edge unbuilt, so they
@@ -100,11 +101,15 @@ private struct HostRow: View {
                 }
             }
             .padding(.vertical, 30)
-            .padding(.horizontal, 12)
+            // Starts and ends at the app grid's column edges, like the recents row.
+            .padding(.horizontal, leading)
         }
         .scrollClipDisabled()
         .defaultFocus($focusedHostID, model.selectedHost?.id, priority: .userInitiated)
         .frame(height: 250)
+        .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { width in
+            leading = AppTile.Columns.leading(in: width)
+        }
     }
 
     /// The last split, only while both of its hosts are still paired.
