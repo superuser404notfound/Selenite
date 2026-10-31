@@ -189,8 +189,8 @@ private struct AppSection: View {
     @Environment(AppModel.self) private var model
 
     // Fixed-width columns with the recents row's 48pt gap, as many as the measured width holds,
-    // left-aligned: adaptive columns shared the leftover width and centered each tile in its
-    // column, so the grid's edge inset and gaps drifted from the recents row above it.
+    // the grid as a whole centered on the page: adaptive columns shared the leftover width and
+    // centered each tile in its column, so the gaps drifted from the recents row above it.
     @State private var columnCount = 1
     private static let gap: CGFloat = 48
     private static let inset: CGFloat = 30
@@ -203,7 +203,7 @@ private struct AppSection: View {
     var body: some View {
         if let snapshot = model.selectedHost {
             content(for: snapshot)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .center)
                 .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { width in
                     let usable = width - 2 * Self.inset + Self.gap
                     columnCount = max(1, Int(usable / (AppTile.size.width + Self.gap)))
