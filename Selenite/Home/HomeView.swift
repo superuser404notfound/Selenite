@@ -65,6 +65,7 @@ private struct HostRow: View {
     let focusScope: Namespace.ID
     @Binding var hostForSettings: PairedHost?
     @FocusState private var focusedHostID: String?
+    @State private var leading = AppTile.Columns.inset
 
     var body: some View {
         // Eager like the recents row: a lazy stack left the cards past the edge unbuilt, so they
@@ -100,11 +101,15 @@ private struct HostRow: View {
                 }
             }
             .padding(.vertical, 30)
-            .padding(.horizontal, 12)
+            // Starts and ends at the app grid's column edges, like the recents row.
+            .padding(.horizontal, leading)
         }
         .scrollClipDisabled()
         .defaultFocus($focusedHostID, model.selectedHost?.id, priority: .userInitiated)
         .frame(height: 250)
+        .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { width in
+            leading = AppTile.Columns.leading(in: width)
+        }
     }
 
     /// The last split, only while both of its hosts are still paired.
@@ -188,26 +193,21 @@ private struct AddHostCard: View {
 private struct AppSection: View {
     @Environment(AppModel.self) private var model
 
-    // Fixed-width columns with the recents row's 48pt gap, as many as the measured width holds,
-    // left-aligned: adaptive columns shared the leftover width and centered each tile in its
-    // column, so the grid's edge inset and gaps drifted from the recents row above it.
-    @State private var columnCount = 1
-    private static let gap: CGFloat = 48
-    private static let inset: CGFloat = 30
+    // Fixed-width columns (`AppTile.Columns`) inset by the same leading edge as the rows above, which
+    // centers the block: the grid itself takes the full width and lays fixed columns out from its
+    // leading edge, so aligning its frame alone moved nothing.
+    @State private var width: CGFloat = 0
 
     private var columns: [GridItem] {
-        Array(repeating: GridItem(.fixed(AppTile.size.width), spacing: Self.gap, alignment: .leading),
-              count: columnCount)
+        Array(repeating: GridItem(.fixed(AppTile.size.width), spacing: AppTile.Columns.gap, alignment: .leading),
+              count: AppTile.Columns.count(in: width))
     }
 
     var body: some View {
         if let snapshot = model.selectedHost {
             content(for: snapshot)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { width in
-                    let usable = width - 2 * Self.inset + Self.gap
-                    columnCount = max(1, Int(usable / (AppTile.size.width + Self.gap)))
-                }
+                .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { width = $0 }
                 .task(id: "\(snapshot.id)|\(String(describing: snapshot.status))") {
                     await model.loadApps(for: snapshot)
                 }
@@ -225,7 +225,8 @@ private struct AppSection: View {
                     }
                 }
             }
-            .padding(Self.inset)
+            .padding(.vertical, AppTile.Columns.inset)
+            .padding(.horizontal, AppTile.Columns.leading(in: width))
         } else if snapshot.status == .offline {
             notice(systemImage: "wifi.slash", text: Text("\(snapshot.host.name) is offline."))
         } else if apps.isEmpty && model.catalog.failedHosts.contains(snapshot.id) {
@@ -243,7 +244,8 @@ private struct AppSection: View {
                     }
                 }
             }
-            .padding(Self.inset)
+            .padding(.vertical, AppTile.Columns.inset)
+            .padding(.horizontal, AppTile.Columns.leading(in: width))
         }
     }
 
