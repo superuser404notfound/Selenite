@@ -9,6 +9,24 @@ import SwiftUI
 struct AppTile: View {
     static let size = CGSize(width: 240, height: 320)
 
+    /// The page's tile columns, shared by the app grid and the recents row so both start at the
+    /// same x: fixed-width tiles 48pt apart, as many as fit inside a 30pt inset, the block centered.
+    enum Columns {
+        static let gap: CGFloat = 48
+        static let inset: CGFloat = 30
+
+        static func count(in width: CGFloat) -> Int {
+            max(1, Int((width - 2 * inset + gap) / (size.width + gap)))
+        }
+
+        /// The inset plus half the width the columns leave over.
+        static func leading(in width: CGFloat) -> CGFloat {
+            let n = CGFloat(count(in: width))
+            let used = n * size.width + (n - 1) * gap
+            return inset + max(0, (width - 2 * inset - used) / 2)
+        }
+    }
+
     let host: PairedHost
     let app: AppEntry
     let isRunning: Bool
