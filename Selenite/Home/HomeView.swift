@@ -193,23 +193,21 @@ private struct AddHostCard: View {
 private struct AppSection: View {
     @Environment(AppModel.self) private var model
 
-    // Fixed-width columns (`AppTile.Columns`), the grid as a whole centered on the page: adaptive
-    // columns shared the leftover width and centered each tile in its column, so the gaps drifted
-    // from the recents row above it.
-    @State private var columnCount = 1
+    // Fixed-width columns (`AppTile.Columns`) inset by the same leading edge as the rows above, which
+    // centers the block: the grid itself takes the full width and lays fixed columns out from its
+    // leading edge, so aligning its frame alone moved nothing.
+    @State private var width: CGFloat = 0
 
     private var columns: [GridItem] {
         Array(repeating: GridItem(.fixed(AppTile.size.width), spacing: AppTile.Columns.gap, alignment: .leading),
-              count: columnCount)
+              count: AppTile.Columns.count(in: width))
     }
 
     var body: some View {
         if let snapshot = model.selectedHost {
             content(for: snapshot)
-                .frame(maxWidth: .infinity, alignment: .center)
-                .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { width in
-                    columnCount = AppTile.Columns.count(in: width)
-                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { width = $0 }
                 .task(id: "\(snapshot.id)|\(String(describing: snapshot.status))") {
                     await model.loadApps(for: snapshot)
                 }
@@ -227,7 +225,8 @@ private struct AppSection: View {
                     }
                 }
             }
-            .padding(AppTile.Columns.inset)
+            .padding(.vertical, AppTile.Columns.inset)
+            .padding(.horizontal, AppTile.Columns.leading(in: width))
         } else if snapshot.status == .offline {
             notice(systemImage: "wifi.slash", text: Text("\(snapshot.host.name) is offline."))
         } else if apps.isEmpty && model.catalog.failedHosts.contains(snapshot.id) {
@@ -245,7 +244,8 @@ private struct AppSection: View {
                     }
                 }
             }
-            .padding(AppTile.Columns.inset)
+            .padding(.vertical, AppTile.Columns.inset)
+            .padding(.horizontal, AppTile.Columns.leading(in: width))
         }
     }
 
